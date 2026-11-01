@@ -59,6 +59,21 @@ jobs:
           test -s "$GITHUB_WORKSPACE/upload-key.jks"
           echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/upload-key.jks" >> "$GITHUB_ENV"
 
+      # The project intentionally uses a repository-root debug.keystore for debugConfig.
+      # Recreate the standard non-production Android debug key on the ephemeral CI runner.
+      - name: Prepare debug signing
+        if: env.IS_RELEASE != 'true'
+        run: |
+          keytool -genkeypair -v \
+            -keystore "$GITHUB_WORKSPACE/debug.keystore" \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
       - name: Run tests and build debug APK
         if: env.IS_RELEASE != 'true'
         run: gradle :app:testDebugUnitTest :app:assembleDebug
