@@ -38,6 +38,7 @@ fun MultiTrackTimeline(
     onSelectLine: (String?) -> Unit,
     onSeek: (Long) -> Unit,
     onNudge: (Long) -> Unit,
+    onMoveLine: (Long) -> Unit,
     onAdjustDuration: (Long) -> Unit,
     onTextChange: (String, String) -> Unit,
     onAddLine: () -> Unit,
@@ -185,7 +186,7 @@ fun MultiTrackTimeline(
                         selectedLineId = selectedLineId,
                         pxPerMs = pxPerMs,
                         onSelectLine = onSelectLine,
-                        onMoveLine = onNudge,
+                        onMoveLine = onMoveLine,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp)
