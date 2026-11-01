@@ -51,6 +51,7 @@ fun MultiTrackTimeline(
     val totalTimelineWidthDp = ((project.durationMs * pxPerMs)).dp.coerceAtLeast(360.dp)
 
     val scrollState = rememberScrollState()
+    var editingLineId by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = modifier
@@ -186,6 +187,10 @@ fun MultiTrackTimeline(
                         selectedLineId = selectedLineId,
                         pxPerMs = pxPerMs,
                         onSelectLine = onSelectLine,
+                        onEditLine = { id ->
+                            onSelectLine(id)
+                            editingLineId = id
+                        },
                         onMoveLine = onMoveLine,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -240,19 +245,37 @@ fun MultiTrackTimeline(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    OutlinedTextField(
-                        value = selectedLine?.text.orEmpty(),
-                        onValueChange = { text -> selectedLine?.let { onTextChange(it.id, text) } },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp),
-                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary),
-                        placeholder = { Text("Edit lyric text", fontSize = 12.sp) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = NeonCyan,
-                            unfocusedBorderColor = StudioCardBorder,
-                            cursorColor = NeonCyan
+                    if (selectedLine != null && editingLineId == selectedLine.id) {
+                        OutlinedTextField(
+                            value = selectedLine.text,
+                            onValueChange = { text -> onTextChange(selectedLine.id, text) },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp).testTag("lyric_inline_editor"),
+                            textStyle = LocalTextStyle.current.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary),
+                            placeholder = { Text("Edit lyric text", fontSize = 12.sp) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = NeonCyan,
+                                unfocusedBorderColor = StudioCardBorder,
+                                cursorColor = NeonCyan
+                            )
                         )
-                    )
+                        TextButton(onClick = { editingLineId = null }, contentPadding = PaddingValues(horizontal = 4.dp)) {
+                            Text("Done", color = NeonCyan, fontSize = 11.sp)
+                        }
+                    } else {
+                        Text(
+                            text = selectedLine?.text ?: "Selected Line",
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                selectedLine?.let { editingLineId = it.id }
+                            },
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text("Double tap lyric block to edit", fontSize = 10.sp, color = TextSecondary)
+                    }
                     Text(
                         text = "${formatMs(selectedLine?.startMs ?: 0L)} → ${formatMs(selectedLine?.endMs ?: 0L)} (${selectedLine?.durationMs ?: 0L}ms)",
                         fontSize = 11.sp,
@@ -405,6 +428,7 @@ private fun LyricsTrackRow(
     selectedLineId: String?,
     pxPerMs: Float,
     onSelectLine: (String) -> Unit,
+    onEditLine: (String) -> Unit,
     onMoveLine: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -439,7 +463,12 @@ private fun LyricsTrackRow(
                         color = if (isSelected) NeonCyan else Color.White.copy(alpha = 0.2f),
                         shape = RoundedCornerShape(6.dp)
                     )
-                    .clickable { onSelectLine(line.id) }
+                    .pointerInput(line.id) {
+                        detectTapGestures(
+                            onTap = { onSelectLine(line.id) },
+                            onDoubleTap = { onEditLine(line.id) }
+                        )
+                    }
                     .pointerInput(line.id, pxPerMs) {
                         var dragRemainderPx = 0f
                         detectDragGestures(
