@@ -110,7 +110,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
             val old = currentLyrics[index]
             val newStart = (old.startMs + deltaMs).coerceAtLeast(0L)
             val newEnd = (old.endMs + deltaMs).coerceAtLeast(newStart + 200L)
-            currentLyrics[index] = PresetLibrary.createLyricLineWithWords(old.text, newStart, newEnd)
+            currentLyrics[index] = rebuildLyricLine(old, old.text, newStart, newEnd)
             _project.value = _project.value.copy(lyrics = currentLyrics.sortedBy { it.startMs })
             audioEngine.seekTo(newStart)
         }
@@ -123,7 +123,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         if (index != -1) {
             val old = currentLyrics[index]
             val newEnd = (old.endMs + deltaMs).coerceAtLeast(old.startMs + 300L)
-            currentLyrics[index] = PresetLibrary.createLyricLineWithWords(old.text, old.startMs, newEnd)
+            currentLyrics[index] = rebuildLyricLine(old, old.text, old.startMs, newEnd)
             _project.value = _project.value.copy(lyrics = currentLyrics)
         }
     }
@@ -133,7 +133,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         val index = currentLyrics.indexOfFirst { it.id == id }
         if (index != -1) {
             val old = currentLyrics[index]
-            currentLyrics[index] = PresetLibrary.createLyricLineWithWords(newText, old.startMs, old.endMs)
+            currentLyrics[index] = rebuildLyricLine(old, newText, old.startMs, old.endMs)
             _project.value = _project.value.copy(lyrics = currentLyrics)
         }
     }
@@ -162,6 +162,18 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         val currentLyrics = _project.value.lyrics.filterNot { it.id == id }
         _project.value = _project.value.copy(lyrics = currentLyrics)
         _selectedLineId.value = currentLyrics.firstOrNull()?.id
+    }
+
+    private fun rebuildLyricLine(old: LyricLine, text: String, startMs: Long, endMs: Long): LyricLine {
+        val tokens = text.trim().split(Regex("\\\\s+")).filter { it.isNotBlank() }
+        val duration = (endMs - startMs).coerceAtLeast(100L)
+        val step = if (tokens.isEmpty()) 0L else duration / tokens.size
+        val words = tokens.mapIndexed { index, token ->
+            val wordStart = startMs + index * step
+            val wordEnd = if (index == tokens.lastIndex) endMs else wordStart + step
+            LyricWord(text = token, startMs = wordStart, endMs = wordEnd)
+        }
+        return old.copy(text = text, startMs = startMs, endMs = endMs, words = words)
     }
 
     // --- Tap-To-Sync Workflow ---
