@@ -256,6 +256,7 @@ private fun StudioTopAppBar(
     onOpenExport: () -> Unit
 ) {
     Surface(
+        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
         color = StudioSurface,
         border = androidx.compose.foundation.BorderStroke(1.dp, StudioCardBorder)
     ) {
