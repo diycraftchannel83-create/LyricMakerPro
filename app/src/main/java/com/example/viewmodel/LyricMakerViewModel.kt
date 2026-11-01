@@ -165,7 +165,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     private fun rebuildLyricLine(old: LyricLine, text: String, startMs: Long, endMs: Long): LyricLine {
-        val tokens = text.trim().split(Regex("\\\\s+")).filter { it.isNotBlank() }
+        val tokens = text.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
         val duration = (endMs - startMs).coerceAtLeast(100L)
         val step = if (tokens.isEmpty()) 0L else duration / tokens.size
         val words = tokens.mapIndexed { index, token ->
