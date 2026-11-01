@@ -151,6 +151,7 @@ class MainActivity : ComponentActivity() {
                                         onSeek = { viewModel.audioEngine.seekTo(it) },
                                         onNudge = { viewModel.nudgeSelectedLyric(it) },
                                         onAdjustDuration = { viewModel.updateSelectedLyricDuration(it) },
+                                        onTextChange = { id, text -> viewModel.updateLyricText(id, text) },
                                         onAddLine = { viewModel.addLyricLine() },
                                         onDeleteLine = { viewModel.deleteSelectedLyric() },
                                         onOpenTapToSync = { viewModel.startTapToSync() }
@@ -188,6 +189,7 @@ class MainActivity : ComponentActivity() {
                                     onSeek = { viewModel.audioEngine.seekTo(it) },
                                     onNudge = { viewModel.nudgeSelectedLyric(it) },
                                     onAdjustDuration = { viewModel.updateSelectedLyricDuration(it) },
+                                        onTextChange = { id, text -> viewModel.updateLyricText(id, text) },
                                     onAddLine = { viewModel.addLyricLine() },
                                     onDeleteLine = { viewModel.deleteSelectedLyric() },
                                     onOpenTapToSync = { viewModel.startTapToSync() }
