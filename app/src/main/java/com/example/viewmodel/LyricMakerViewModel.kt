@@ -116,6 +116,19 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    fun moveSelectedLyric(deltaMs: Long) {
+        val id = _selectedLineId.value ?: return
+        val currentLyrics = _project.value.lyrics.toMutableList()
+        val index = currentLyrics.indexOfFirst { it.id == id }
+        if (index != -1) {
+            val old = currentLyrics[index]
+            val newStart = (old.startMs + deltaMs).coerceAtLeast(0L)
+            val newEnd = (old.endMs + deltaMs).coerceAtLeast(newStart + 200L)
+            currentLyrics[index] = rebuildLyricLine(old, old.text, newStart, newEnd)
+            _project.value = _project.value.copy(lyrics = currentLyrics.sortedBy { it.startMs })
+        }
+    }
+
     fun updateSelectedLyricDuration(deltaMs: Long) {
         val id = _selectedLineId.value ?: return
         val currentLyrics = _project.value.lyrics.toMutableList()
