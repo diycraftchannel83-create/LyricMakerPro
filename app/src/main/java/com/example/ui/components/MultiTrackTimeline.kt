@@ -39,6 +39,7 @@ fun MultiTrackTimeline(
     onSeek: (Long) -> Unit,
     onNudge: (Long) -> Unit,
     onAdjustDuration: (Long) -> Unit,
+    onTextChange: (String, String) -> Unit,
     onAddLine: () -> Unit,
     onDeleteLine: () -> Unit,
     onOpenTapToSync: () -> Unit,
@@ -184,6 +185,7 @@ fun MultiTrackTimeline(
                         selectedLineId = selectedLineId,
                         pxPerMs = pxPerMs,
                         onSelectLine = onSelectLine,
+                        onMoveLine = onNudge,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp)
@@ -237,13 +239,18 @@ fun MultiTrackTimeline(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = selectedLine?.text ?: "Selected Line",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                    OutlinedTextField(
+                        value = selectedLine?.text.orEmpty(),
+                        onValueChange = { text -> selectedLine?.let { onTextChange(it.id, text) } },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp),
+                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary),
+                        placeholder = { Text("Edit lyric text", fontSize = 12.sp) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NeonCyan,
+                            unfocusedBorderColor = StudioCardBorder,
+                            cursorColor = NeonCyan
+                        )
                     )
                     Text(
                         text = "${formatMs(selectedLine?.startMs ?: 0L)} → ${formatMs(selectedLine?.endMs ?: 0L)} (${selectedLine?.durationMs ?: 0L}ms)",
@@ -397,6 +404,7 @@ private fun LyricsTrackRow(
     selectedLineId: String?,
     pxPerMs: Float,
     onSelectLine: (String) -> Unit,
+    onMoveLine: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -431,6 +439,21 @@ private fun LyricsTrackRow(
                         shape = RoundedCornerShape(6.dp)
                     )
                     .clickable { onSelectLine(line.id) }
+                    .pointerInput(line.id, pxPerMs) {
+                        var dragRemainderPx = 0f
+                        detectDragGestures(
+                            onDragStart = { onSelectLine(line.id) },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                dragRemainderPx += dragAmount.x
+                                val deltaMs = (dragRemainderPx / pxPerMs).toLong()
+                                if (deltaMs != 0L) {
+                                    onMoveLine(deltaMs)
+                                    dragRemainderPx -= deltaMs * pxPerMs
+                                }
+                            }
+                        )
+                    }
                     .padding(horizontal = 6.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
