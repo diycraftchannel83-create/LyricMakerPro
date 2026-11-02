@@ -560,7 +560,7 @@ private fun StudioTopAppBar(
             title = { Text("Language", color = TextPrimary, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    listOf("English", "Bahasa Indonesia").forEach { language ->
+                    listOf("English").forEach { language ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
