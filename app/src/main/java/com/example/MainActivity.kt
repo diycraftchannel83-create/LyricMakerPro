@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import coil.compose.AsyncImage
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -504,18 +505,15 @@ private fun StudioTopAppBar(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(40.dp)
                         .clickable { menuExpanded = true }
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(ElectricPurple)
-                        .border(1.dp, NeonCyan, RoundedCornerShape(8.dp)),
+                        .clip(RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.MusicVideo,
-                        contentDescription = "Open application menu",
-                        tint = NeonCyan,
-                        modifier = Modifier.size(20.dp)
+                    AsyncImage(
+                        model = R.drawable.lyricmakepro_ico,
+                        contentDescription = "LyricMakerPro logo",
+                        modifier = Modifier.fillMaxSize()
                     )
                     DropdownMenu(
                         expanded = menuExpanded,
