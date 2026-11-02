@@ -1,4 +1,4 @@
-package com.example.ui.components
+package com.winsmediatama.lyricmakerpro.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -16,10 +16,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.CanvasRatio
-import com.example.model.ExportQuality
-import com.example.model.VideoProject
-import com.example.ui.theme.*
+import com.winsmediatama.lyricmakerpro.model.CanvasRatio
+import com.winsmediatama.lyricmakerpro.model.ExportQuality
+import com.winsmediatama.lyricmakerpro.model.VideoProject
+import com.winsmediatama.lyricmakerpro.ui.theme.*
 import java.io.File
 
 @Composable
@@ -213,7 +213,7 @@ fun ExportDialog(
             } else if (!isExporting) {
                 Button(
                     onClick = { onStartExport(selectedQuality, selectedDurationSec) },
-                    enabled = project.audioTrack.beatType == com.example.model.AudioBeatType.CUSTOM_FILE && project.durationMs > 0L,
+                    enabled = project.audioTrack.beatType == com.winsmediatama.lyricmakerpro.model.AudioBeatType.CUSTOM_FILE && project.durationMs > 0L,
                     colors = ButtonDefaults.buttonColors(containerColor = NeonMagenta),
                     modifier = Modifier.testTag("start_export_button")
                 ) {
