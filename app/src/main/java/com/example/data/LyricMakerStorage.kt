@@ -27,7 +27,7 @@ object LyricMakerStorage {
 
     fun saveProject(context: Context, project: VideoProject, projectName: String = project.title): Uri {
         val name = "${safeName(projectName)}_${timestamp()}.lyricmaker.json"
-        return saveText(context, name, "application/json", "$ROOT/Project", ProjectFileCodec.encode(project))
+        return saveText(context, name, "application/json", "$ROOT/Project", ProjectFileCodec.encode(project.copy(title = projectName.trim())))
     }
 
     fun saveLrc(context: Context, project: VideoProject): Uri {
