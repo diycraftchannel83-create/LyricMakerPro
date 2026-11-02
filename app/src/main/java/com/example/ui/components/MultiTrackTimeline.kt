@@ -39,6 +39,7 @@ fun MultiTrackTimeline(
     onSeek: (Long) -> Unit,
     onNudge: (Long) -> Unit,
     onMoveLine: (Long) -> Unit,
+    onAdjustStart: (Long) -> Unit,
     onAdjustDuration: (Long) -> Unit,
     onTextChange: (String, String) -> Unit,
     onAddLine: () -> Unit,
@@ -191,7 +192,8 @@ fun MultiTrackTimeline(
                             onSelectLine(id)
                             editingLineId = id
                         },
-                        onMoveLine = onMoveLine,
+                        onAdjustStart = onAdjustStart,
+                        onAdjustDuration = onAdjustDuration,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp)
@@ -378,7 +380,8 @@ private fun LyricsTrackRow(
     pxPerMs: Float,
     onSelectLine: (String) -> Unit,
     onEditLine: (String) -> Unit,
-    onMoveLine: (Long) -> Unit,
+    onAdjustStart: (Long) -> Unit,
+    onAdjustDuration: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -418,23 +421,8 @@ private fun LyricsTrackRow(
                             onDoubleTap = { onEditLine(line.id) }
                         )
                     }
-                    .pointerInput(line.id, pxPerMs) {
-                        var dragRemainderPx = 0f
-                        detectDragGestures(
-                            onDragStart = { onSelectLine(line.id) },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                dragRemainderPx += dragAmount.x
-                                val deltaMs = (dragRemainderPx / pxPerMs).toLong()
-                                if (deltaMs != 0L) {
-                                    onMoveLine(deltaMs)
-                                    dragRemainderPx -= deltaMs * pxPerMs
-                                }
-                            }
-                        )
-                    }
-                    .padding(horizontal = 6.dp),
-                contentAlignment = Alignment.CenterStart
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = line.text,
@@ -442,8 +430,63 @@ private fun LyricsTrackRow(
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
                 )
+
+                // Left trim handle: adjusts the lyric start while keeping its end fixed.
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .width(16.dp)
+                        .fillMaxHeight()
+                        .background(NeonCyan.copy(alpha = 0.9f), RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp))
+                        .pointerInput(line.id, pxPerMs) {
+                            var remainder = 0f
+                            detectDragGestures(
+                                onDragStart = { onSelectLine(line.id) },
+                                onDrag = { change, amount ->
+                                    change.consume()
+                                    remainder += amount.x
+                                    val delta = (remainder / pxPerMs).toLong()
+                                    if (delta != 0L) {
+                                        onAdjustStart(delta)
+                                        remainder -= delta * pxPerMs
+                                    }
+                                }
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(Modifier.width(2.dp).fillMaxHeight(0.55f).background(Color.White, CircleShape))
+                }
+
+                // Right trim handle: adjusts the lyric end while keeping its start fixed.
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .width(16.dp)
+                        .fillMaxHeight()
+                        .background(NeonCyan.copy(alpha = 0.9f), RoundedCornerShape(topEnd = 6.dp, bottomEnd = 6.dp))
+                        .pointerInput(line.id, pxPerMs) {
+                            var remainder = 0f
+                            detectDragGestures(
+                                onDragStart = { onSelectLine(line.id) },
+                                onDrag = { change, amount ->
+                                    change.consume()
+                                    remainder += amount.x
+                                    val delta = (remainder / pxPerMs).toLong()
+                                    if (delta != 0L) {
+                                        onAdjustDuration(delta)
+                                        remainder -= delta * pxPerMs
+                                    }
+                                }
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(Modifier.width(2.dp).fillMaxHeight(0.55f).background(Color.White, CircleShape))
+                }
             }
         }
     }
