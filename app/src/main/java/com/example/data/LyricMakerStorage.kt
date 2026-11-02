@@ -25,17 +25,18 @@ object LyricMakerStorage {
 
     private fun timestamp(): String = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
 
-    fun saveProject(context: Context, project: VideoProject): Uri {
-        val name = "${safeName(project.title)}_${timestamp()}.lyricmaker.json"
+    fun saveProject(context: Context, project: VideoProject, projectName: String = project.title): Uri {
+        val name = "${safeName(projectName)}_${timestamp()}.lyricmaker.json"
         return saveText(context, name, "application/json", "$ROOT/Project", ProjectFileCodec.encode(project))
     }
 
     fun saveLrc(context: Context, project: VideoProject): Uri {
-        val name = "${safeName(project.title)}_${timestamp()}.lrc"
+        val songTitle = project.audioTrack.title.takeIf { it.isNotBlank() && it != "No audio" } ?: project.title
+        val name = "${safeName(songTitle)}.lrc"
         val content = project.lyrics.sortedBy { it.startMs }.joinToString("\n") { line ->
             "[${formatLrcTime(line.startMs)}]${line.text}"
         }
-        return saveText(context, name, "application/x-subrip", "$ROOT/LrcLyric", content + "\n")
+        return saveText(context, name, "text/plain", "$ROOT/LrcLyric", content + "\n")
     }
 
     private fun formatLrcTime(ms: Long): String {
