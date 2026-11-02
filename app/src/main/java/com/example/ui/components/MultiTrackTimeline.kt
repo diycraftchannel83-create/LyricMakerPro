@@ -1,4 +1,4 @@
-package com.example.ui.components
+package com.winsmediatama.lyricmakerpro.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -27,11 +27,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.LyricLine
-import com.example.model.MediaClip
-import com.example.model.MediaClipType
-import com.example.model.VideoProject
-import com.example.ui.theme.*
+import com.winsmediatama.lyricmakerpro.model.LyricLine
+import com.winsmediatama.lyricmakerpro.model.MediaClip
+import com.winsmediatama.lyricmakerpro.model.MediaClipType
+import com.winsmediatama.lyricmakerpro.model.VideoProject
+import com.winsmediatama.lyricmakerpro.ui.theme.*
 
 @Composable
 fun MultiTrackTimeline(
