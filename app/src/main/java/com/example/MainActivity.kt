@@ -496,7 +496,7 @@ private fun StudioTopAppBar(
     var selectedLanguage by remember { mutableStateOf(preferences.getString("interface_language", "English") ?: "English") }
     SideEffect { AppLanguage.current = selectedLanguage }
     fun selectLanguage(language: String) {
-        selectLanguage(language)
+        selectedLanguage = language
         preferences.edit().putString("interface_language", language).apply()
         AppLanguage.current = language
     }
@@ -587,11 +587,11 @@ private fun StudioTopAppBar(
                         DropdownMenuItem(
                             text = { Text(tr("About")) },
                             leadingIcon = { Icon(Icons.Default.Info, null) },
-                            onClick = { menuExpanded = false }
+                            onClick = { menuExpanded = false; aboutDialog = true }
                         )
                         HorizontalDivider(color = StudioCardBorder)
                         DropdownMenuItem(
-                            text = { Text("Exit", color = Color(0xFFFF5370)) },
+                            text = { Text(tr("Exit"), color = Color(0xFFFF5370)) },
                             leadingIcon = { Icon(Icons.Default.ExitToApp, null, tint = Color(0xFFFF5370)) },
                             onClick = {
                                 menuExpanded = false
@@ -640,7 +640,7 @@ private fun StudioTopAppBar(
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        text = "Export",
+                        text = tr("Export"),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -662,7 +662,7 @@ private fun StudioTopAppBar(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    selectedLanguage = language
+                                    selectLanguage(language)
                                     languageDialog = false
                                 }
                                 .padding(vertical = 8.dp),
@@ -671,7 +671,7 @@ private fun StudioTopAppBar(
                             RadioButton(
                                 selected = selectedLanguage == language,
                                 onClick = {
-                                    selectedLanguage = language
+                                    selectLanguage(language)
                                     languageDialog = false
                                 },
                                 colors = RadioButtonDefaults.colors(selectedColor = NeonCyan)
