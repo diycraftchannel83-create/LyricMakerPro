@@ -11,13 +11,16 @@ import org.junit.Test
 class LyricMakerUnitTest {
 
     @Test
-    fun defaultProject_hasValidLyricsAndAudio() {
+    fun defaultProject_startsCleanWithoutLyricsOrAudio() {
         val project = PresetLibrary.createDefaultProject()
         assertNotNull(project)
-        assertFalse(project.lyrics.isEmpty())
-        assertTrue(project.durationMs > 0)
+        assertTrue(project.lyrics.isEmpty())
+        assertEquals(0L, project.durationMs)
         assertNotNull(project.audioTrack)
-        assertTrue(project.audioTrack.bpm in 60..180)
+        assertEquals(com.example.model.AudioBeatType.NONE, project.audioTrack.beatType)
+        assertNull(project.audioTrack.customUri)
+        assertTrue(project.audioTrack.waveformPeaks.isEmpty())
+        assertEquals("Untitled Project", project.title)
     }
 
     @Test
