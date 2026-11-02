@@ -90,9 +90,9 @@ fun MultiTrackTimeline(
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
-                    text = "Multi-Track Timeline",
+                    text = "Timeline",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
+                    fontSize = 12.sp,
                     color = TextPrimary
                 )
             }
@@ -139,9 +139,9 @@ fun MultiTrackTimeline(
                 Button(
                     onClick = onOpenTapToSync,
                     colors = ButtonDefaults.buttonColors(containerColor = NeonMagenta),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 7.dp, vertical = 3.dp),
                     modifier = Modifier
-                        .height(30.dp)
+                        .height(28.dp)
                         .testTag("tap_to_sync_quick_button")
                 ) {
                     Icon(
@@ -151,7 +151,7 @@ fun MultiTrackTimeline(
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(Modifier.width(4.dp))
-                    Text("Tap to Sync", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Sync", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
         }
@@ -168,7 +168,7 @@ fun MultiTrackTimeline(
                 modifier = Modifier
                     .width(totalTimelineWidthDp)
                     .fillMaxHeight()
-                    .pointerInput(project.durationMs) {
+                     .pointerInput(project.durationMs, pxPerMs) {
                         detectTapGestures { offset ->
                             val clickedMs = (offset.x / pxPerMs).toLong().coerceIn(0L, project.durationMs)
                             onSeek(clickedMs)
@@ -196,7 +196,7 @@ fun MultiTrackTimeline(
                              .height(28.dp)
                     )
 
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(2.dp))
 
                     // Track 2: Imported photo/video clips, placed above lyrics.
                     MediaClipsTrackRow(
@@ -212,7 +212,7 @@ fun MultiTrackTimeline(
                             .height(42.dp)
                     )
 
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(2.dp))
 
                     // Track 3: Lyrics Blocks Track
                     LyricsTrackRow(
@@ -232,7 +232,7 @@ fun MultiTrackTimeline(
                              .height(42.dp)
                     )
 
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(2.dp))
 
                     // Track 4: Visualizer & Background Effects Track
                     EffectsTrackRow(
@@ -480,6 +480,8 @@ private fun TimeRuler(
 ) {
     val totalSec = (durationMs / 1000).toInt()
     val majorStep = when {
+        pxPerMs < 0.001f -> 120
+        pxPerMs < 0.002f -> 60
         pxPerMs < 0.004f -> 30
         pxPerMs < 0.012f -> 10
         else -> 5
