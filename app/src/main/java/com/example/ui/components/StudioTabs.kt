@@ -55,7 +55,7 @@ fun StudioTabs(
                 .pointerInput(isExpanded) {
                     var totalDrag = 0f
                     detectVerticalDragGestures(
-                        onDragStart = { totalDrag = 0f },
+                        onDragStart = { _ -> totalDrag = 0f },
                         onVerticalDrag = { change, dragAmount ->
                             change.consume()
                             totalDrag += dragAmount
