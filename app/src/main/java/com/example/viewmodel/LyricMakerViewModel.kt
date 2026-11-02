@@ -413,35 +413,21 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
 
     fun importCustomAudio(uriString: String, fileName: String, durationMs: Long) {
         val safeDurationMs = durationMs.coerceAtLeast(500L)
+        val songTitle = fileName.substringBeforeLast('.', fileName).trim().ifBlank { "Untitled Song" }
         val customTrack = AudioTrackConfig(
-            id = UUID.randomUUID().toString(),
-            title = fileName.ifBlank { "Imported Track" },
-            artist = "Local Device",
-            bpm = 120,
-            durationMs = safeDurationMs,
-            beatType = AudioBeatType.CUSTOM_FILE,
-            customUri = uriString
+            id = UUID.randomUUID().toString(), title = songTitle, artist = "Local Device",
+            bpm = 120, durationMs = safeDurationMs, beatType = AudioBeatType.CUSTOM_FILE, customUri = uriString
         )
-        _project.value = _project.value.copy(audioTrack = customTrack)
+        _project.value = _project.value.copy(title = songTitle, audioTrack = customTrack)
         audioEngine.loadTrack(customTrack)
-
-        // Decode real PCM samples off the UI thread; only apply them if this track
-        // is still selected when extraction completes.
         viewModelScope.launch {
-            val peaks = AudioWaveformExtractor.extract(
-                context = getApplication(),
-                uriString = uriString,
-                durationMs = safeDurationMs
-            )
-            if (peaks.isNotEmpty() && _project.value.audioTrack.id == customTrack.id) {
-                _project.value = _project.value.copy(
-                    audioTrack = _project.value.audioTrack.copy(waveformPeaks = peaks)
-                )
+            val peaks = AudioWaveformExtractor.extractPeaks(getApplication(), uriString)
+            if (_project.value.audioTrack.id == customTrack.id) {
+                _project.value = _project.value.copy(audioTrack = customTrack.copy(waveformPeaks = peaks))
             }
         }
     }
 
-    // --- Export Video Workflow ---
     fun startExport(quality: ExportQuality, durationSec: Int = 15) {
         if (_isExporting.value) return
         audioEngine.pause()
