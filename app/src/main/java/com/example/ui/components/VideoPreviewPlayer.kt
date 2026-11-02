@@ -308,41 +308,42 @@ fun VideoPreviewPlayer(
                 }
 
                 // Imported media is rendered behind the lyric/effect canvas.
-                when (activeMedia?.type) {
-                    MediaClipType.IMAGE -> {
-                        AsyncImage(
-                            model = Uri.parse(activeMedia.uri),
-                            contentDescription = activeMedia.displayName,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                    MediaClipType.VIDEO -> {
-                        key(activeMedia.id) {
-                            AndroidView(
-                                factory = { context ->
-                                    VideoView(context).apply {
-                                        setVideoURI(Uri.parse(activeMedia.uri))
-                                        setOnPreparedListener { player ->
-                                            player.isLooping = true
-                                            seekTo((playheadMs - activeMedia.startMs).toInt().coerceAtLeast(0))
-                                            if (isPlaying) start()
-                                        }
-                                    }
-                                },
-                                update = { player ->
-                                    val target = (playheadMs - activeMedia.startMs).toInt().coerceAtLeast(0)
-                                    if (kotlin.math.abs(player.currentPosition - target) > 700) {
-                                        player.seekTo(target)
-                                    }
-                                    if (isPlaying && !player.isPlaying) player.start()
-                                    if (!isPlaying && player.isPlaying) player.pause()
-                                },
+                if (activeMedia != null) {
+                    when (activeMedia.type) {
+                        MediaClipType.IMAGE -> {
+                            AsyncImage(
+                                model = Uri.parse(activeMedia.uri),
+                                contentDescription = activeMedia.displayName,
+                                contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
+                        MediaClipType.VIDEO -> {
+                            key(activeMedia.id) {
+                                AndroidView(
+                                    factory = { context ->
+                                        VideoView(context).apply {
+                                            setVideoURI(Uri.parse(activeMedia.uri))
+                                            setOnPreparedListener { player ->
+                                                player.isLooping = true
+                                                seekTo((playheadMs - activeMedia.startMs).toInt().coerceAtLeast(0))
+                                                if (isPlaying) start()
+                                            }
+                                        }
+                                    },
+                                    update = { player ->
+                                        val target = (playheadMs - activeMedia.startMs).toInt().coerceAtLeast(0)
+                                        if (kotlin.math.abs(player.currentPosition - target) > 700) {
+                                            player.seekTo(target)
+                                        }
+                                        if (isPlaying && !player.isPlaying) player.start()
+                                        if (!isPlaying && player.isPlaying) player.pause()
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
                     }
-                    null -> Unit
                 }
 
                 // Real-time Canvas Rendering
