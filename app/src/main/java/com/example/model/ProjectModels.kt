@@ -69,7 +69,9 @@ data class TypographyPreset(
     val letterSpacingSp: Float = 1.0f,
     val isBold: Boolean = true,
     val isItalic: Boolean = false,
-    val textAlign: TextAlign = TextAlign.Center
+    val textAlign: TextAlign = TextAlign.Center,
+    val positionXPercent: Float = 50f,
+    val positionYPercent: Float = 56f
 )
 
 data class LyricWord(
