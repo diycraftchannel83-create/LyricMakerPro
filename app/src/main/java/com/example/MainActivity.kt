@@ -5,6 +5,9 @@ import android.media.MediaMetadataRetriever
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.widget.Toast
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -13,6 +16,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +32,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.res.painterResource
+import coil.compose.AsyncImage
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -483,7 +489,18 @@ private fun StudioTopAppBar(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     var languageDialog by remember { mutableStateOf(false) }
-    var selectedLanguage by remember { mutableStateOf("English") }
+    var privacyDialog by remember { mutableStateOf(false) }
+    var aboutDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val preferences = remember { context.getSharedPreferences("lyricmakerpro_settings", android.content.Context.MODE_PRIVATE) }
+    var selectedLanguage by remember { mutableStateOf(preferences.getString("interface_language", "English") ?: "English") }
+    SideEffect { AppLanguage.current = selectedLanguage }
+    fun selectLanguage(language: String) {
+        selectedLanguage = language
+        preferences.edit().putString("interface_language", language).apply()
+        AppLanguage.current = language
+    }
+    fun tr(value: String) = AppLanguage.text(value)
 
     Surface(
         modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
@@ -504,18 +521,15 @@ private fun StudioTopAppBar(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(40.dp)
                         .clickable { menuExpanded = true }
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(ElectricPurple)
-                        .border(1.dp, NeonCyan, RoundedCornerShape(8.dp)),
+                        .clip(RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.MusicVideo,
+                    Image(
+                        painter = painterResource(id = R.drawable.lyricmakepro_ico),
                         contentDescription = "Open application menu",
-                        tint = NeonCyan,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.fillMaxSize()
                     )
                     DropdownMenu(
                         expanded = menuExpanded,
@@ -523,61 +537,61 @@ private fun StudioTopAppBar(
                         modifier = Modifier.widthIn(min = 230.dp).background(StudioSurface)
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Insert Audio") },
+                            text = { Text(tr("Insert Audio")) },
                             leadingIcon = { Icon(Icons.Default.AudioFile, null, tint = NeonCyan) },
                             onClick = { menuExpanded = false; onPickAudio() }
                         )
                         DropdownMenuItem(
-                            text = { Text("Insert Picture") },
+                            text = { Text(tr("Insert Picture")) },
                             leadingIcon = { Icon(Icons.Default.Image, null, tint = NeonCyan) },
                             onClick = { menuExpanded = false; onPickImage() }
                         )
                         DropdownMenuItem(
-                            text = { Text("Insert Video") },
+                            text = { Text(tr("Insert Video")) },
                             leadingIcon = { Icon(Icons.Default.VideoFile, null, tint = NeonMagenta) },
                             onClick = { menuExpanded = false; onPickVideo() }
                         )
                         DropdownMenuItem(
-                            text = { Text("Insert Lyrics (.TXT / .LRC)") },
+                            text = { Text(tr("Insert Lyrics (.TXT / .LRC)")) },
                             leadingIcon = { Icon(Icons.Default.Subtitles, null, tint = NeonCyan) },
                             onClick = { menuExpanded = false; onPickLyrics() }
                         )
                         HorizontalDivider(color = StudioCardBorder)
                         DropdownMenuItem(
-                            text = { Text("Open Project") },
+                            text = { Text(tr("Open Project")) },
                             leadingIcon = { Icon(Icons.Default.FolderOpen, null) },
                             onClick = { menuExpanded = false; onOpenProject() }
                         )
                         DropdownMenuItem(
-                            text = { Text("Save Project") },
+                            text = { Text(tr("Save Project")) },
                             leadingIcon = { Icon(Icons.Default.Save, null) },
                             onClick = { menuExpanded = false; onSaveProject() }
                         )
                         DropdownMenuItem(
-                            text = { Text("Save Lyrics (.LRC)") },
+                            text = { Text(tr("Save Lyrics (.LRC)")) },
                             leadingIcon = { Icon(Icons.Default.Subtitles, null, tint = NeonCyan) },
                             onClick = { menuExpanded = false; onSaveLrc() }
                         )
                         HorizontalDivider(color = StudioCardBorder)
                         DropdownMenuItem(
-                            text = { Text("Privacy Policy") },
+                            text = { Text(tr("Privacy Policy")) },
                             leadingIcon = { Icon(Icons.Default.PrivacyTip, null) },
-                            onClick = { menuExpanded = false }
+                            onClick = { menuExpanded = false; privacyDialog = true }
                         )
                         DropdownMenuItem(
-                            text = { Text("Language  ·  $selectedLanguage") },
+                            text = { Text("${tr("Language")}  ·  $selectedLanguage") },
                             leadingIcon = { Icon(Icons.Default.Language, null, tint = NeonCyan) },
                             trailingIcon = { Icon(Icons.Default.ChevronRight, null) },
                             onClick = { menuExpanded = false; languageDialog = true }
                         )
                         DropdownMenuItem(
-                            text = { Text("About") },
+                            text = { Text(tr("About")) },
                             leadingIcon = { Icon(Icons.Default.Info, null) },
-                            onClick = { menuExpanded = false }
+                            onClick = { menuExpanded = false; aboutDialog = true }
                         )
                         HorizontalDivider(color = StudioCardBorder)
                         DropdownMenuItem(
-                            text = { Text("Exit", color = Color(0xFFFF5370)) },
+                            text = { Text(tr("Exit"), color = Color(0xFFFF5370)) },
                             leadingIcon = { Icon(Icons.Default.ExitToApp, null, tint = Color(0xFFFF5370)) },
                             onClick = {
                                 menuExpanded = false
@@ -626,7 +640,7 @@ private fun StudioTopAppBar(
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        text = "Export",
+                        text = tr("Export"),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -640,15 +654,15 @@ private fun StudioTopAppBar(
         AlertDialog(
             onDismissRequest = { languageDialog = false },
             containerColor = StudioSurface,
-            title = { Text("Language", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            title = { Text(tr("Language"), color = TextPrimary, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    listOf("English").forEach { language ->
+                    AppLanguage.supported.forEach { language ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    selectedLanguage = language
+                                    selectLanguage(language)
                                     languageDialog = false
                                 }
                                 .padding(vertical = 8.dp),
@@ -657,7 +671,7 @@ private fun StudioTopAppBar(
                             RadioButton(
                                 selected = selectedLanguage == language,
                                 onClick = {
-                                    selectedLanguage = language
+                                    selectLanguage(language)
                                     languageDialog = false
                                 },
                                 colors = RadioButtonDefaults.colors(selectedColor = NeonCyan)
@@ -670,9 +684,66 @@ private fun StudioTopAppBar(
             },
             confirmButton = {
                 TextButton(onClick = { languageDialog = false }) {
-                    Text("Close", color = NeonCyan)
+                    Text(tr("Close"), color = NeonCyan)
                 }
             }
+        )
+    }
+
+    if (privacyDialog) {
+        AlertDialog(
+            onDismissRequest = { privacyDialog = false },
+            containerColor = StudioSurface,
+            title = { Text(tr("Privacy Policy"), color = TextPrimary, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                    Text(text = """LyricMakerPro Privacy Policy
+
+Last updated: November 2, 2026
+
+1. About this app
+LyricMakerPro is an Android lyric-video editor. It lets you import audio, images, videos and lyric files, synchronize lyrics, save projects, preview compositions and export videos.
+
+2. Files and information you choose
+The app accesses audio, images, videos, lyrics and project documents only when you select them through Android system pickers. Selected files are processed to provide editing, preview and export features. Project data and exported files are stored on your device. Core editing features do not require an account.
+
+3. Advertising
+The app uses Google Mobile Ads, including optional rewarded ads for export features. Google and its advertising partners may process device identifiers, IP address, app interaction and advertising-related data to deliver, measure and protect advertising. Processing is subject to Google's policies and your device/account settings. See https://policies.google.com/privacy.
+
+4. Network and third-party services
+The app uses internet access for advertising and configured Google services. Those providers process information under their own privacy policies. LyricMakerPro does not sell personal information.
+
+5. Storage, retention and deletion
+Imported media, project files and exported videos are stored locally on your device in app-managed or user-selected locations. You can remove those files using the app or your device's file manager. Data collected by Google services is governed by Google's retention and deletion controls.
+
+6. Permissions and security
+Access to selected media is granted through Android system pickers. Internet access is used for online services and advertising. Keep your device updated and avoid sharing project files that contain private material.
+
+7. Children
+LyricMakerPro is not specifically directed to children. If you believe a child has submitted personal information to a third-party service, contact that provider and the developer through the app's Google Play listing.
+
+8. Policy changes and contact
+This policy may change as app features or legal requirements evolve. For privacy questions, contact Wins Mediatama using the developer contact information on the LyricMakerPro Google Play Store listing.
+
+By using LyricMakerPro, you acknowledge this policy.""", color = TextPrimary, fontSize = 12.sp, lineHeight = 18.sp)
+                }
+            },
+            confirmButton = { TextButton(onClick = { privacyDialog = false }) { Text(tr("Close"), color = NeonCyan) } }
+        )
+    }
+    if (aboutDialog) {
+        AlertDialog(
+            onDismissRequest = { aboutDialog = false },
+            containerColor = StudioSurface,
+            title = { Text("LyricMakerPro", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Wins Mediatama", color = TextPrimary)
+                    Text("${tr("Installed version")}: ${com.winsmediatama.lyricmakerpro.BuildConfig.VERSION_NAME}", color = NeonCyan)
+                    Text("${tr("Version code")}: ${com.winsmediatama.lyricmakerpro.BuildConfig.VERSION_CODE}", color = TextSecondary)
+                }
+            },
+            confirmButton = { TextButton(onClick = { aboutDialog = false }) { Text(tr("Close"), color = NeonCyan) } }
         )
     }
 

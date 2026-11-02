@@ -58,7 +58,7 @@ fun MultiTrackTimeline(
 ) {
     // Zoom factor: pixels per millisecond
     var pxPerMs by remember { mutableFloatStateOf(0.065f) } // pixels per millisecond
-    val totalTimelineWidthDp = ((project.durationMs * pxPerMs)).dp.coerceAtLeast(360.dp)
+    val totalTimelineWidthDp = ((project.durationMs * pxPerMs) + 84f).dp.coerceAtLeast(360.dp)
     val minZoom = 0.0005f
     val maxZoom = 0.18f
 
@@ -91,7 +91,7 @@ fun MultiTrackTimeline(
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
-                    text = "Timeline",
+                    text = com.winsmediatama.lyricmakerpro.AppLanguage.text("Timeline"),
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
                     color = TextPrimary
@@ -133,7 +133,7 @@ fun MultiTrackTimeline(
                     contentPadding = PaddingValues(horizontal = 4.dp),
                     modifier = Modifier.height(28.dp).testTag("timeline_fit_button")
                 ) {
-                    Text("Fit", color = NeonCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text(com.winsmediatama.lyricmakerpro.AppLanguage.text("Fit"), color = NeonCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
 
                 // Tap to sync shortcut pill
@@ -152,7 +152,7 @@ fun MultiTrackTimeline(
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(Modifier.width(4.dp))
-                    Text("Sync", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(com.winsmediatama.lyricmakerpro.AppLanguage.text("Sync"), fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
         }
@@ -543,7 +543,7 @@ private fun TimeRuler(
             color = NeonCyan,
             fontSize = 7.sp,
             maxLines = 1,
-            modifier = Modifier.align(Alignment.TopEnd)
+            modifier = Modifier.offset(x = (durationMs * pxPerMs).dp + 4.dp, y = 0.dp)
         )
     }
 }
