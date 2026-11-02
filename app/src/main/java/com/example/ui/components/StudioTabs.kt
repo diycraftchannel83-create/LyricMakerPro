@@ -36,6 +36,9 @@ fun StudioTabs(
     currentTab: LyricMakerViewModel.StudioTab,
     onTabSelected: (LyricMakerViewModel.StudioTab) -> Unit,
     onOpenTapToSync: () -> Unit,
+    onPickAudio: () -> Unit = {},
+    onPickVideo: () -> Unit = {},
+    onPickImage: () -> Unit = {},
     isExpanded: Boolean = true,
     onToggleExpanded: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
@@ -137,7 +140,7 @@ fun StudioTabs(
                     VisualizerTab(viewModel, project)
                 }
                 LyricMakerViewModel.StudioTab.BACKGROUND -> {
-                    BackgroundTab(viewModel, project)
+                    BackgroundTab(viewModel, project, onPickAudio, onPickVideo, onPickImage)
                 }
                 LyricMakerViewModel.StudioTab.LYRICS_SYNC -> {
                     LyricsSyncTab(
@@ -544,13 +547,24 @@ private fun VisualizerTab(viewModel: LyricMakerViewModel, project: VideoProject)
 }
 
 @Composable
-private fun BackgroundTab(viewModel: LyricMakerViewModel, project: VideoProject) {
+private fun BackgroundTab(viewModel: LyricMakerViewModel, project: VideoProject, onPickAudio: () -> Unit, onPickVideo: () -> Unit, onPickImage: () -> Unit) {
     val bg = project.background
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Canvas media import controls.
+        item {
+            Text("Media", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(onClick = onPickAudio, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 3.dp)) { Text("Audio", fontSize = 11.sp) }
+                OutlinedButton(onClick = onPickVideo, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 3.dp)) { Text("Video", fontSize = 11.sp) }
+                OutlinedButton(onClick = onPickImage, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 3.dp)) { Text("Photo", fontSize = 11.sp) }
+            }
+        }
+
         // Aspect Ratio
         item {
             Text(text = "Export Aspect Ratio", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
