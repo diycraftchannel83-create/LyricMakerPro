@@ -338,7 +338,16 @@ private fun MediaClipsTrackRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("VIDEO / PHOTO  •  DRAG TO MOVE  •  LEFT + RIGHT TRIM", color = NeonCyan, fontSize = 7.sp, fontWeight = FontWeight.ExtraBold)
+            Text(
+                "VIDEO / PHOTO  •  DRAG TO MOVE  •  LEFT + RIGHT TRIM",
+                color = NeonCyan,
+                fontSize = 7.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
             if (selectedClipId != null && clips.any { it.id == selectedClipId }) {
                 IconButton(
                     onClick = { selectedClipId?.let(onRemoveClip); selectedClipId = null },
@@ -403,14 +412,24 @@ private fun MediaClipsTrackRow(
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Column {
-                            Text(clip.displayName, color = Color.White, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(
-                                String.format(java.util.Locale.US, "%.1fs", clip.durationMs / 1000f),
-                                color = Color.White.copy(alpha = 0.75f),
-                                fontSize = 7.sp,
-                                maxLines = 1
-                            )
+                        Column(modifier = Modifier.weight(1f)) {
+                            if (clipWidth >= 54.dp) {
+                                Text(
+                                    clip.displayName,
+                                    color = Color.White,
+                                    fontSize = if (clipWidth < 84.dp) 7.sp else 9.sp,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Text(
+                                    String.format(java.util.Locale.US, "%.1fs", clip.durationMs / 1000f),
+                                    color = Color.White.copy(alpha = 0.75f),
+                                    fontSize = 7.sp,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                     Box(
@@ -573,9 +592,13 @@ private fun AudioTrackRow(
             )
             Text(
                 text = "${project.audioTrack.title} (${project.audioTrack.bpm} BPM)",
-                fontSize = 10.sp,
+                fontSize = 9.sp,
                 color = TextPrimary,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 220.dp)
             )
         }
     }
@@ -718,37 +741,37 @@ private fun EffectsTrackRow(
     ) {
         // Visualizer Tag
         Row(
+            modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Equalizer,
-                contentDescription = null,
-                tint = NeonCyan,
-                modifier = Modifier.size(12.dp)
-            )
+            Icon(Icons.Default.Equalizer, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(11.dp))
             Text(
                 text = "FX: ${project.visualizer.label}",
-                fontSize = 10.sp,
-                color = TextSecondary
+                fontSize = 8.sp,
+                color = TextSecondary,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
             )
         }
 
         // Motion Transition Tag
         Row(
+            modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Animation,
-                contentDescription = null,
-                tint = NeonMagenta,
-                modifier = Modifier.size(12.dp)
-            )
+            Icon(Icons.Default.Animation, contentDescription = null, tint = NeonMagenta, modifier = Modifier.size(11.dp))
             Text(
                 text = "Motion: ${project.transitionEffect.label}",
-                fontSize = 10.sp,
-                color = TextSecondary
+                fontSize = 8.sp,
+                color = TextSecondary,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
             )
         }
     }
