@@ -97,13 +97,25 @@ class MainActivity : ComponentActivity() {
                     contract = ActivityResultContracts.PickVisualMedia()
                 ) { uri: Uri? ->
                     if (uri != null) {
-                        viewModel.updateBackground(
-                            BackgroundConfig(
-                                type = BackgroundType.IMAGE,
-                                imageUri = uri.toString(),
-                                darkOverlayOpacity = 0.5f
-                            )
-                        )
+                        var fileName = "Imported Image"
+                        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                            if (cursor.moveToFirst() && nameIndex != -1) fileName = cursor.getString(nameIndex)
+                        }
+                        viewModel.addMediaClip(uri.toString(), fileName, com.example.model.MediaClipType.IMAGE)
+                    }
+                }
+
+                val videoPicker = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.GetContent()
+                ) { uri: Uri? ->
+                    if (uri != null) {
+                        var fileName = "Imported Video"
+                        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                            if (cursor.moveToFirst() && nameIndex != -1) fileName = cursor.getString(nameIndex)
+                        }
+                        viewModel.addMediaClip(uri.toString(), fileName, com.example.model.MediaClipType.VIDEO)
                     }
                 }
 
@@ -122,6 +134,7 @@ class MainActivity : ComponentActivity() {
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                 )
                             },
+                            onPickVideo = { videoPicker.launch("video/*") },
                             onOpenExport = { viewModel.setShowExportDialog(true) },
                             onPickLyrics = { lyricsPicker.launch("text/*") },
                             onOpenProject = { viewModel.setShowTemplatesSheet(true) }
@@ -280,6 +293,7 @@ private fun StudioTopAppBar(
     onOpenTemplates: () -> Unit,
     onPickAudio: () -> Unit,
     onPickImage: () -> Unit,
+    onPickVideo: () -> Unit,
     onOpenExport: () -> Unit,
     onPickLyrics: () -> Unit,
     onOpenProject: () -> Unit
@@ -334,6 +348,11 @@ private fun StudioTopAppBar(
                             text = { Text("Insert Picture") },
                             leadingIcon = { Icon(Icons.Default.Image, null, tint = NeonCyan) },
                             onClick = { menuExpanded = false; onPickImage() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Insert Video") },
+                            leadingIcon = { Icon(Icons.Default.VideoFile, null, tint = NeonMagenta) },
+                            onClick = { menuExpanded = false; onPickVideo() }
                         )
                         DropdownMenuItem(
                             text = { Text("Insert Lyrics (.TXT / .LRC)") },
