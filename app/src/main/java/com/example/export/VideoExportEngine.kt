@@ -888,14 +888,22 @@ class VideoExportEngine(private val context: Context) {
     }
 
     private fun drawWatermark(canvas: Canvas, width: Int, height: Int, text: String) {
+        // Compact creator mark: target width is 10% of the exported frame.
+        // 70% alpha keeps the branding visible without competing with the lyrics.
+        val label = "Created with LyricMakerPro"
+        val targetWidth = width * 0.10f
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            textSize = (width * 0.035f).coerceAtLeast(20f)
+            textSize = (width * 0.018f).coerceAtLeast(12f)
             color = Color.WHITE
-            alpha = 110
+            alpha = 179
             typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
             textAlign = Paint.Align.RIGHT
         }
-        canvas.drawText(text, width * 0.94f, height * 0.95f, paint)
+        val measuredWidth = paint.measureText(label).coerceAtLeast(1f)
+        paint.textScaleX = (targetWidth / measuredWidth).coerceIn(0.08f, 1f)
+        val right = width * 0.97f
+        val baseline = height * 0.965f
+        canvas.drawText(label, right, baseline, paint)
     }
 
     private fun parseColor(hex: String, default: Int): Int {
