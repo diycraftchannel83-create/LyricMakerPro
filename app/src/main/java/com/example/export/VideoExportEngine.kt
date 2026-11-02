@@ -271,7 +271,8 @@ class VideoExportEngine(private val context: Context) {
             activeAsset?.image != null -> activeAsset.image
             activeAsset?.retriever != null -> runCatching {
                 activeAsset.retriever.getFrameAtTime(
-                    (timeMs - activeAsset.clip.startMs).coerceAtLeast(0L) * 1_000L,
+                    (activeAsset.clip.sourceOffsetMs +
+                        (timeMs - activeAsset.clip.startMs).coerceAtLeast(0L)) * 1_000L,
                     MediaMetadataRetriever.OPTION_CLOSEST
                 )
             }.getOrNull()

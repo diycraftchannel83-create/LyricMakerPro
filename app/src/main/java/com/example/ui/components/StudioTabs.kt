@@ -3,6 +3,9 @@ package com.example.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -33,6 +36,8 @@ fun StudioTabs(
     currentTab: LyricMakerViewModel.StudioTab,
     onTabSelected: (LyricMakerViewModel.StudioTab) -> Unit,
     onOpenTapToSync: () -> Unit,
+    isExpanded: Boolean = true,
+    onToggleExpanded: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showImportDialog by remember { mutableStateOf(false) }
@@ -42,6 +47,45 @@ fun StudioTabs(
             .fillMaxWidth()
             .background(StudioSurface)
     ) {
+        // Drag handle / expand-collapse affordance for the mobile bottom editor panel.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(24.dp)
+                .pointerInput(isExpanded) {
+                    var totalDrag = 0f
+                    detectVerticalDragGestures(
+                        onDragStart = { _ -> totalDrag = 0f },
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            totalDrag += dragAmount
+                        },
+                        onDragEnd = {
+                            if (totalDrag < -24f) onToggleExpanded(true)
+                            else if (totalDrag > 24f) onToggleExpanded(false)
+                        }
+                    )
+                }
+                .clickable { onToggleExpanded(!isExpanded) },
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(42.dp)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(TextSecondary.copy(alpha = 0.7f))
+            )
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                contentDescription = if (isExpanded) "Collapse editor panel" else "Expand editor panel",
+                tint = NeonCyan,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
         // Tab Navigation Bar
         ScrollableTabRow(
             selectedTabIndex = currentTab.ordinal,
@@ -68,13 +112,17 @@ fun StudioTabs(
             }
         }
 
-        // Active Tab Content
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(12.dp)
-        ) {
+        // The editor body is hidden while collapsed and becomes a bounded,
+        // scrollable workspace when the sheet is expanded.
+        if (isExpanded) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .heightIn(min = 120.dp)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .testTag("studio_tab_content")
+            ) {
             when (currentTab) {
                 LyricMakerViewModel.StudioTab.TIMELINE -> {
                     TimelineControlsTab(viewModel, project, onOpenTapToSync)
@@ -99,6 +147,7 @@ fun StudioTabs(
                         onOpenImport = { showImportDialog = true }
                     )
                 }
+            }
             }
         }
     }

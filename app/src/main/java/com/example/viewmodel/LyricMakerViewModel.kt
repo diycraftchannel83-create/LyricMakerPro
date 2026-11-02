@@ -317,7 +317,9 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
             displayName = displayName,
             type = type,
             startMs = startMs,
-            durationMs = timelineDuration
+            durationMs = timelineDuration,
+            sourceDurationMs = if (type == MediaClipType.VIDEO) timelineDuration else timelineDuration,
+            sourceOffsetMs = 0L
         )
         _project.value = _project.value.copy(mediaClips = (_project.value.mediaClips + clip).sortedBy { it.startMs })
     }
@@ -338,11 +340,46 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         val clips = _project.value.mediaClips.map { clip ->
             if (clip.id == id) {
                 val minimum = if (clip.type == MediaClipType.VIDEO) 500L else 1_000L
-                val maximum = if (clip.type == MediaClipType.VIDEO) clip.durationMs else 3_600_000L
+                val maximum = if (clip.type == MediaClipType.VIDEO) {
+                    // Video timeline length follows its source duration, even when it exceeds song length.
+                    (clip.sourceDurationMs - clip.sourceOffsetMs).coerceAtLeast(minimum)
+                } else {
+                    (_project.value.durationMs - clip.startMs).coerceIn(minimum, 3_600_000L)
+                }
                 clip.copy(durationMs = (clip.durationMs + deltaMs).coerceIn(minimum, maximum))
             } else clip
         }
         _project.value = _project.value.copy(mediaClips = clips)
+    }
+
+    /**
+     * Trims the left edge while preserving the clip's right edge.
+     * Positive delta removes source from the beginning; negative delta restores it.
+     */
+    fun trimMediaClipStart(id: String, deltaMs: Long) {
+        val project = _project.value
+        val clips = project.mediaClips.map { clip ->
+            if (clip.id != id) return@map clip
+            val minimum = if (clip.type == MediaClipType.VIDEO) 500L else 1_000L
+            val maxOffset = (clip.sourceDurationMs - minimum).coerceAtLeast(0L)
+            val requestedOffset = (clip.sourceOffsetMs + deltaMs).coerceIn(0L, maxOffset)
+            val actualDelta = (requestedOffset - clip.sourceOffsetMs).coerceIn(
+                -minOf(clip.startMs, clip.sourceOffsetMs),
+                (clip.durationMs - minimum).coerceAtLeast(0L)
+            )
+            val newOffset = (clip.sourceOffsetMs + actualDelta).coerceAtLeast(0L)
+            val newDuration = (clip.durationMs - actualDelta).coerceAtLeast(minimum)
+            clip.copy(
+                startMs = (clip.startMs + actualDelta).coerceAtLeast(0L),
+                durationMs = newDuration,
+                sourceOffsetMs = newOffset
+            )
+        }
+        _project.value = project.copy(mediaClips = clips.sortedBy { it.startMs })
+    }
+
+    fun setVideoAudioMuted(muted: Boolean) {
+        _project.value = _project.value.copy(videoAudioMuted = muted)
     }
 
     fun removeMediaClip(id: String) {
