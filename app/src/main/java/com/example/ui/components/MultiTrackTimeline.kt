@@ -148,7 +148,7 @@ fun MultiTrackTimeline(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(180.dp)
+                .height(208.dp)
                 .padding(vertical = 4.dp)
                 .horizontalScroll(scrollState)
         ) {
@@ -196,7 +196,7 @@ fun MultiTrackTimeline(
                         onRemoveClip = onRemoveMediaClip,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(46.dp)
+                            .height(52.dp)
                     )
 
                     Spacer(Modifier.height(4.dp))
@@ -227,7 +227,7 @@ fun MultiTrackTimeline(
                         pxPerMs = pxPerMs,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(32.dp)
+                            .height(20.dp)
                     )
                 }
 
