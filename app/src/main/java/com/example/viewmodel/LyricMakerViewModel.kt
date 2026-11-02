@@ -319,7 +319,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
             startMs = startMs,
             durationMs = timelineDuration
         )
-        _project.value = _project.value.copy(mediaClips = _project.value.mediaClips + clip)
+        _project.value = _project.value.copy(mediaClips = (_project.value.mediaClips + clip).sortedBy { it.startMs })
     }
 
     fun moveMediaClip(id: String, deltaMs: Long) {
