@@ -49,12 +49,17 @@ fun MultiTrackTimeline(
     onOpenTapToSync: () -> Unit,
     onMoveMediaClip: (String, Long) -> Unit = { _, _ -> },
     onResizeMediaClip: (String, Long) -> Unit = { _, _ -> },
+    onTrimMediaClipStart: (String, Long) -> Unit = { _, _ -> },
+    videoAudioMuted: Boolean = false,
+    onToggleVideoMute: () -> Unit = {},
     onRemoveMediaClip: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Zoom factor: pixels per millisecond
-    var pxPerMs by remember { mutableFloatStateOf(0.065f) } // ~65px per second
+    var pxPerMs by remember { mutableFloatStateOf(0.065f) } // pixels per millisecond
     val totalTimelineWidthDp = ((project.durationMs * pxPerMs)).dp.coerceAtLeast(360.dp)
+    val minZoom = 0.0005f
+    val maxZoom = 0.18f
 
     val scrollState = rememberScrollState()
     var editingLineId by remember { mutableStateOf<String?>(null) }
@@ -97,30 +102,37 @@ fun MultiTrackTimeline(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Zoom Out
+                // Global mute/unmute for every video clip in the project.
                 IconButton(
-                    onClick = { pxPerMs = (pxPerMs * 0.8f).coerceAtLeast(0.03f) },
-                    modifier = Modifier.size(28.dp)
+                    onClick = onToggleVideoMute,
+                    modifier = Modifier.size(28.dp).testTag("timeline_video_mute")
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ZoomOut,
-                        contentDescription = "Zoom Out",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(16.dp)
+                        imageVector = if (videoAudioMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                        contentDescription = if (videoAudioMuted) "Unmute all videos" else "Mute all videos",
+                        tint = if (videoAudioMuted) NeonMagenta else NeonCyan,
+                        modifier = Modifier.size(17.dp)
                     )
                 }
 
-                // Zoom In
                 IconButton(
-                    onClick = { pxPerMs = (pxPerMs * 1.25f).coerceAtMost(0.18f) },
+                    onClick = { pxPerMs = (pxPerMs * 0.65f).coerceAtLeast(minZoom) },
                     modifier = Modifier.size(28.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.ZoomIn,
-                        contentDescription = "Zoom In",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    Icon(Icons.Default.ZoomOut, contentDescription = "Zoom Out", tint = TextSecondary, modifier = Modifier.size(16.dp))
+                }
+                IconButton(
+                    onClick = { pxPerMs = (pxPerMs * 1.35f).coerceAtMost(maxZoom) },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(Icons.Default.ZoomIn, contentDescription = "Zoom In", tint = TextSecondary, modifier = Modifier.size(16.dp))
+                }
+                TextButton(
+                    onClick = { pxPerMs = (340f / project.durationMs.coerceAtLeast(1L)).coerceIn(minZoom, maxZoom) },
+                    contentPadding = PaddingValues(horizontal = 4.dp),
+                    modifier = Modifier.height(28.dp).testTag("timeline_fit_button")
+                ) {
+                    Text("Fit", color = NeonCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
 
                 // Tap to sync shortcut pill
@@ -148,8 +160,8 @@ fun MultiTrackTimeline(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(208.dp)
-                .padding(vertical = 4.dp)
+                .height(166.dp)
+                .padding(vertical = 2.dp)
                 .horizontalScroll(scrollState)
         ) {
             Box(
@@ -170,7 +182,7 @@ fun MultiTrackTimeline(
                         pxPerMs = pxPerMs,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(24.dp)
+                             .height(28.dp)
                     )
 
                     Spacer(Modifier.height(4.dp))
@@ -181,7 +193,7 @@ fun MultiTrackTimeline(
                         pxPerMs = pxPerMs,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(44.dp)
+                             .height(28.dp)
                     )
 
                     Spacer(Modifier.height(4.dp))
@@ -193,10 +205,11 @@ fun MultiTrackTimeline(
                         onSeek = onSeek,
                         onMoveClip = onMoveMediaClip,
                         onResizeClip = onResizeMediaClip,
+                        onTrimLeftClip = onTrimMediaClipStart,
                         onRemoveClip = onRemoveMediaClip,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp)
+                            .height(42.dp)
                     )
 
                     Spacer(Modifier.height(4.dp))
@@ -216,7 +229,7 @@ fun MultiTrackTimeline(
                         onAdjustDuration = onAdjustDuration,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp)
+                             .height(42.dp)
                     )
 
                     Spacer(Modifier.height(4.dp))
@@ -227,7 +240,7 @@ fun MultiTrackTimeline(
                         pxPerMs = pxPerMs,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(20.dp)
+                             .height(16.dp)
                     )
                 }
 
@@ -314,17 +327,18 @@ private fun MediaClipsTrackRow(
     onSeek: (Long) -> Unit,
     onMoveClip: (String, Long) -> Unit,
     onResizeClip: (String, Long) -> Unit,
+    onTrimLeftClip: (String, Long) -> Unit,
     onRemoveClip: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedClipId by remember { mutableStateOf<String?>(null) }
     Column(modifier = modifier) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(18.dp),
+            modifier = Modifier.fillMaxWidth().height(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("MEDIA • DRAG TO MOVE • RIGHT HANDLE TO TRIM", color = NeonCyan, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold)
+            Text("VIDEO / PHOTO  •  DRAG TO MOVE  •  LEFT + RIGHT TRIM", color = NeonCyan, fontSize = 7.sp, fontWeight = FontWeight.ExtraBold)
             if (selectedClipId != null && clips.any { it.id == selectedClipId }) {
                 IconButton(
                     onClick = { selectedClipId?.let(onRemoveClip); selectedClipId = null },
@@ -343,7 +357,7 @@ private fun MediaClipsTrackRow(
         ) {
             clips.sortedBy { it.startMs }.forEach { clip ->
                 val left = (clip.startMs * pxPerMs).dp
-                val clipWidth = (clip.durationMs * pxPerMs).dp.coerceAtLeast(42.dp)
+                val clipWidth = (clip.durationMs * pxPerMs).dp.coerceAtLeast(28.dp)
                 val tint = if (clip.type == MediaClipType.VIDEO) Color(0xFF6D45B5) else Color(0xFF147B76)
                 val selected = selectedClipId == clip.id
                 Box(
@@ -402,14 +416,46 @@ private fun MediaClipsTrackRow(
                     Box(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
-                            .width(10.dp)
+                            .width(12.dp)
                             .fillMaxHeight()
-                            .background(Color.White.copy(alpha = 0.22f))
+                            .background(Color.White.copy(alpha = 0.28f))
                             .pointerInput(clip.id, pxPerMs) {
-                                detectDragGestures { change, dragAmount ->
-                                    change.consume()
-                                    onResizeClip(clip.id, (dragAmount.x / pxPerMs).toLong())
-                                }
+                                var remainder = 0f
+                                detectDragGestures(
+                                    onDragStart = { selectedClipId = clip.id; remainder = 0f },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        remainder += dragAmount.x / pxPerMs
+                                        val delta = remainder.toLong()
+                                        if (delta != 0L) {
+                                            onResizeClip(clip.id, delta)
+                                            remainder -= delta
+                                        }
+                                    }
+                                )
+                            }
+                    )
+                    // Left trim handle. It changes the source in-point and keeps the right edge fixed.
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .width(12.dp)
+                            .fillMaxHeight()
+                            .background(NeonCyan.copy(alpha = 0.35f))
+                            .pointerInput(clip.id, pxPerMs) {
+                                var remainder = 0f
+                                detectDragGestures(
+                                    onDragStart = { selectedClipId = clip.id; remainder = 0f },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        remainder += dragAmount.x / pxPerMs
+                                        val delta = remainder.toLong()
+                                        if (delta != 0L) {
+                                            onTrimLeftClip(clip.id, delta)
+                                            remainder -= delta
+                                        }
+                                    }
+                                )
                             }
                     )
                 }
@@ -432,23 +478,44 @@ private fun TimeRuler(
     pxPerMs: Float,
     modifier: Modifier = Modifier
 ) {
-    Canvas(modifier = modifier) {
-        val totalSec = (durationMs / 1000).toInt()
-        val secStepPx = 1000f * pxPerMs
-
-        for (sec in 0..totalSec) {
-            val x = sec * secStepPx
-            val isMajor = sec % 5 == 0
-            val lineH = if (isMajor) size.height * 0.7f else size.height * 0.35f
-            val lineColor = if (isMajor) TextSecondary else TextMuted.copy(alpha = 0.5f)
-
-            drawLine(
-                color = lineColor,
-                start = Offset(x, size.height - lineH),
-                end = Offset(x, size.height),
-                strokeWidth = if (isMajor) 1.5f else 1f
+    val totalSec = (durationMs / 1000).toInt()
+    val majorStep = when {
+        pxPerMs < 0.004f -> 30
+        pxPerMs < 0.012f -> 10
+        else -> 5
+    }
+    Box(modifier = modifier) {
+        Canvas(Modifier.fillMaxSize()) {
+            val secStepPx = 1000f * pxPerMs
+            for (sec in 0..totalSec) {
+                val x = sec * secStepPx
+                val isMajor = sec % majorStep == 0
+                val lineH = if (isMajor) size.height * 0.48f else size.height * 0.22f
+                val lineColor = if (isMajor) TextSecondary else TextMuted.copy(alpha = 0.45f)
+                drawLine(
+                    color = lineColor,
+                    start = Offset(x, size.height - lineH),
+                    end = Offset(x, size.height),
+                    strokeWidth = if (isMajor) 1.4f else 1f
+                )
+            }
+        }
+        for (sec in 0..totalSec step majorStep) {
+            Text(
+                text = formatTimelineTime(sec * 1000L),
+                color = TextSecondary,
+                fontSize = 7.sp,
+                maxLines = 1,
+                modifier = Modifier.offset(x = (sec * 1000f * pxPerMs).dp, y = 0.dp)
             )
         }
+        Text(
+            text = formatTimelineTime(durationMs),
+            color = NeonCyan,
+            fontSize = 7.sp,
+            maxLines = 1,
+            modifier = Modifier.align(Alignment.TopEnd)
+        )
     }
 }
 
@@ -683,6 +750,11 @@ private fun EffectsTrackRow(
             )
         }
     }
+}
+
+private fun formatTimelineTime(ms: Long): String {
+    val totalSeconds = ms / 1000L
+    return String.format(java.util.Locale.US, "%d:%02d", totalSeconds / 60L, totalSeconds % 60L)
 }
 
 private fun formatMs(ms: Long): String {
