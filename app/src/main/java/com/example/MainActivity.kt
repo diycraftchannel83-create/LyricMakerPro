@@ -65,7 +65,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         rewardedAdManager = RewardedAdManager(this)
-        rewardedAdManager.initialize()
         watermarkBilling = PermanentWatermarkBilling(this)
         watermarkBilling.connect()
 
@@ -94,6 +93,13 @@ class MainActivity : ComponentActivity() {
                 val exportStatus by viewModel.exportStatus.collectAsStateWithLifecycle()
                 val lastExportedFile by viewModel.lastExportedFile.collectAsStateWithLifecycle()
                 val permanentWatermarkRemoved by watermarkBilling.isOwned.collectAsStateWithLifecycle()
+                val watermarkEntitlementResolved by watermarkBilling.isEntitlementResolved.collectAsStateWithLifecycle()
+                LaunchedEffect(watermarkEntitlementResolved, permanentWatermarkRemoved) {
+                    // Premium owners never initialize or request rewarded ads.
+                    if (watermarkEntitlementResolved && !permanentWatermarkRemoved) {
+                        rewardedAdManager.initialize()
+                    }
+                }
                 val permanentWatermarkPrice by watermarkBilling.price.collectAsStateWithLifecycle()
                 val billingMessage by watermarkBilling.message.collectAsStateWithLifecycle()
                 LaunchedEffect(billingMessage) {
