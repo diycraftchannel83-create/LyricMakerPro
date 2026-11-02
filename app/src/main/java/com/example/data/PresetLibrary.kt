@@ -94,7 +94,23 @@ object PresetLibrary {
     )
 
     fun createDefaultProject(): VideoProject {
-        return sampleProjects.first()
+        // A new app session always starts with a clean, empty project.
+        // Sample songs remain available only when the user explicitly opens the template library.
+        return VideoProject(
+            title = "Untitled Project",
+            artist = "",
+            audioTrack = AudioTrackConfig(
+                title = "No audio",
+                artist = "",
+                bpm = 120,
+                durationMs = 0L,
+                beatType = AudioBeatType.NONE,
+                customUri = null,
+                waveformPeaks = emptyList()
+            ),
+            lyrics = emptyList(),
+            typography = typographyPresets.first()
+        )
     }
 
     val sampleProjects: List<VideoProject> by lazy {

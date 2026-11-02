@@ -107,10 +107,12 @@ class MainActivity : ComponentActivity() {
                                 fileName = cursor.getString(nameIndex)
                             }
                         }
+                        var songTitle = ""
                         val durationMs = runCatching {
                             MediaMetadataRetriever().let { retriever ->
                                 try {
                                     retriever.setDataSource(this@MainActivity, uri)
+                                    songTitle = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE).orEmpty()
                                     retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                                         ?.toLongOrNull() ?: 45_000L
                                 } finally {
@@ -118,7 +120,11 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }.getOrDefault(45_000L).coerceAtLeast(500L)
-                        viewModel.importCustomAudio(uri.toString(), fileName, durationMs)
+                        viewModel.importCustomAudio(
+                            uri.toString(),
+                            songTitle.ifBlank { fileName },
+                            durationMs
+                        )
                     }
                 }
 
