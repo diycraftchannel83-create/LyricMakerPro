@@ -495,7 +495,12 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             try {
                 val exported = exportEngine.exportVideo(
-                    project = if (removeWatermark) _project.value.copy(showWatermark = false) else _project.value,
+                    // Watermark is mandatory for free exports, regardless of the editor preview toggle.
+                    // A verified rewarded-ad callback or permanent Play purchase is the only bypass.
+                    project = _project.value.copy(
+                        showWatermark = !removeWatermark,
+                        watermarkText = "Created with LyricMakerPro"
+                    ),
                     quality = quality,
                     durationSeconds = durationSec
                 ) { progress ->

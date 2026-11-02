@@ -235,7 +235,7 @@ fun ExportDialog(
                             Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Verified, contentDescription = null, tint = NeonCyan)
                                 Spacer(Modifier.width(8.dp))
-                                Text("Permanent watermark removal active", color = NeonCyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text("Premium active • No ads • Unlimited watermark-free exports", color = NeonCyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                         }
                         Button(
@@ -274,7 +274,7 @@ fun ExportDialog(
                         ) {
                             Icon(Icons.Default.PlayCircle, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Black)
                             Spacer(Modifier.width(6.dp))
-                            Text("Watch Ad • Export Without Watermark", fontWeight = FontWeight.Bold, color = Color.Black)
+                            Text("Watch Ad • One Watermark-Free Export", fontWeight = FontWeight.Bold, color = Color.Black)
                         }
                         Button(
                             onClick = { onStartExport(selectedQuality, selectedDurationSec) },
