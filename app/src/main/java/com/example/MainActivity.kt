@@ -1,4 +1,4 @@
-package com.example
+package com.winsmediatama.lyricmakerpro
 
 import android.net.Uri
 import android.media.MediaMetadataRetriever
@@ -34,13 +34,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.model.BackgroundConfig
-import com.example.model.BackgroundType
-import com.example.data.ProjectFileCodec
-import com.example.data.LyricMakerStorage
-import com.example.ui.components.*
-import com.example.ui.theme.*
-import com.example.viewmodel.LyricMakerViewModel
+import com.winsmediatama.lyricmakerpro.model.BackgroundConfig
+import com.winsmediatama.lyricmakerpro.model.BackgroundType
+import com.winsmediatama.lyricmakerpro.data.ProjectFileCodec
+import com.winsmediatama.lyricmakerpro.data.LyricMakerStorage
+import com.winsmediatama.lyricmakerpro.ui.components.*
+import com.winsmediatama.lyricmakerpro.ui.theme.*
+import com.winsmediatama.lyricmakerpro.viewmodel.LyricMakerViewModel
 
 class MainActivity : ComponentActivity() {
 
@@ -138,7 +138,7 @@ class MainActivity : ComponentActivity() {
                             val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                             if (cursor.moveToFirst() && nameIndex != -1) fileName = cursor.getString(nameIndex)
                         }
-                        viewModel.addMediaClip(uri.toString(), fileName, com.example.model.MediaClipType.IMAGE)
+                        viewModel.addMediaClip(uri.toString(), fileName, com.winsmediatama.lyricmakerpro.model.MediaClipType.IMAGE)
                     }
                 }
 
@@ -162,7 +162,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }.getOrDefault(10_000L).coerceAtLeast(500L)
-                        viewModel.addMediaClip(uri.toString(), fileName, com.example.model.MediaClipType.VIDEO, durationMs)
+                        viewModel.addMediaClip(uri.toString(), fileName, com.winsmediatama.lyricmakerpro.model.MediaClipType.VIDEO, durationMs)
                     }
                 }
 
@@ -178,7 +178,7 @@ class MainActivity : ComponentActivity() {
                             .onSuccess { loaded ->
                                 val audioUri = loaded.audioTrack.customUri?.let(Uri::parse)
                                 val audioCanBeReopened = if (
-                                    loaded.audioTrack.beatType == com.example.model.AudioBeatType.CUSTOM_FILE &&
+                                    loaded.audioTrack.beatType == com.winsmediatama.lyricmakerpro.model.AudioBeatType.CUSTOM_FILE &&
                                     audioUri != null
                                 ) {
                                     runCatching {
@@ -186,7 +186,7 @@ class MainActivity : ComponentActivity() {
                                             ?: error("Audio file is unavailable")
                                     }.isSuccess
                                 } else {
-                                    loaded.audioTrack.beatType != com.example.model.AudioBeatType.CUSTOM_FILE
+                                    loaded.audioTrack.beatType != com.winsmediatama.lyricmakerpro.model.AudioBeatType.CUSTOM_FILE
                                 }
 
                                 // Restore lyrics, word-level sync and timeline even if the
