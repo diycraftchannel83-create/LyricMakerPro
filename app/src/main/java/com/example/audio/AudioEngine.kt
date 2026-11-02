@@ -83,12 +83,12 @@ class AudioEngine(private val context: Context) {
         playbackStartSystemTime = System.currentTimeMillis()
         playheadOffsetOnStart = _playheadMs.value
 
-        if (isCustomFile && mediaPlayer != null) {
-            mediaPlayer?.seekTo(_playheadMs.value.toInt())
-            mediaPlayer?.start()
-        } else {
-            startSynthesizedPlayback(track, _playheadMs.value)
+        if (track.beatType != AudioBeatType.CUSTOM_FILE || mediaPlayer == null) {
+            _isPlaying.value = false
+            return
         }
+        mediaPlayer?.seekTo(_playheadMs.value.toInt())
+        mediaPlayer?.start()
 
         startTicker(track)
     }
