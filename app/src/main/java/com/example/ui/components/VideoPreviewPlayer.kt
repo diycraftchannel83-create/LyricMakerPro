@@ -470,14 +470,26 @@ private fun drawInto(
             val tf = when (typography.fontFamilyName.lowercase()) {
                 "monospace" -> Typeface.MONOSPACE
                 "serif" -> Typeface.SERIF
+                "casual" -> Typeface.create("casual", Typeface.NORMAL)
+                "cursive" -> Typeface.create("cursive", Typeface.NORMAL)
                 else -> Typeface.SANS_SERIF
             }
-            val style = if (typography.isBold) Typeface.BOLD else Typeface.NORMAL
+            val style = when {
+                typography.isBold && typography.isItalic -> Typeface.BOLD_ITALIC
+                typography.isBold -> Typeface.BOLD
+                typography.isItalic -> Typeface.ITALIC
+                else -> Typeface.NORMAL
+            }
 
             val textPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
                 typeface = Typeface.create(tf, style)
                 textSize = fontSize
                 textAlign = AndroidPaint.Align.CENTER
+                when (typography.visualEffect) {
+                    FontVisualEffect.NEON_GLOW -> setShadowLayer(typography.glowRadiusDp * (width / 360f), 0f, 0f, AndroidColor.parseColor("#FF00C8"))
+                    FontVisualEffect.SOFT_SHADOW -> setShadowLayer(typography.glowRadiusDp * (width / 360f), 2f, 3f, AndroidColor.BLACK)
+                    else -> {}
+                }
             }
             val strokePaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
                 typeface = Typeface.create(tf, style)
@@ -489,7 +501,8 @@ private fun drawInto(
             }
 
             val cx = width * (typography.positionXPercent / 100f)
-            val cy = height * (typography.positionYPercent / 100f)
+            val baseCy = height * (typography.positionYPercent / 100f)
+            val cy = if (typography.lyricLayout == LyricLayoutMode.KARAOKE_TWO_LINE) baseCy - fontSize * 0.72f else baseCy
 
             native.save()
 
@@ -522,6 +535,13 @@ private fun drawInto(
 
             val primaryC = try { AndroidColor.parseColor(typography.primaryColorHex) } catch (_: Exception) { AndroidColor.WHITE }
             val highlightC = try { AndroidColor.parseColor(typography.highlightColorHex) } catch (_: Exception) { AndroidColor.CYAN }
+            if (typography.visualEffect == FontVisualEffect.DOUBLE_OUTLINE) {
+                val outer = AndroidPaint(strokePaint).apply {
+                    strokeWidth = typography.strokeWidthDp * (width / 360f) * 2.4f
+                    color = AndroidColor.parseColor("#FF00C8")
+                }
+                native.drawText(lineToDraw.text, cx, cy, outer)
+            }
 
             if (project.transitionEffect == TextTransitionEffect.TYPEWRITER_GLITCH && isCurrentlyActive) {
                 val count = (lineToDraw.text.length * (progressInLine * 1.3f).coerceIn(0f, 1f)).toInt()
@@ -549,6 +569,19 @@ private fun drawInto(
                 native.drawText(lineToDraw.text, cx, cy, textPaint)
             }
 
+            if (typography.lyricLayout == LyricLayoutMode.KARAOKE_TWO_LINE) {
+                val nextLine = lyrics.firstOrNull { it.startMs > lineToDraw.endMs }
+                if (nextLine != null) {
+                    textPaint.color = primaryC
+                    textPaint.alpha = 210
+                    strokePaint.alpha = 150
+                    val secondY = baseCy + fontSize * 0.72f
+                    if (typography.strokeWidthDp > 0f) native.drawText(nextLine.text, cx, secondY, strokePaint)
+                    native.drawText(nextLine.text, cx, secondY, textPaint)
+                    textPaint.alpha = 255
+                    strokePaint.alpha = 255
+                }
+            }
             native.restore()
         }
     }
