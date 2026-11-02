@@ -166,52 +166,101 @@ fun VideoPreviewPlayer(
         if (showStyleDialog) {
             AlertDialog(
                 onDismissRequest = { showStyleDialog = false },
-                title = { Text("Lyric Style Studio", color = TextPrimary, fontWeight = FontWeight.Bold) },
+                title = {
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("TEXT STUDIO", color = NeonCyan, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
+                        Text("Lyric Typography", color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text("Atur tampilan teks untuk seluruh baris lirik", color = TextSecondary, fontSize = 12.sp)
+                    }
+                },
                 text = {
                     Column(
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 540.dp).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text("Font Size • ${project.typography.fontSizeSp.toInt()} sp", color = NeonCyan, fontWeight = FontWeight.Bold)
-                        Slider(value = project.typography.fontSizeSp, onValueChange = { onTypographyChange(project.typography.copy(fontSizeSp = it)) }, valueRange = 18f..96f)
-                        Text("Font Family", color = TextSecondary, fontSize = 12.sp)
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            listOf("SansSerif", "Serif", "Monospace", "Casual", "Cursive").chunked(3).forEach { row ->
-                                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                                    row.forEach { family ->
-                                        FilterChip(
-                                            selected = project.typography.fontFamilyName == family,
-                                            onClick = { onTypographyChange(project.typography.copy(fontFamilyName = family)) },
-                                            label = { Text(family, fontSize = 10.sp) }
-                                        )
+                        Surface(
+                            color = StudioSurfaceVariant,
+                            shape = RoundedCornerShape(14.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, StudioCardBorder)
+                        ) {
+                            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("UKURAN HURUF", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                    Text("${project.typography.fontSizeSp.toInt()} sp", color = NeonCyan, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+                                }
+                                Slider(
+                                    value = project.typography.fontSizeSp.coerceIn(2f, 96f),
+                                    onValueChange = { onTypographyChange(project.typography.copy(fontSizeSp = it)) },
+                                    valueRange = 2f..96f
+                                )
+                                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                    Text("2 sp • Sangat kecil", color = TextSecondary, fontSize = 10.sp)
+                                    Text("96 sp • Besar", color = TextSecondary, fontSize = 10.sp)
+                                }
+                            }
+                        }
+
+                        Surface(color = StudioSurfaceVariant, shape = RoundedCornerShape(14.dp), border = androidx.compose.foundation.BorderStroke(1.dp, StudioCardBorder)) {
+                            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                                Text("JENIS HURUF", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                listOf("SansSerif", "Serif", "Monospace", "Casual", "Cursive").chunked(3).forEach { familyRow ->
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        familyRow.forEach { family ->
+                                            FilterChip(
+                                                selected = project.typography.fontFamilyName == family,
+                                                onClick = { onTypographyChange(project.typography.copy(fontFamilyName = family)) },
+                                                label = { Text(family, fontSize = 11.sp) }
+                                            )
+                                        }
+                                    }
+                                }
+                                androidx.compose.material3.HorizontalDivider(color = StudioCardBorder)
+                                Text("GAYA HURUF", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    FilterChip(selected = project.typography.isBold, onClick = { onTypographyChange(project.typography.copy(isBold = !project.typography.isBold)) }, label = { Text("B  Bold") })
+                                    FilterChip(selected = project.typography.isItalic, onClick = { onTypographyChange(project.typography.copy(isItalic = !project.typography.isItalic)) }, label = { Text("I  Italic") })
+                                }
+                            }
+                        }
+
+                        Surface(color = StudioSurfaceVariant, shape = RoundedCornerShape(14.dp), border = androidx.compose.foundation.BorderStroke(1.dp, StudioCardBorder)) {
+                            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                                Text("EFEK VISUAL", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                FontVisualEffect.entries.chunked(2).forEach { effectRow ->
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        effectRow.forEach { effect ->
+                                            FilterChip(
+                                                selected = project.typography.visualEffect == effect,
+                                                onClick = { onTypographyChange(project.typography.copy(visualEffect = effect)) },
+                                                label = { Text(effect.label, fontSize = 11.sp) }
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(selected = project.typography.isBold, onClick = { onTypographyChange(project.typography.copy(isBold = !project.typography.isBold)) }, label = { Text("Bold") })
-                            FilterChip(selected = project.typography.isItalic, onClick = { onTypographyChange(project.typography.copy(isItalic = !project.typography.isItalic)) }, label = { Text("Italic") })
-                        }
-                        Text("Visual Font Effect", color = TextSecondary, fontSize = 12.sp)
-                        FontVisualEffect.entries.forEach { effect ->
-                            FilterChip(
-                                selected = project.typography.visualEffect == effect,
-                                onClick = { onTypographyChange(project.typography.copy(visualEffect = effect)) },
-                                label = { Text(effect.label) }
-                            )
-                        }
-                        Text("Karaoke Layout", color = TextSecondary, fontSize = 12.sp)
-                        LyricLayoutMode.entries.forEach { mode ->
-                            FilterChip(
-                                selected = project.typography.lyricLayout == mode,
-                                onClick = { onTypographyChange(project.typography.copy(lyricLayout = mode)) },
-                                label = { Text(mode.label) }
-                            )
+
+                        Surface(color = StudioSurfaceVariant, shape = RoundedCornerShape(14.dp), border = androidx.compose.foundation.BorderStroke(1.dp, StudioCardBorder)) {
+                            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                                Text("TATA LETAK KARAOKE", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                LyricLayoutMode.entries.forEach { mode ->
+                                    FilterChip(
+                                        selected = project.typography.lyricLayout == mode,
+                                        onClick = { onTypographyChange(project.typography.copy(lyricLayout = mode)) },
+                                        label = { Text(mode.label, fontSize = 11.sp) }
+                                    )
+                                }
+                            }
                         }
                     }
                 },
-                confirmButton = { TextButton(onClick = { showStyleDialog = false }) { Text("Done", color = NeonCyan) } },
-                containerColor = StudioSurface
+                confirmButton = {
+                    TextButton(onClick = { showStyleDialog = false }) {
+                        Text("Selesai", color = NeonCyan, fontWeight = FontWeight.Bold)
+                    }
+                },
+                containerColor = StudioSurface,
+                shape = RoundedCornerShape(24.dp)
             )
         }
 
