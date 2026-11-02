@@ -167,13 +167,17 @@ fun MultiTrackTimeline(
         ) {
             val density = LocalDensity.current
             val viewportWidthPx = constraints.maxWidth
-            LaunchedEffect(playheadMs, pxPerMs, viewportWidthPx, project.durationMs) {
+            LaunchedEffect(playheadMs, pxPerMs, viewportWidthPx, project.durationMs, scrollState.maxValue) {
                 val playheadPx = with(density) { (playheadMs * pxPerMs).dp.roundToPx() }
                 val visibleStart = scrollState.value
                 val visibleEnd = visibleStart + viewportWidthPx
                 if (playheadPx < visibleStart || playheadPx > visibleEnd) {
-                    val targetScroll = (playheadPx - (viewportWidthPx * 0.65f).toInt())
-                        .coerceIn(0, scrollState.maxValue)
+                    val targetScroll = if (playheadMs >= project.durationMs) {
+                        scrollState.maxValue
+                    } else {
+                        (playheadPx - (viewportWidthPx * 0.65f).toInt())
+                            .coerceIn(0, scrollState.maxValue)
+                    }
                     scrollState.animateScrollTo(targetScroll)
                 }
             }
