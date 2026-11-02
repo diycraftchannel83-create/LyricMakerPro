@@ -213,6 +213,7 @@ fun ExportDialog(
             } else if (!isExporting) {
                 Button(
                     onClick = { onStartExport(selectedQuality, selectedDurationSec) },
+                    enabled = project.audioTrack.beatType == com.example.model.AudioBeatType.CUSTOM_FILE && project.durationMs > 0L,
                     colors = ButtonDefaults.buttonColors(containerColor = NeonMagenta),
                     modifier = Modifier.testTag("start_export_button")
                 ) {
