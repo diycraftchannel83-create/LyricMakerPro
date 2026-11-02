@@ -325,7 +325,7 @@ fun VideoPreviewPlayer(
                                         VideoView(context).apply {
                                             setVideoURI(Uri.parse(activeMedia.uri))
                                             setOnPreparedListener { player ->
-                                                player.isLooping = true
+                                                player.isLooping = false
                                                 seekTo((playheadMs - activeMedia.startMs).toInt().coerceAtLeast(0))
                                                 if (isPlaying) start()
                                             }
