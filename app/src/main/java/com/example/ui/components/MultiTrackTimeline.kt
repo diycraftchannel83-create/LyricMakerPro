@@ -129,7 +129,7 @@ fun MultiTrackTimeline(
                     Icon(Icons.Default.ZoomIn, contentDescription = "Zoom In", tint = TextSecondary, modifier = Modifier.size(16.dp))
                 }
                 TextButton(
-                    onClick = { pxPerMs = (340f / project.durationMs.coerceAtLeast(1L)).coerceIn(minZoom, maxZoom) },
+                    onClick = { pxPerMs = (360f / project.durationMs.coerceAtLeast(1L)).coerceIn(minZoom, maxZoom) },
                     contentPadding = PaddingValues(horizontal = 4.dp),
                     modifier = Modifier.height(28.dp).testTag("timeline_fit_button")
                 ) {
@@ -522,15 +522,13 @@ private fun TimeRuler(
             }
             // Draw a dedicated end tick at the exact audio duration, including
             // the final fractional second (for example 05:23.8).
-            if (hasPartialSecond) {
-                val endX = durationMs * pxPerMs
-                drawLine(
-                    color = NeonCyan,
-                    start = Offset(endX, size.height * 0.28f),
-                    end = Offset(endX, size.height),
-                    strokeWidth = 2f
-                )
-            }
+            val endX = durationMs * pxPerMs
+            drawLine(
+                color = NeonCyan,
+                start = Offset(endX, size.height * 0.28f),
+                end = Offset(endX, size.height),
+                strokeWidth = 2f
+            )
         }
         for (sec in 0..totalSec step majorStep) {
             Text(
