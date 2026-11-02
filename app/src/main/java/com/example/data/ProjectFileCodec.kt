@@ -1,7 +1,7 @@
-package com.example.data
+package com.winsmediatama.lyricmakerpro.data
 
 import androidx.compose.ui.text.style.TextAlign
-import com.example.model.VideoProject
+import com.winsmediatama.lyricmakerpro.model.VideoProject
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.JsonReader

@@ -1,4 +1,4 @@
-package com.example.model
+package com.winsmediatama.lyricmakerpro.model
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign

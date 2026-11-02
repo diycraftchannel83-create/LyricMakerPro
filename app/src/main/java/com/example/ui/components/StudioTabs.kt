@@ -1,4 +1,4 @@
-package com.example.ui.components
+package com.winsmediatama.lyricmakerpro.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,10 +24,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.PresetLibrary
-import com.example.model.*
-import com.example.ui.theme.*
-import com.example.viewmodel.LyricMakerViewModel
+import com.winsmediatama.lyricmakerpro.data.PresetLibrary
+import com.winsmediatama.lyricmakerpro.model.*
+import com.winsmediatama.lyricmakerpro.ui.theme.*
+import com.winsmediatama.lyricmakerpro.viewmodel.LyricMakerViewModel
 
 @Composable
 fun StudioTabs(

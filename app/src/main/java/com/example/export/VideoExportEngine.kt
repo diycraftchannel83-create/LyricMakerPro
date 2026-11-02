@@ -1,4 +1,4 @@
-package com.example.export
+package com.winsmediatama.lyricmakerpro.export
 
 import android.content.Context
 import android.content.Intent
@@ -11,8 +11,8 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import androidx.core.content.FileProvider
-import com.example.model.*
-import com.example.data.LyricMakerStorage
+import com.winsmediatama.lyricmakerpro.model.*
+import com.winsmediatama.lyricmakerpro.data.LyricMakerStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File

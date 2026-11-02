@@ -1,4 +1,4 @@
-package com.example.ui.components
+package com.winsmediatama.lyricmakerpro.ui.components
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -24,8 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.model.VideoProject
-import com.example.ui.theme.*
+import com.winsmediatama.lyricmakerpro.model.VideoProject
+import com.winsmediatama.lyricmakerpro.ui.theme.*
 
 @Composable
 fun TapToSyncModal(

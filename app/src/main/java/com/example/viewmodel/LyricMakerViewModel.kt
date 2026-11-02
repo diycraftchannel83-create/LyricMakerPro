@@ -1,4 +1,4 @@
-package com.example.viewmodel
+package com.winsmediatama.lyricmakerpro.viewmodel
 
 import android.app.Application
 import android.os.Build
@@ -6,11 +6,11 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.audio.AudioEngine
-import com.example.audio.AudioWaveformExtractor
-import com.example.data.PresetLibrary
-import com.example.export.VideoExportEngine
-import com.example.model.*
+import com.winsmediatama.lyricmakerpro.audio.AudioEngine
+import com.winsmediatama.lyricmakerpro.audio.AudioWaveformExtractor
+import com.winsmediatama.lyricmakerpro.data.PresetLibrary
+import com.winsmediatama.lyricmakerpro.export.VideoExportEngine
+import com.winsmediatama.lyricmakerpro.model.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.io.File

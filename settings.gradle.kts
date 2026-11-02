@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "LyricMaker"
+rootProject.name = "LyricMakerPro"
 
 include(":app")

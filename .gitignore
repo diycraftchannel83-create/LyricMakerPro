@@ -16,3 +16,6 @@
 local.properties
 .env
 debug.keystore
+
+# Firebase client configuration is injected from GitHub Actions secrets.
+/app/google-services.json

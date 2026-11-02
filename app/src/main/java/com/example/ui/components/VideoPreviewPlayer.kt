@@ -1,4 +1,4 @@
-package com.example.ui.components
+package com.winsmediatama.lyricmakerpro.ui.components
 
 import android.net.Uri
 import android.widget.VideoView
@@ -39,8 +39,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.*
-import com.example.ui.theme.*
+import com.winsmediatama.lyricmakerpro.model.*
+import com.winsmediatama.lyricmakerpro.ui.theme.*
 import kotlin.math.*
 import kotlinx.coroutines.delay
 

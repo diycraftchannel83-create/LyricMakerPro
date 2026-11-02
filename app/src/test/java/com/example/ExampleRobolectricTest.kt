@@ -1,4 +1,4 @@
-package com.example
+package com.winsmediatama.lyricmakerpro
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
@@ -16,6 +16,6 @@ class ExampleRobolectricTest {
   fun `read string from context`() {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val appName = context.getString(R.string.app_name)
-    assertEquals("LyricMaker", appName)
+    assertEquals("LyricMakerPro", appName)
   }
 }

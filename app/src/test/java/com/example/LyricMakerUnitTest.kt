@@ -1,10 +1,10 @@
-package com.example
+package com.winsmediatama.lyricmakerpro
 
-import com.example.data.PresetLibrary
-import com.example.model.CanvasRatio
-import com.example.model.TextTransitionEffect
-import com.example.model.VisualizerType
-import com.example.model.parseColorHex
+import com.winsmediatama.lyricmakerpro.data.PresetLibrary
+import com.winsmediatama.lyricmakerpro.model.CanvasRatio
+import com.winsmediatama.lyricmakerpro.model.TextTransitionEffect
+import com.winsmediatama.lyricmakerpro.model.VisualizerType
+import com.winsmediatama.lyricmakerpro.model.parseColorHex
 import org.junit.Assert.*
 import org.junit.Test
 
