@@ -115,6 +115,19 @@ data class AudioTrackConfig(
     val waveformPeaks: List<Float> = emptyList()
 )
 
+enum class MediaClipType { IMAGE, VIDEO }
+
+data class MediaClip(
+    val id: String = UUID.randomUUID().toString(),
+    val uri: String,
+    val displayName: String,
+    val type: MediaClipType,
+    val startMs: Long,
+    val durationMs: Long = if (type == MediaClipType.IMAGE) 5000L else 10000L
+) {
+    val endMs: Long get() = startMs + durationMs.coerceAtLeast(500L)
+}
+
 data class VideoProject(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
@@ -129,7 +142,8 @@ data class VideoProject(
     val background: BackgroundConfig = BackgroundConfig(),
     val watermarkText: String = "@LyricMaker",
     val showWatermark: Boolean = false,
-    val playbackSpeed: Float = 1.0f
+    val playbackSpeed: Float = 1.0f,
+    val mediaClips: List<MediaClip> = emptyList()
 ) {
     val durationMs: Long get() = audioTrack.durationMs
 }
