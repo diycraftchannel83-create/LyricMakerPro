@@ -13,6 +13,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -510,9 +512,9 @@ private fun StudioTopAppBar(
                         .clip(RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    AsyncImage(
-                        model = R.drawable.lyricmakepro_ico,
-                        contentDescription = "LyricMakerPro logo",
+                    Image(
+                        painter = painterResource(id = R.drawable.lyricmakepro_ico),
+                        contentDescription = "Open application menu",
                         modifier = Modifier.fillMaxSize()
                     )
                     DropdownMenu(
