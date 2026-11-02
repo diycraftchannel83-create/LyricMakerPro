@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import com.example.model.*
 import com.example.ui.theme.*
 import kotlin.math.*
+import kotlinx.coroutines.delay
 
 @Composable
 fun VideoPreviewPlayer(
@@ -58,11 +59,19 @@ fun VideoPreviewPlayer(
     modifier: Modifier = Modifier
 ) {
     var showRatioMenu by remember { mutableStateOf(false) }
+    var isTextDragging by remember { mutableStateOf(false) }
     var showStyleDialog by remember { mutableStateOf(false) }
     val latestPositionX by rememberUpdatedState(project.typography.positionXPercent)
     val latestPositionY by rememberUpdatedState(project.typography.positionYPercent)
     val latestOnPositionChange by rememberUpdatedState(onTextPositionChange)
     val latestOnScaleChange by rememberUpdatedState(onTextScaleChange)
+
+    LaunchedEffect(project.typography.positionXPercent, project.typography.positionYPercent, isTextDragging) {
+        if (isTextDragging) {
+            delay(180)
+            isTextDragging = false
+        }
+    }
 
     Column(
         modifier = modifier
@@ -176,7 +185,7 @@ fun VideoPreviewPlayer(
                     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text("TEXT STUDIO", color = NeonCyan, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
                         Text("Lyric Typography", color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text("Atur tampilan teks untuk seluruh baris lirik", color = TextSecondary, fontSize = 12.sp)
+                        Text("Customize text appearance for all lyric lines", color = TextSecondary, fontSize = 12.sp)
                     }
                 },
                 text = {
@@ -191,7 +200,7 @@ fun VideoPreviewPlayer(
                         ) {
                             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("UKURAN HURUF", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                    Text("FONT SIZE", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                                     Text("${project.typography.fontSizeSp.toInt()} sp", color = NeonCyan, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
                                 }
                                 Slider(
@@ -200,15 +209,15 @@ fun VideoPreviewPlayer(
                                     valueRange = 2f..96f
                                 )
                                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                    Text("2 sp • Sangat kecil", color = TextSecondary, fontSize = 10.sp)
-                                    Text("96 sp • Besar", color = TextSecondary, fontSize = 10.sp)
+                                    Text("2 sp • Tiny", color = TextSecondary, fontSize = 10.sp)
+                                    Text("96 sp • Large", color = TextSecondary, fontSize = 10.sp)
                                 }
                             }
                         }
 
                         Surface(color = StudioSurfaceVariant, shape = RoundedCornerShape(14.dp), border = androidx.compose.foundation.BorderStroke(1.dp, StudioCardBorder)) {
                             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                                Text("JENIS HURUF", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Text("FONT FAMILY", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                                 listOf("SansSerif", "Serif", "Monospace", "Casual", "Cursive").chunked(3).forEach { familyRow ->
                                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         familyRow.forEach { family ->
@@ -221,7 +230,7 @@ fun VideoPreviewPlayer(
                                     }
                                 }
                                 androidx.compose.material3.HorizontalDivider(color = StudioCardBorder)
-                                Text("GAYA HURUF", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Text("FONT STYLE", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     FilterChip(selected = project.typography.isBold, onClick = { onTypographyChange(project.typography.copy(isBold = !project.typography.isBold)) }, label = { Text("B  Bold") })
                                     FilterChip(selected = project.typography.isItalic, onClick = { onTypographyChange(project.typography.copy(isItalic = !project.typography.isItalic)) }, label = { Text("I  Italic") })
@@ -231,7 +240,7 @@ fun VideoPreviewPlayer(
 
                         Surface(color = StudioSurfaceVariant, shape = RoundedCornerShape(14.dp), border = androidx.compose.foundation.BorderStroke(1.dp, StudioCardBorder)) {
                             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                                Text("EFEK VISUAL", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Text("VISUAL EFFECTS", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                                 FontVisualEffect.entries.chunked(2).forEach { effectRow ->
                                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         effectRow.forEach { effect ->
@@ -248,7 +257,7 @@ fun VideoPreviewPlayer(
 
                         Surface(color = StudioSurfaceVariant, shape = RoundedCornerShape(14.dp), border = androidx.compose.foundation.BorderStroke(1.dp, StudioCardBorder)) {
                             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                                Text("TATA LETAK KARAOKE", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Text("KARAOKE LAYOUT", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                                 LyricLayoutMode.entries.forEach { mode ->
                                     FilterChip(
                                         selected = project.typography.lyricLayout == mode,
@@ -262,7 +271,7 @@ fun VideoPreviewPlayer(
                 },
                 confirmButton = {
                     TextButton(onClick = { showStyleDialog = false }) {
-                        Text("Selesai", color = NeonCyan, fontWeight = FontWeight.Bold)
+                        Text("Done", color = NeonCyan, fontWeight = FontWeight.Bold)
                     }
                 },
                 containerColor = StudioSurface,
@@ -289,6 +298,7 @@ fun VideoPreviewPlayer(
                     .pointerInput(Unit) {
                         detectTransformGestures { _, pan, zoom, _ ->
                             if (size.width > 0 && size.height > 0) {
+                                if (pan.x != 0f || pan.y != 0f) isTextDragging = true
                                 val currentX = latestPositionX
                                 val currentY = latestPositionY
                                 val proposedX = (currentX + pan.x / size.width * 100f).coerceIn(5f, 95f)
@@ -367,7 +377,7 @@ fun VideoPreviewPlayer(
                 // Center alignment guides appear while lyric position is snapped to canvas center.
                 val verticalAligned = kotlin.math.abs(project.typography.positionXPercent - 50f) < 0.01f
                 val horizontalAligned = kotlin.math.abs(project.typography.positionYPercent - 50f) < 0.01f
-                if (verticalAligned || horizontalAligned) {
+                if (isTextDragging) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val guidePaintColor = NeonCyan
                         if (verticalAligned) {
