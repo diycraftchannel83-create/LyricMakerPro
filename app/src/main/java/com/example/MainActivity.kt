@@ -4,6 +4,7 @@ import android.net.Uri
 import android.media.MediaMetadataRetriever
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -32,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.model.BackgroundConfig
 import com.example.model.BackgroundType
+import com.example.data.ProjectFileCodec
 import com.example.ui.components.*
 import com.example.ui.theme.*
 import com.example.viewmodel.LyricMakerViewModel
@@ -132,6 +134,40 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                val saveProjectLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.CreateDocument("application/json")
+                ) { uri: Uri? ->
+                    if (uri != null) {
+                        runCatching {
+                            contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
+                                writer.write(ProjectFileCodec.encode(project))
+                            } ?: error("Unable to open destination file")
+                        }.onSuccess {
+                            Toast.makeText(this@MainActivity, "Project saved", Toast.LENGTH_SHORT).show()
+                        }.onFailure {
+                            Toast.makeText(this@MainActivity, "Save failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+
+                val openProjectLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.OpenDocument()
+                ) { uri: Uri? ->
+                    if (uri != null) {
+                        runCatching {
+                            contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                                ?: error("Unable to read project file")
+                        }.mapCatching { json -> ProjectFileCodec.decode(json) }
+                            .onSuccess { loaded ->
+                                viewModel.loadProject(loaded)
+                                Toast.makeText(this@MainActivity, "Project opened", Toast.LENGTH_SHORT).show()
+                            }.onFailure {
+                                Toast.makeText(this@MainActivity, "Open failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show()
+                            }
+                    }
+                }
+
                 Scaffold(
                     modifier = Modifier
                         .fillMaxSize()
@@ -148,7 +184,8 @@ class MainActivity : ComponentActivity() {
                             onPickVideo = { videoPicker.launch(arrayOf("video/*")) },
                             onOpenExport = { viewModel.setShowExportDialog(true) },
                             onPickLyrics = { lyricsPicker.launch("text/*") },
-                            onOpenProject = { viewModel.setShowTemplatesSheet(true) }
+                            onOpenProject = { openProjectLauncher.launch(arrayOf("application/json", "text/plain")) },
+                            onSaveProject = { saveProjectLauncher.launch("${project.title.replace(Regex("[^A-Za-z0-9_-]"), "_")}.lyricmaker.json") }
                         )
                     }
                 ) { innerPadding ->
@@ -313,7 +350,8 @@ private fun StudioTopAppBar(
     onPickVideo: () -> Unit,
     onOpenExport: () -> Unit,
     onPickLyrics: () -> Unit,
-    onOpenProject: () -> Unit
+    onOpenProject: () -> Unit,
+    onSaveProject: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     var languageDialog by remember { mutableStateOf(false) }
@@ -385,7 +423,7 @@ private fun StudioTopAppBar(
                         DropdownMenuItem(
                             text = { Text("Save Project") },
                             leadingIcon = { Icon(Icons.Default.Save, null) },
-                            onClick = { menuExpanded = false }
+                            onClick = { menuExpanded = false; onSaveProject() }
                         )
                         HorizontalDivider(color = StudioCardBorder)
                         DropdownMenuItem(
