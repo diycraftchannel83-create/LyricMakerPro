@@ -297,7 +297,10 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun setTypographyPreset(preset: TypographyPreset) {
-        _project.value = _project.value.copy(typography = preset)
+        val selectedSize = _project.value.typography.fontSizeSp
+        _project.value = _project.value.copy(
+            typography = preset.copy(fontSizeSp = selectedSize)
+        )
     }
 
     fun updateTypographyProperties(

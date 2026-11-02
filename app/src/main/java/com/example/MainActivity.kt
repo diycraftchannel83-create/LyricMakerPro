@@ -80,6 +80,8 @@ class MainActivity : ComponentActivity() {
                 val lastExportedFile by viewModel.lastExportedFile.collectAsStateWithLifecycle()
 
                 val showTemplatesSheet by viewModel.showTemplatesSheet.collectAsStateWithLifecycle()
+                var showSaveProjectDialog by rememberSaveable { mutableStateOf(false) }
+                var saveProjectName by rememberSaveable { mutableStateOf(project.title) }
 
                 val lyricsPicker = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.GetContent()
@@ -226,9 +228,8 @@ class MainActivity : ComponentActivity() {
                             onPickLyrics = { lyricsPicker.launch("text/*") },
                             onOpenProject = { openProjectLauncher.launch(arrayOf("application/json", "text/plain")) },
                             onSaveProject = {
-                                runCatching { LyricMakerStorage.saveProject(this@MainActivity, project) }
-                                    .onSuccess { Toast.makeText(this@MainActivity, "Project saved successfully", Toast.LENGTH_LONG).show() }
-                                    .onFailure { Toast.makeText(this@MainActivity, "Save failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show() }
+                                saveProjectName = project.title
+                                showSaveProjectDialog = true
                             },
                             onSaveLrc = {
                                 runCatching { LyricMakerStorage.saveLrc(this@MainActivity, project) }
@@ -373,6 +374,49 @@ class MainActivity : ComponentActivity() {
                     }
 
                     // Dialogs & Sheets
+
+                    if (showSaveProjectDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showSaveProjectDialog = false },
+                            containerColor = StudioSurface,
+                            title = { Text("Save Project", color = TextPrimary, fontWeight = FontWeight.Bold) },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("Enter a name for this project", color = TextSecondary, fontSize = 12.sp)
+                                    OutlinedTextField(
+                                        value = saveProjectName,
+                                        onValueChange = { saveProjectName = it },
+                                        singleLine = true,
+                                        label = { Text("Project name") },
+                                        placeholder = { Text("My Lyric Project") },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    enabled = saveProjectName.isNotBlank(),
+                                    onClick = {
+                                        val name = saveProjectName.trim()
+                                        runCatching {
+                                            LyricMakerStorage.saveProject(this@MainActivity, project, name)
+                                        }.onSuccess {
+                                            showSaveProjectDialog = false
+                                            Toast.makeText(this@MainActivity, "Project saved as $name", Toast.LENGTH_LONG).show()
+                                        }.onFailure {
+                                            Toast.makeText(this@MainActivity, "Save failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                ) { Text("Save", color = NeonCyan) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showSaveProjectDialog = false }) {
+                                    Text("Cancel", color = TextSecondary)
+                                }
+                            }
+                        )
+                    }
+
                     if (isTapToSyncActive) {
                         TapToSyncModal(
                             project = project,
