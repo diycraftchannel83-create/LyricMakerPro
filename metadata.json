@@ -1,0 +1,6 @@
+{
+  "name": "LyricMaker",
+  "description": "Create animated lyric videos with real-time audio sync, dynamic text transitions, visualizer overlays, and multi-track timeline editing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
