@@ -47,11 +47,12 @@ fun VideoPreviewPlayer(
     onSeek: (Long) -> Unit,
     onTextPositionChange: (Float, Float) -> Unit,
     onTextScaleChange: (Float) -> Unit,
+    onTypographyChange: (TypographyPreset) -> Unit,
     onRatioChange: (CanvasRatio) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showRatioMenu by remember { mutableStateOf(false) }
-    var showStyleDialog by remember { mutableStateOf(false) }\n    var showStyleDialog by remember { mutableStateOf(false) }
+    var showStyleDialog by remember { mutableStateOf(false) }
     val latestPositionX by rememberUpdatedState(project.typography.positionXPercent)
     val latestPositionY by rememberUpdatedState(project.typography.positionYPercent)
     val latestOnPositionChange by rememberUpdatedState(onTextPositionChange)
