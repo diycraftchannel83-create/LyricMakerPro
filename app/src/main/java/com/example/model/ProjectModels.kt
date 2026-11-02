@@ -55,7 +55,7 @@ data class BackgroundConfig(
     val darkOverlayOpacity: Float = 0.45f
 )
 
-data class TypographyPreset(
+enum class FontVisualEffect(val label: String) { NONE("Clean"), NEON_GLOW("Neon Glow"), SOFT_SHADOW("Soft Shadow"), DOUBLE_OUTLINE("Double Outline") }\n\nenum class LyricLayoutMode(val label: String) { SINGLE_LINE("Single Line"), KARAOKE_TWO_LINE("Two-Line Karaoke") }\n\ndata class TypographyPreset(
     val id: String = UUID.randomUUID().toString(),
     val name: String,
     val fontFamilyName: String = "SansSerif",
