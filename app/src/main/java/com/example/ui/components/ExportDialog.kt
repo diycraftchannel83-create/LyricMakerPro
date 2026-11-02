@@ -148,16 +148,6 @@ fun ExportDialog(
                     )
                 }
 
-                    FilterChip(
-                        selected = selectedDurationSec == 0,
-                        onClick = { selectedDurationSec = 0 },
-                        label = { Text("Full Song • ${formatExportDuration(project.durationMs)}", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                        modifier = Modifier.fillMaxWidth().testTag("export_full_song_duration")
-                    )
-                    if (project.audioTrack.beatType != com.example.model.AudioBeatType.CUSTOM_FILE) {
-                        Text("Import an MP3/WAV song to enable video export.", fontSize = 11.sp, color = CyberYellow)
-                    }
-
                 // Live Export Progress
                 if (isExporting) {
                     Column(
