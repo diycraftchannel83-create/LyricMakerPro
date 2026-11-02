@@ -23,7 +23,7 @@ object LyricMakerStorage {
     private fun safeName(value: String): String =
         value.replace(Regex("[^A-Za-z0-9._-]"), "_").trim('_').ifBlank { "Untitled" }
 
-    private fun timestamp(): String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+    private fun timestamp(): String = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
 
     fun saveProject(context: Context, project: VideoProject): Uri {
         val name = "${safeName(project.title)}_${timestamp()}.lyricmaker.json"
@@ -51,16 +51,22 @@ object LyricMakerStorage {
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, name)
                 put(MediaStore.MediaColumns.MIME_TYPE, mime)
-                put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
+                // RELATIVE_PATH must begin with a standard public collection directory.
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOCUMENTS}/$relativePath/")
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
             val collection = MediaStore.Files.getContentUri("external")
             val uri = requireNotNull(context.contentResolver.insert(collection, values)) { "Cannot create $name" }
             try {
-                context.contentResolver.openOutputStream(uri, "w")?.bufferedWriter()?.use { it.write(content) }
-                    ?: error("Cannot write $name")
+                val output = context.contentResolver.openOutputStream(uri, "wt")
+                    ?: error("Cannot open output stream for $name")
+                output.bufferedWriter(Charsets.UTF_8).use { writer ->
+                    writer.write(content)
+                    writer.flush()
+                }
                 val publish = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
-                context.contentResolver.update(uri, publish, null, null)
+                val updated = context.contentResolver.update(uri, publish, null, null)
+                if (updated <= 0) error("Could not publish saved file $name")
                 return uri
             } catch (error: Exception) {
                 context.contentResolver.delete(uri, null, null)
@@ -68,9 +74,20 @@ object LyricMakerStorage {
             }
         }
 
-        val directory = File(context.getExternalFilesDir(null), relativePath).apply { mkdirs() }
+        // Android 9 and earlier: use the app-specific Documents directory.
+        // This avoids requesting broad legacy storage permissions.
+        val baseDirectory = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+            ?: File(context.filesDir, Environment.DIRECTORY_DOCUMENTS)
+        val directory = File(baseDirectory, relativePath).apply {
+            if (!exists() && !mkdirs()) error("Cannot create project folder: $absolutePath")
+            if (!isDirectory || !canWrite()) error("Project folder is not writable: $absolutePath")
+        }
         val file = File(directory, name)
-        file.writeText(content)
+        file.outputStream().bufferedWriter(Charsets.UTF_8).use { writer ->
+            writer.write(content)
+            writer.flush()
+        }
+        if (!file.exists() || file.length() <= 0L) error("Project file was not written")
         return Uri.fromFile(file)
     }
 
