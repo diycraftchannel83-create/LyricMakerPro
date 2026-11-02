@@ -37,6 +37,7 @@ Feature availability and behavior may evolve as development continues.
 - Kotlin Coroutines
 - Gradle Kotlin DSL
 - Firebase Google Services Gradle plugin and Firebase dependencies
+- Google Mobile Ads SDK (rewarded video export)
 
 ## Build
 
@@ -117,6 +118,15 @@ base64 < google-services.json | tr -d '\\n'
 The workflow decodes the secret to `app/google-services.json` and validates it before running the Android build. If the secret is absent, the workflow can continue without Firebase configuration; Firebase-dependent runtime features may therefore be unavailable. Configure the secret before relying on Firebase services in CI builds.
 
 The file `app/google-services.json` is excluded by `.gitignore`. Never commit service account private keys or other server credentials. The Firebase Android configuration file is a client configuration, not a substitute for securing backend services with Firebase Security Rules and App Check.
+
+## AdMob rewarded export
+
+LyricMakerPro uses Google Mobile Ads rewarded video to offer one watermark-free video export after the SDK confirms the user's reward.
+
+- AdMob app ID (release): `ca-app-pub-1254774552944426~4202353823`
+- Rewarded ad unit (release): `ca-app-pub-1254774552944426/3672317894`
+- Debug builds use Google's official sample app and rewarded-ad unit IDs; live ads are used only in non-debug builds.
+- If an ad is unavailable or the user does not earn the reward, the app does not start a watermark-free export. Standard export remains available with watermark.
 
 ## GitHub Actions
 
