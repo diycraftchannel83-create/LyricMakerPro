@@ -340,7 +340,9 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         val clips = _project.value.mediaClips.map { clip ->
             if (clip.id == id) {
                 val minimum = if (clip.type == MediaClipType.VIDEO) 500L else 1_000L
-                val sourceRemaining = (clip.sourceDurationMs - clip.sourceOffsetMs).coerceAtLeast(minimum)
+                val sourceRemaining = if (clip.type == MediaClipType.VIDEO) {
+                    (clip.sourceDurationMs - clip.sourceOffsetMs).coerceAtLeast(minimum)
+                } else 3_600_000L
                 val projectRemaining = (_project.value.durationMs - clip.startMs).coerceAtLeast(minimum)
                 val maximum = minOf(sourceRemaining, projectRemaining)
                 clip.copy(durationMs = (clip.durationMs + deltaMs).coerceIn(minimum, maximum))
@@ -360,8 +362,10 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
             val minimum = if (clip.type == MediaClipType.VIDEO) 500L else 1_000L
             val maxOffset = (clip.sourceDurationMs - minimum).coerceAtLeast(0L)
             val requestedOffset = (clip.sourceOffsetMs + deltaMs).coerceIn(0L, maxOffset)
-            val actualDelta = (requestedOffset - clip.sourceOffsetMs)
-                .coerceAtLeast(-clip.startMs)
+            val actualDelta = (requestedOffset - clip.sourceOffsetMs).coerceIn(
+                -minOf(clip.startMs, clip.sourceOffsetMs),
+                (clip.durationMs - minimum).coerceAtLeast(0L)
+            )
             val newOffset = (clip.sourceOffsetMs + actualDelta).coerceAtLeast(0L)
             val newDuration = (clip.durationMs - actualDelta).coerceAtLeast(minimum)
             clip.copy(
