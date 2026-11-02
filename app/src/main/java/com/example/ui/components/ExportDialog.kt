@@ -30,6 +30,7 @@ fun ExportDialog(
     exportStatus: String,
     lastExportedFile: File?,
     onStartExport: (ExportQuality, Int) -> Unit,
+    onWatchAdAndExport: (ExportQuality, Int) -> Unit,
     onExportCover: () -> Unit,
     onShare: () -> Unit,
     onDismiss: () -> Unit
@@ -211,6 +212,17 @@ fun ExportDialog(
                     Text("Share to Social Media", color = Color.Black, fontWeight = FontWeight.Bold)
                 }
             } else if (!isExporting) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Button(
+                    onClick = { onWatchAdAndExport(selectedQuality, selectedDurationSec) },
+                    enabled = project.audioTrack.beatType == com.winsmediatama.lyricmakerpro.model.AudioBeatType.CUSTOM_FILE && project.durationMs > 0L,
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
+                    modifier = Modifier.testTag("watch_ad_export_button").fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.PlayCircle, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Black)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Watch Ad • Export Without Watermark", fontWeight = FontWeight.Bold, color = Color.Black)
+                }
                 Button(
                     onClick = { onStartExport(selectedQuality, selectedDurationSec) },
                     enabled = project.audioTrack.beatType == com.winsmediatama.lyricmakerpro.model.AudioBeatType.CUSTOM_FILE && project.durationMs > 0L,
@@ -219,7 +231,8 @@ fun ExportDialog(
                 ) {
                     Icon(Icons.Default.MovieCreation, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Export MP4 Video", fontWeight = FontWeight.Bold)
+                    Text("Export With Watermark", fontWeight = FontWeight.Bold)
+                }
                 }
             }
         },
