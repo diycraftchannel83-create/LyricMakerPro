@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.core.content.FileProvider
 import com.example.model.*
+import com.example.data.LyricMakerStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -190,6 +191,7 @@ class VideoExportEngine(private val context: Context) {
             releaseMediaAssets(mediaAssets)
         }
 
+        LyricMakerStorage.copyExportedVideo(context, outputFile)
         outputFile
     }
 
