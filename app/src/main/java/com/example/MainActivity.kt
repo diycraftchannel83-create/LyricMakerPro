@@ -179,6 +179,10 @@ class MainActivity : ComponentActivity() {
                                 runCatching { LyricMakerStorage.saveLrc(this@MainActivity, project) }
                                     .onSuccess { Toast.makeText(this@MainActivity, "LRC saved to LyricMakerPro/LrcLyric", Toast.LENGTH_LONG).show() }
                                     .onFailure { Toast.makeText(this@MainActivity, "LRC save failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show() }
+                            },
+                            onExit = {
+                                viewModel.audioEngine.stop()
+                                finishAffinity()
                             }
                         )
                     }
@@ -346,7 +350,8 @@ private fun StudioTopAppBar(
     onPickLyrics: () -> Unit,
     onOpenProject: () -> Unit,
     onSaveProject: () -> Unit,
-    onSaveLrc: () -> Unit
+    onSaveLrc: () -> Unit,
+    onExit: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     var languageDialog by remember { mutableStateOf(false) }
@@ -446,7 +451,10 @@ private fun StudioTopAppBar(
                         DropdownMenuItem(
                             text = { Text("Exit", color = Color(0xFFFF5370)) },
                             leadingIcon = { Icon(Icons.Default.ExitToApp, null, tint = Color(0xFFFF5370)) },
-                            onClick = { menuExpanded = false }
+                            onClick = {
+                                menuExpanded = false
+                                onExit()
+                            }
                         )
                     }
                 }
