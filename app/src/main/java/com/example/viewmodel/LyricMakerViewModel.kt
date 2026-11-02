@@ -266,7 +266,9 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         highlightHex: String? = null,
         strokeWidthDp: Float? = null,
         glowRadiusDp: Float? = null,
-        fontFamily: String? = null
+        fontFamily: String? = null,
+        positionXPercent: Float? = null,
+        positionYPercent: Float? = null
     ) {
         val current = _project.value.typography
         _project.value = _project.value.copy(
@@ -276,7 +278,9 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
                 highlightColorHex = highlightHex ?: current.highlightColorHex,
                 strokeWidthDp = strokeWidthDp ?: current.strokeWidthDp,
                 glowRadiusDp = glowRadiusDp ?: current.glowRadiusDp,
-                fontFamilyName = fontFamily ?: current.fontFamilyName
+                fontFamilyName = fontFamily ?: current.fontFamilyName,
+                positionXPercent = positionXPercent?.coerceIn(5f, 95f) ?: current.positionXPercent,
+                positionYPercent = positionYPercent?.coerceIn(5f, 95f) ?: current.positionYPercent
             )
         )
     }
