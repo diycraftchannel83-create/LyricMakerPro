@@ -133,7 +133,8 @@ class MainActivity : ComponentActivity() {
                                     onTogglePlay = { viewModel.audioEngine.togglePlayPause() },
                                     onSeek = { viewModel.audioEngine.seekTo(it) },
                                     onTextPositionChange = { dx, dy -> viewModel.updateTypographyProperties(positionXPercent = project.typography.positionXPercent + dx, positionYPercent = project.typography.positionYPercent + dy) },
-                                    onTextScaleChange = { factor -> viewModel.updateTypographyProperties(fontSizeSp = (project.typography.fontSizeSp * factor).coerceIn(18f, 96f)) },\n                                    onTypographyChange = { viewModel.setTypographyPreset(it) },
+                                    onTextScaleChange = { factor -> viewModel.updateTypographyProperties(fontSizeSp = (project.typography.fontSizeSp * factor).coerceIn(18f, 96f)) },
+                                    onTypographyChange = { viewModel.setTypographyPreset(it) },
                                     onRatioChange = { viewModel.setCanvasRatio(it) },
                                     modifier = Modifier
                                         .weight(0.5f)
