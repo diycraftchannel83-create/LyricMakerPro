@@ -12,6 +12,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +59,11 @@ class MainActivity : ComponentActivity() {
 
                 val selectedLineId by viewModel.selectedLineId.collectAsStateWithLifecycle()
                 val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
+                var studioSheetExpanded by rememberSaveable { mutableStateOf(false) }
+                val studioSheetHeight by animateDpAsState(
+                    targetValue = if (studioSheetExpanded) 360.dp else 78.dp,
+                    label = "studio-sheet-height"
+                )
 
                 val isTapToSyncActive by viewModel.isTapToSyncActive.collectAsStateWithLifecycle()
                 val syncLineIndex by viewModel.syncLineIndex.collectAsStateWithLifecycle()
@@ -254,44 +261,46 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         } else {
-                            // Mobile vertical studio layout
-                            Column(modifier = Modifier.fillMaxSize()) {
-                                VideoPreviewPlayer(
-                                    project = project,
-                                    playheadMs = playheadMs,
-                                    isPlaying = isPlaying,
-                                    spectrumBands = spectrumBands,
-                                    bassEnergy = bassEnergy,
-                                    onTogglePlay = { viewModel.audioEngine.togglePlayPause() },
-                                    onSeek = { viewModel.audioEngine.seekTo(it) },
-                                    onTextPositionChange = { dx, dy -> viewModel.updateTypographyProperties(positionXPercent = project.typography.positionXPercent + dx, positionYPercent = project.typography.positionYPercent + dy) },
-                                    onTextScaleChange = { factor -> viewModel.updateTypographyProperties(fontSizeSp = (project.typography.fontSizeSp * factor).coerceIn(18f, 96f)) },
-                                    onTypographyChange = { viewModel.setTypographyPreset(it) },
-                                    onRatioChange = { viewModel.setCanvasRatio(it) },
-                                    videoAudioMuted = project.videoAudioMuted
-                                )
+                            // Mobile vertical studio layout with a draggable bottom editor sheet.
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                Column(modifier = Modifier.fillMaxSize()) {
+                                    VideoPreviewPlayer(
+                                        project = project,
+                                        playheadMs = playheadMs,
+                                        isPlaying = isPlaying,
+                                        spectrumBands = spectrumBands,
+                                        bassEnergy = bassEnergy,
+                                        onTogglePlay = { viewModel.audioEngine.togglePlayPause() },
+                                        onSeek = { viewModel.audioEngine.seekTo(it) },
+                                        onTextPositionChange = { dx, dy -> viewModel.updateTypographyProperties(positionXPercent = project.typography.positionXPercent + dx, positionYPercent = project.typography.positionYPercent + dy) },
+                                        onTextScaleChange = { factor -> viewModel.updateTypographyProperties(fontSizeSp = (project.typography.fontSizeSp * factor).coerceIn(18f, 96f)) },
+                                        onTypographyChange = { viewModel.setTypographyPreset(it) },
+                                        onRatioChange = { viewModel.setCanvasRatio(it) },
+                                        videoAudioMuted = project.videoAudioMuted
+                                    )
 
-                                MultiTrackTimeline(
-                                    project = project,
-                                    playheadMs = playheadMs,
-                                    selectedLineId = selectedLineId,
-                                    onSelectLine = { viewModel.selectLyricLine(it) },
-                                    onSeek = { viewModel.audioEngine.seekTo(it) },
-                                    onNudge = { viewModel.nudgeSelectedLyric(it) },
-                                    onMoveLine = { viewModel.moveSelectedLyric(it) },
-                                    onAdjustStart = { viewModel.updateSelectedLyricStart(it) },
-                                    onAdjustDuration = { viewModel.updateSelectedLyricDuration(it) },
+                                    MultiTrackTimeline(
+                                        project = project,
+                                        playheadMs = playheadMs,
+                                        selectedLineId = selectedLineId,
+                                        onSelectLine = { viewModel.selectLyricLine(it) },
+                                        onSeek = { viewModel.audioEngine.seekTo(it) },
+                                        onNudge = { viewModel.nudgeSelectedLyric(it) },
+                                        onMoveLine = { viewModel.moveSelectedLyric(it) },
+                                        onAdjustStart = { viewModel.updateSelectedLyricStart(it) },
+                                        onAdjustDuration = { viewModel.updateSelectedLyricDuration(it) },
                                         onTextChange = { id, text -> viewModel.updateLyricText(id, text) },
-                                    onAddLine = { viewModel.addLyricLine() },
-                                    onDeleteLine = { viewModel.deleteSelectedLyric() },
-                                    onOpenTapToSync = { viewModel.startTapToSync() },
-                                    onMoveMediaClip = { id, delta -> viewModel.moveMediaClip(id, delta) },
-                                    onResizeMediaClip = { id, delta -> viewModel.resizeMediaClip(id, delta) },
-                                    onTrimMediaClipStart = { id, delta -> viewModel.trimMediaClipStart(id, delta) },
-                                    videoAudioMuted = project.videoAudioMuted,
-                                    onToggleVideoMute = { viewModel.setVideoAudioMuted(!project.videoAudioMuted) },
-                                    onRemoveMediaClip = { id -> viewModel.removeMediaClip(id) }
-                                )
+                                        onAddLine = { viewModel.addLyricLine() },
+                                        onDeleteLine = { viewModel.deleteSelectedLyric() },
+                                        onOpenTapToSync = { viewModel.startTapToSync() },
+                                        onMoveMediaClip = { id, delta -> viewModel.moveMediaClip(id, delta) },
+                                        onResizeMediaClip = { id, delta -> viewModel.resizeMediaClip(id, delta) },
+                                        onTrimMediaClipStart = { id, delta -> viewModel.trimMediaClipStart(id, delta) },
+                                        videoAudioMuted = project.videoAudioMuted,
+                                        onToggleVideoMute = { viewModel.setVideoAudioMuted(!project.videoAudioMuted) },
+                                        onRemoveMediaClip = { id -> viewModel.removeMediaClip(id) }
+                                    )
+                                }
 
                                 StudioTabs(
                                     viewModel = viewModel,
@@ -299,9 +308,16 @@ class MainActivity : ComponentActivity() {
                                     currentTab = currentTab,
                                     onTabSelected = { viewModel.selectTab(it) },
                                     onOpenTapToSync = { viewModel.startTapToSync() },
+                                    isExpanded = studioSheetExpanded,
+                                    onToggleExpanded = { studioSheetExpanded = it },
                                     modifier = Modifier
+                                        .align(Alignment.BottomCenter)
                                         .fillMaxWidth()
-                                        .weight(1f)
+                                        .height(studioSheetHeight)
+                                        .navigationBarsPadding()
+                                        .shadow(18.dp, RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
+                                        .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
+                                        .border(1.dp, StudioCardBorder, RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
                                 )
                             }
                         }
