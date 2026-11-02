@@ -33,6 +33,7 @@ fun ExportDialog(
     onWatchAdAndExport: (ExportQuality, Int) -> Unit,
     onExportCover: () -> Unit,
     onShare: () -> Unit,
+    onExportAgain: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var selectedQuality by remember { mutableStateOf(ExportQuality.FULL_HD_1080P) }
@@ -201,53 +202,76 @@ fun ExportDialog(
             }
         },
         confirmButton = {
-            if (lastExportedFile != null && !isExporting) {
-                Button(
-                    onClick = onShare,
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
-                    modifier = Modifier.testTag("share_video_button")
-                ) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Black)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Share to Social Media", color = Color.Black, fontWeight = FontWeight.Bold)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (lastExportedFile != null && !isExporting) {
+                    Button(
+                        onClick = onShare,
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
+                        modifier = Modifier.fillMaxWidth().testTag("share_video_button")
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Black)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Share to Social Media", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = onExportAgain,
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonMagenta),
+                        modifier = Modifier.fillMaxWidth().testTag("export_again_button")
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Export Video Again", fontWeight = FontWeight.Bold)
+                    }
+                } else if (!isExporting) {
+                    Button(
+                        onClick = { onWatchAdAndExport(selectedQuality, selectedDurationSec) },
+                        enabled = project.audioTrack.beatType == com.winsmediatama.lyricmakerpro.model.AudioBeatType.CUSTOM_FILE && project.durationMs > 0L,
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
+                        modifier = Modifier.fillMaxWidth().testTag("watch_ad_export_button")
+                    ) {
+                        Icon(Icons.Default.PlayCircle, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Black)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Watch Ad • Export Without Watermark", fontWeight = FontWeight.Bold, color = Color.Black)
+                    }
+                    Button(
+                        onClick = { onStartExport(selectedQuality, selectedDurationSec) },
+                        enabled = project.audioTrack.beatType == com.winsmediatama.lyricmakerpro.model.AudioBeatType.CUSTOM_FILE && project.durationMs > 0L,
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonMagenta),
+                        modifier = Modifier.fillMaxWidth().testTag("start_export_button")
+                    ) {
+                        Icon(Icons.Default.MovieCreation, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Export With Watermark", fontWeight = FontWeight.Bold)
+                    }
                 }
-            } else if (!isExporting) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Button(
-                    onClick = { onWatchAdAndExport(selectedQuality, selectedDurationSec) },
-                    enabled = project.audioTrack.beatType == com.winsmediatama.lyricmakerpro.model.AudioBeatType.CUSTOM_FILE && project.durationMs > 0L,
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
-                    modifier = Modifier.testTag("watch_ad_export_button").fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.PlayCircle, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Black)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Watch Ad • Export Without Watermark", fontWeight = FontWeight.Bold, color = Color.Black)
-                }
-                Button(
-                    onClick = { onStartExport(selectedQuality, selectedDurationSec) },
-                    enabled = project.audioTrack.beatType == com.winsmediatama.lyricmakerpro.model.AudioBeatType.CUSTOM_FILE && project.durationMs > 0L,
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonMagenta),
-                    modifier = Modifier.testTag("start_export_button")
-                ) {
-                    Icon(Icons.Default.MovieCreation, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Export With Watermark", fontWeight = FontWeight.Bold)
-                }
+
+                if (!isExporting) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onExportCover,
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = CyberYellow)
+                        ) {
+                            Text("Save Poster", fontWeight = FontWeight.SemiBold)
+                        }
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+                        ) {
+                            Text("Close", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                 }
             }
         },
-        dismissButton = {
-            if (!isExporting) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    TextButton(onClick = onExportCover) {
-                        Text("Save Poster", color = CyberYellow)
-                    }
-                    TextButton(onClick = onDismiss) {
-                        Text("Close", color = TextSecondary)
-                    }
-                }
-            }
-        },
+        dismissButton = {},
         containerColor = StudioSurface
     )
 }
