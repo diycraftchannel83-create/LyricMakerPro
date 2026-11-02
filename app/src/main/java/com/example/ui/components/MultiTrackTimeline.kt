@@ -656,15 +656,29 @@ private fun LyricsTrackRow(
                     .padding(horizontal = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = line.text,
-                    fontSize = 11.sp,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                if (widthDp >= 56.dp) {
+                    Text(
+                        text = line.text,
+                        fontSize = when {
+                            widthDp < 76.dp -> 7.sp
+                            widthDp < 110.dp -> 9.sp
+                            else -> 11.sp
+                        },
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = "Lyric clip",
+                        tint = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier.size(10.dp)
+                    )
+                }
 
                 // Left trim handle: adjusts the lyric start while keeping its end fixed.
                 Box(
