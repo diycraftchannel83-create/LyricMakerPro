@@ -6,6 +6,7 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.ByteOrder
@@ -26,9 +27,12 @@ object AudioWaveformExtractor {
         val peaks = FloatArray(peakCount.coerceIn(128, 1200))
         val extractor = MediaExtractor()
         var decoder: MediaCodec? = null
+        var sourceDescriptor: ParcelFileDescriptor? = null
 
         try {
-            extractor.setDataSource(context, Uri.parse(uriString))
+            sourceDescriptor = context.contentResolver.openFileDescriptor(Uri.parse(uriString), "r")
+                ?: return@withContext emptyList<Float>()
+            extractor.setDataSource(sourceDescriptor.fileDescriptor)
             var audioFormat: MediaFormat? = null
             for (trackIndex in 0 until extractor.trackCount) {
                 val format = extractor.getTrackFormat(trackIndex)
@@ -138,6 +142,7 @@ object AudioWaveformExtractor {
             runCatching { decoder?.stop() }
             runCatching { decoder?.release() }
             runCatching { extractor.release() }
+            runCatching { sourceDescriptor?.close() }
         }
     }
 }

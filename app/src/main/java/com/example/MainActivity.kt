@@ -272,7 +272,7 @@ class MainActivity : ComponentActivity() {
                                         currentTab = currentTab,
                                         onTabSelected = { viewModel.selectTab(it) },
                                         onOpenTapToSync = { viewModel.startTapToSync() },
-                                        onPickAudio = { audioPicker.launch("audio/*") },
+                                        onPickAudio = { audioPicker.launch(arrayOf("audio/*")) },
                                         onPickVideo = { videoPicker.launch(arrayOf("video/*")) },
                                         onPickImage = { imagePicker.launch(arrayOf("image/*")) },
                                         modifier = Modifier.weight(1f)
@@ -325,7 +325,7 @@ class MainActivity : ComponentActivity() {
                                     currentTab = currentTab,
                                     onTabSelected = { viewModel.selectTab(it) },
                                     onOpenTapToSync = { viewModel.startTapToSync() },
-                                    onPickAudio = { audioPicker.launch("audio/*") },
+                                    onPickAudio = { audioPicker.launch(arrayOf("audio/*")) },
                                     onPickVideo = { videoPicker.launch(arrayOf("video/*")) },
                                     onPickImage = { imagePicker.launch(arrayOf("image/*")) },
                                     isExpanded = studioSheetExpanded,
