@@ -31,6 +31,10 @@ fun ExportDialog(
     lastExportedFile: File?,
     onStartExport: (ExportQuality, Int) -> Unit,
     onWatchAdAndExport: (ExportQuality, Int) -> Unit,
+    isPermanentWatermarkRemoved: Boolean,
+    permanentWatermarkPrice: String?,
+    onBuyPermanentWatermark: () -> Unit,
+    onRestorePurchases: () -> Unit,
     onExportCover: () -> Unit,
     onShare: () -> Unit,
     onExportAgain: () -> Unit,
@@ -226,6 +230,29 @@ fun ExportDialog(
                         Text("Export Video Again", fontWeight = FontWeight.Bold)
                     }
                 } else if (!isExporting) {
+                    if (isPermanentWatermarkRemoved) {
+                        Surface(color = NeonCyan.copy(alpha = 0.12f), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                            Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Verified, contentDescription = null, tint = NeonCyan)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Permanent watermark removal active", color = NeonCyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+                    } else {
+                        Button(
+                            onClick = onBuyPermanentWatermark,
+                            colors = ButtonDefaults.buttonColors(containerColor = CyberYellow),
+                            modifier = Modifier.fillMaxWidth().testTag("buy_permanent_remove_watermark_button")
+                        ) {
+                            Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = Color.Black)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Remove Watermark Permanently • ${permanentWatermarkPrice ?: "US$5.00"}", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                        OutlinedButton(
+                            onClick = onRestorePurchases,
+                            modifier = Modifier.fillMaxWidth().testTag("restore_remove_watermark_button")
+                        ) { Text("Restore Purchase") }
+                    }
                     Button(
                         onClick = { onWatchAdAndExport(selectedQuality, selectedDurationSec) },
                         enabled = project.audioTrack.beatType == com.winsmediatama.lyricmakerpro.model.AudioBeatType.CUSTOM_FILE && project.durationMs > 0L,

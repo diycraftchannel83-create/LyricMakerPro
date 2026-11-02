@@ -112,6 +112,7 @@ dependencies {
   implementation(libs.converter.moshi)
   implementation(libs.firebase.ai)
   implementation(libs.play.services.ads)
+  implementation(libs.google.play.billing)
   // Uncomment to use Firestore:
   // implementation(libs.firebase.firestore)
 
