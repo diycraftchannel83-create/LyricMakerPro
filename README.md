@@ -119,6 +119,12 @@ The workflow decodes the secret to `app/google-services.json` and validates it b
 
 The file `app/google-services.json` is excluded by `.gitignore`. Never commit service account private keys or other server credentials. The Firebase Android configuration file is a client configuration, not a substitute for securing backend services with Firebase Security Rules and App Check.
 
+## AdMob App Open ad
+
+The first successful launch after installation attempts to show one App Open ad. The app records the first-launch ad as shown only after the SDK reports that it was displayed. If loading fails, the app remains usable and the next launch can retry. Debug builds use Google's official App Open test unit; release builds use the configured production unit.
+
+- AdMob App Open unit (release): `ca-app-pub-1254774552944426/5183216826`
+
 ## AdMob rewarded export
 
 LyricMakerPro uses Google Mobile Ads rewarded video to offer one watermark-free video export after the SDK confirms the user's reward.
