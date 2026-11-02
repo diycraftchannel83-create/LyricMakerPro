@@ -1,4 +1,4 @@
-package com.example.ui.components
+package com.winsmediatama.lyricmakerpro.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,10 +18,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.PresetLibrary
-import com.example.model.VideoProject
-import com.example.model.parseColorHex
-import com.example.ui.theme.*
+import com.winsmediatama.lyricmakerpro.data.PresetLibrary
+import com.winsmediatama.lyricmakerpro.model.VideoProject
+import com.winsmediatama.lyricmakerpro.model.parseColorHex
+import com.winsmediatama.lyricmakerpro.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
