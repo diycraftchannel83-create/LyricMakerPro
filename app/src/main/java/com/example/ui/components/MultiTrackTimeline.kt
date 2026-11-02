@@ -27,6 +27,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.LyricLine
+import com.example.model.MediaClip
+import com.example.model.MediaClipType
 import com.example.model.VideoProject
 import com.example.ui.theme.*
 
@@ -45,6 +47,9 @@ fun MultiTrackTimeline(
     onAddLine: () -> Unit,
     onDeleteLine: () -> Unit,
     onOpenTapToSync: () -> Unit,
+    onMoveMediaClip: (String, Long) -> Unit = { _, _ -> },
+    onResizeMediaClip: (String, Long) -> Unit = { _, _ -> },
+    onRemoveMediaClip: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Zoom factor: pixels per millisecond
@@ -181,7 +186,22 @@ fun MultiTrackTimeline(
 
                     Spacer(Modifier.height(4.dp))
 
-                    // Track 2: Lyrics Blocks Track
+                    // Track 2: Imported photo/video clips, placed above lyrics.
+                    MediaClipsTrackRow(
+                        clips = project.mediaClips,
+                        pxPerMs = pxPerMs,
+                        onSeek = onSeek,
+                        onMoveClip = onMoveMediaClip,
+                        onResizeClip = onResizeMediaClip,
+                        onRemoveClip = onRemoveMediaClip,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp)
+                    )
+
+                    Spacer(Modifier.height(4.dp))
+
+                    // Track 3: Lyrics Blocks Track
                     LyricsTrackRow(
                         lyrics = project.lyrics,
                         playheadMs = playheadMs,
@@ -201,7 +221,7 @@ fun MultiTrackTimeline(
 
                     Spacer(Modifier.height(4.dp))
 
-                    // Track 3: Visualizer & Background Effects Track
+                    // Track 4: Visualizer & Background Effects Track
                     EffectsTrackRow(
                         project = project,
                         pxPerMs = pxPerMs,
@@ -283,6 +303,113 @@ fun MultiTrackTimeline(
             titleContentColor = TextPrimary,
             textContentColor = TextPrimary
         )
+    }
+}
+
+
+@Composable
+private fun MediaClipsTrackRow(
+    clips: List<MediaClip>,
+    pxPerMs: Float,
+    onSeek: (Long) -> Unit,
+    onMoveClip: (String, Long) -> Unit,
+    onResizeClip: (String, Long) -> Unit,
+    onRemoveClip: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var selectedClipId by remember { mutableStateOf<String?>(null) }
+    Column(modifier = modifier) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("MEDIA • DRAG TO MOVE • RIGHT HANDLE TO TRIM", color = NeonCyan, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold)
+            if (selectedClipId != null && clips.any { it.id == selectedClipId }) {
+                IconButton(
+                    onClick = { selectedClipId?.let(onRemoveClip); selectedClipId = null },
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = "Remove selected media", tint = Color(0xFFFF6B78), modifier = Modifier.size(13.dp))
+                }
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF101722))
+                .border(1.dp, StudioCardBorder, RoundedCornerShape(8.dp))
+        ) {
+            clips.sortedBy { it.startMs }.forEach { clip ->
+                val left = (clip.startMs * pxPerMs).dp
+                val clipWidth = (clip.durationMs * pxPerMs).dp.coerceAtLeast(42.dp)
+                val tint = if (clip.type == MediaClipType.VIDEO) Color(0xFF6D45B5) else Color(0xFF147B76)
+                val selected = selectedClipId == clip.id
+                Box(
+                    modifier = Modifier
+                        .offset(x = left, y = 2.dp)
+                        .width(clipWidth)
+                        .fillMaxHeight()
+                        .padding(end = 2.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(tint)
+                        .border(if (selected) 2.dp else 1.dp, if (selected) NeonCyan else if (clip.type == MediaClipType.VIDEO) NeonMagenta else NeonCyan, RoundedCornerShape(6.dp))
+                        .pointerInput(clip.id, pxPerMs) {
+                            detectDragGestures(
+                                onDragStart = { selectedClipId = clip.id },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    onMoveClip(clip.id, (dragAmount.x / pxPerMs).toLong())
+                                }
+                            )
+                        }
+                        .clickable { selectedClipId = clip.id; onSeek(clip.startMs) }
+                        .padding(start = 6.dp, end = 12.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (clip.type == MediaClipType.VIDEO) Icons.Default.Videocam else Icons.Default.Image,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Column {
+                            Text(clip.displayName, color = Color.White, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                String.format(java.util.Locale.US, "%.1fs", clip.durationMs / 1000f),
+                                color = Color.White.copy(alpha = 0.75f),
+                                fontSize = 7.sp,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .width(10.dp)
+                            .fillMaxHeight()
+                            .background(Color.White.copy(alpha = 0.22f))
+                            .pointerInput(clip.id, pxPerMs) {
+                                detectDragGestures { change, dragAmount ->
+                                    change.consume()
+                                    onResizeClip(clip.id, (dragAmount.x / pxPerMs).toLong())
+                                }
+                            }
+                    )
+                }
+            }
+            if (clips.isEmpty()) {
+                Text(
+                    text = "Import photos or videos to add media clips",
+                    color = TextMuted,
+                    fontSize = 9.sp,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+        }
     }
 }
 

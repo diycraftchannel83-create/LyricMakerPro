@@ -115,6 +115,27 @@ data class AudioTrackConfig(
     val waveformPeaks: List<Float> = emptyList()
 )
 
+enum class MediaClipType { IMAGE, VIDEO }
+
+data class MediaClip(
+    val id: String = UUID.randomUUID().toString(),
+    val uri: String,
+    val displayName: String,
+    val type: MediaClipType,
+    val startMs: Long,
+    // Timeline duration: full source duration for video, editable remaining project span for stills.
+    val durationMs: Long
+) {
+    val endMs: Long get() = startMs + durationMs.coerceAtLeast(500L)
+
+    // Export defaults are intentionally separate from timeline/source duration.
+    val exportDurationMs: Long
+        get() = when (type) {
+            MediaClipType.IMAGE -> 5_000L
+            MediaClipType.VIDEO -> durationMs.coerceAtMost(10_000L)
+        }
+}
+
 data class VideoProject(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
@@ -129,7 +150,8 @@ data class VideoProject(
     val background: BackgroundConfig = BackgroundConfig(),
     val watermarkText: String = "@LyricMaker",
     val showWatermark: Boolean = false,
-    val playbackSpeed: Float = 1.0f
+    val playbackSpeed: Float = 1.0f,
+    val mediaClips: List<MediaClip> = emptyList()
 ) {
     val durationMs: Long get() = audioTrack.durationMs
 }

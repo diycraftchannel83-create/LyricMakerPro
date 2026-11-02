@@ -7,10 +7,12 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import androidx.core.content.FileProvider
 import com.example.model.*
+import com.example.data.LyricMakerStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -18,6 +20,40 @@ import java.io.FileOutputStream
 import kotlin.math.*
 
 class VideoExportEngine(private val context: Context) {
+
+    private data class ExportMediaAsset(
+        val clip: MediaClip,
+        val image: Bitmap? = null,
+        val retriever: MediaMetadataRetriever? = null
+    )
+
+    private fun prepareMediaAssets(clips: List<MediaClip>): List<ExportMediaAsset> = clips.mapNotNull { clip ->
+        runCatching {
+            when (clip.type) {
+                MediaClipType.IMAGE -> {
+                    val bitmap = context.contentResolver.openInputStream(Uri.parse(clip.uri))?.use { BitmapFactory.decodeStream(it) }
+                    bitmap?.let { ExportMediaAsset(clip = clip, image = it) }
+                }
+                MediaClipType.VIDEO -> {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(context, Uri.parse(clip.uri))
+                        ExportMediaAsset(clip = clip, retriever = retriever)
+                    } catch (error: Exception) {
+                        retriever.release()
+                        throw error
+                    }
+                }
+            }
+        }.getOrNull()
+    }
+
+    private fun releaseMediaAssets(assets: List<ExportMediaAsset>) {
+        assets.forEach { asset ->
+            runCatching { asset.image?.recycle() }
+            runCatching { asset.retriever?.release() }
+        }
+    }
 
     data class ExportProgress(
         val currentFrame: Int,
@@ -62,6 +98,7 @@ class VideoExportEngine(private val context: Context) {
 
         val bitmap = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
+        val mediaAssets = prepareMediaAssets(project.mediaClips)
 
         try {
             val frameDurationUs = (1_000_000L / fps)
@@ -70,7 +107,7 @@ class VideoExportEngine(private val context: Context) {
                 val timeMs = (frame.toDouble() / fps * 1000).toLong()
 
                 // Render project frame to bitmap
-                renderFrame(canvas, targetWidth, targetHeight, project, timeMs)
+                renderFrameInternal(canvas, targetWidth, targetHeight, project, timeMs, mediaAssets)
 
                 // Draw to codec input surface
                 val surfaceCanvas = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -139,7 +176,7 @@ class VideoExportEngine(private val context: Context) {
         } catch (e: Exception) {
             e.printStackTrace()
             // Fallback: If hardware surface encoding fails on virtual device, generate high-res still image as video clip
-            return@withContext exportStillFrameFallback(project, outputFile)
+            return@withContext exportStillFrameFallback(project, outputFile, mediaAssets)
         } finally {
             try {
                 codec.stop()
@@ -151,19 +188,21 @@ class VideoExportEngine(private val context: Context) {
                 }
                 bitmap.recycle()
             } catch (_: Exception) {}
+            releaseMediaAssets(mediaAssets)
         }
 
+        LyricMakerStorage.copyExportedVideo(context, outputFile)
         outputFile
     }
 
-    private fun exportStillFrameFallback(project: VideoProject, outputFile: File): File {
+    private fun exportStillFrameFallback(project: VideoProject, outputFile: File, mediaAssets: List<ExportMediaAsset>): File {
         val width = 1080
         val height = (width / project.canvasRatio.aspectRatio).toInt()
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val activeLine = project.lyrics.firstOrNull()
         val timeMs = activeLine?.startMs ?: 1500L
-        renderFrame(canvas, width, height, project, timeMs)
+        renderFrameInternal(canvas, width, height, project, timeMs, mediaAssets)
 
         val pngFile = File(outputFile.parentFile, "LyricPoster_${System.currentTimeMillis()}.png")
         FileOutputStream(pngFile).use { out ->
@@ -182,7 +221,12 @@ class VideoExportEngine(private val context: Context) {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
-        renderFrame(canvas, width, height, project, timeMs)
+        val mediaAssets = prepareMediaAssets(project.mediaClips)
+        try {
+            renderFrameInternal(canvas, width, height, project, timeMs, mediaAssets)
+        } finally {
+            releaseMediaAssets(mediaAssets)
+        }
 
         FileOutputStream(pngFile).use { out ->
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
@@ -209,8 +253,37 @@ class VideoExportEngine(private val context: Context) {
     }
 
     fun renderFrame(canvas: Canvas, width: Int, height: Int, project: VideoProject, timeMs: Long) {
-        // 1. Background
-        drawBackground(canvas, width, height, project.background, timeMs)
+        renderFrameInternal(canvas, width, height, project, timeMs, emptyList())
+    }
+
+    private fun renderFrameInternal(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        project: VideoProject,
+        timeMs: Long,
+        mediaAssets: List<ExportMediaAsset>
+    ) {
+        val activeAsset = mediaAssets
+            .filter { asset -> timeMs >= asset.clip.startMs && timeMs < asset.clip.startMs + asset.clip.exportDurationMs }
+            .maxByOrNull { it.clip.startMs }
+        val frameBitmap = when {
+            activeAsset?.image != null -> activeAsset.image
+            activeAsset?.retriever != null -> runCatching {
+                activeAsset.retriever.getFrameAtTime(
+                    (timeMs - activeAsset.clip.startMs).coerceAtLeast(0L) * 1_000L,
+                    MediaMetadataRetriever.OPTION_CLOSEST
+                )
+            }.getOrNull()
+            else -> null
+        }
+
+        if (frameBitmap != null) {
+            drawMediaFrame(canvas, width, height, frameBitmap)
+            if (frameBitmap !== activeAsset?.image) frameBitmap.recycle()
+        } else {
+            drawBackground(canvas, width, height, project.background, timeMs)
+        }
 
         // 2. Visualizer Overlay
         drawVisualizer(canvas, width, height, project.visualizer, project.visualizerColorHex, timeMs, project.audioTrack.bpm)
@@ -222,6 +295,24 @@ class VideoExportEngine(private val context: Context) {
         if (project.showWatermark && project.watermarkText.isNotBlank()) {
             drawWatermark(canvas, width, height, project.watermarkText)
         }
+    }
+
+    private fun drawMediaFrame(canvas: Canvas, width: Int, height: Int, bitmap: Bitmap) {
+        val sourceWidth = bitmap.width.toFloat()
+        val sourceHeight = bitmap.height.toFloat()
+        if (sourceWidth <= 0f || sourceHeight <= 0f) return
+        val scale = max(width / sourceWidth, height / sourceHeight)
+        val cropWidth = width / scale
+        val cropHeight = height / scale
+        val left = (sourceWidth - cropWidth) / 2f
+        val top = (sourceHeight - cropHeight) / 2f
+        val source = Rect(
+            left.toInt().coerceAtLeast(0),
+            top.toInt().coerceAtLeast(0),
+            (left + cropWidth).toInt().coerceAtMost(bitmap.width),
+            (top + cropHeight).toInt().coerceAtMost(bitmap.height)
+        )
+        canvas.drawBitmap(bitmap, source, Rect(0, 0, width, height), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
     }
 
     private fun drawBackground(canvas: Canvas, width: Int, height: Int, bg: BackgroundConfig, timeMs: Long) {

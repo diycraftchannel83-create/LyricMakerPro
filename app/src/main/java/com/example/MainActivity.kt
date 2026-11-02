@@ -1,8 +1,10 @@
 package com.example
 
 import android.net.Uri
+import android.media.MediaMetadataRetriever
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -31,6 +33,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.model.BackgroundConfig
 import com.example.model.BackgroundType
+import com.example.data.ProjectFileCodec
+import com.example.data.LyricMakerStorage
 import com.example.ui.components.*
 import com.example.ui.theme.*
 import com.example.viewmodel.LyricMakerViewModel
@@ -94,16 +98,58 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val imagePicker = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.PickVisualMedia()
+                    contract = ActivityResultContracts.OpenDocument()
                 ) { uri: Uri? ->
                     if (uri != null) {
-                        viewModel.updateBackground(
-                            BackgroundConfig(
-                                type = BackgroundType.IMAGE,
-                                imageUri = uri.toString(),
-                                darkOverlayOpacity = 0.5f
-                            )
-                        )
+                        runCatching { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                        var fileName = "Imported Image"
+                        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                            if (cursor.moveToFirst() && nameIndex != -1) fileName = cursor.getString(nameIndex)
+                        }
+                        viewModel.addMediaClip(uri.toString(), fileName, com.example.model.MediaClipType.IMAGE)
+                    }
+                }
+
+                val videoPicker = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.OpenDocument()
+                ) { uri: Uri? ->
+                    if (uri != null) {
+                        runCatching { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                        var fileName = "Imported Video"
+                        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                            if (cursor.moveToFirst() && nameIndex != -1) fileName = cursor.getString(nameIndex)
+                        }
+                        val durationMs = runCatching {
+                            MediaMetadataRetriever().let { retriever ->
+                                try {
+                                    retriever.setDataSource(this@MainActivity, uri)
+                                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 10_000L
+                                } finally {
+                                    retriever.release()
+                                }
+                            }
+                        }.getOrDefault(10_000L).coerceAtLeast(500L)
+                        viewModel.addMediaClip(uri.toString(), fileName, com.example.model.MediaClipType.VIDEO, durationMs)
+                    }
+                }
+
+                val openProjectLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.OpenDocument()
+                ) { uri: Uri? ->
+                    if (uri != null) {
+                        runCatching {
+                            contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                                ?: error("Unable to read project file")
+                        }.mapCatching { json -> ProjectFileCodec.decode(json) }
+                            .onSuccess { loaded ->
+                                viewModel.loadProject(loaded)
+                                Toast.makeText(this@MainActivity, "Project opened", Toast.LENGTH_SHORT).show()
+                            }.onFailure {
+                                Toast.makeText(this@MainActivity, "Open failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show()
+                            }
                     }
                 }
 
@@ -118,13 +164,22 @@ class MainActivity : ComponentActivity() {
                             onOpenTemplates = { viewModel.setShowTemplatesSheet(true) },
                             onPickAudio = { audioPicker.launch("audio/*") },
                             onPickImage = {
-                                imagePicker.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                )
+                                imagePicker.launch(arrayOf("image/*"))
                             },
+                            onPickVideo = { videoPicker.launch(arrayOf("video/*")) },
                             onOpenExport = { viewModel.setShowExportDialog(true) },
                             onPickLyrics = { lyricsPicker.launch("text/*") },
-                            onOpenProject = { viewModel.setShowTemplatesSheet(true) }
+                            onOpenProject = { openProjectLauncher.launch(arrayOf("application/json", "text/plain")) },
+                            onSaveProject = {
+                                runCatching { LyricMakerStorage.saveProject(this@MainActivity, project) }
+                                    .onSuccess { Toast.makeText(this@MainActivity, "Project saved to LyricMakerPro/Project", Toast.LENGTH_LONG).show() }
+                                    .onFailure { Toast.makeText(this@MainActivity, "Save failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show() }
+                            },
+                            onSaveLrc = {
+                                runCatching { LyricMakerStorage.saveLrc(this@MainActivity, project) }
+                                    .onSuccess { Toast.makeText(this@MainActivity, "LRC saved to LyricMakerPro/LrcLyric", Toast.LENGTH_LONG).show() }
+                                    .onFailure { Toast.makeText(this@MainActivity, "LRC save failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show() }
+                            }
                         )
                     }
                 ) { innerPadding ->
@@ -174,7 +229,10 @@ class MainActivity : ComponentActivity() {
                                         onTextChange = { id, text -> viewModel.updateLyricText(id, text) },
                                         onAddLine = { viewModel.addLyricLine() },
                                         onDeleteLine = { viewModel.deleteSelectedLyric() },
-                                        onOpenTapToSync = { viewModel.startTapToSync() }
+                                        onOpenTapToSync = { viewModel.startTapToSync() },
+                                        onMoveMediaClip = { id, delta -> viewModel.moveMediaClip(id, delta) },
+                                        onResizeMediaClip = { id, delta -> viewModel.resizeMediaClip(id, delta) },
+                                        onRemoveMediaClip = { id -> viewModel.removeMediaClip(id) }
                                     )
 
                                     StudioTabs(
@@ -217,7 +275,10 @@ class MainActivity : ComponentActivity() {
                                         onTextChange = { id, text -> viewModel.updateLyricText(id, text) },
                                     onAddLine = { viewModel.addLyricLine() },
                                     onDeleteLine = { viewModel.deleteSelectedLyric() },
-                                    onOpenTapToSync = { viewModel.startTapToSync() }
+                                    onOpenTapToSync = { viewModel.startTapToSync() },
+                                    onMoveMediaClip = { id, delta -> viewModel.moveMediaClip(id, delta) },
+                                    onResizeMediaClip = { id, delta -> viewModel.resizeMediaClip(id, delta) },
+                                    onRemoveMediaClip = { id -> viewModel.removeMediaClip(id) }
                                 )
 
                                 StudioTabs(
@@ -280,9 +341,12 @@ private fun StudioTopAppBar(
     onOpenTemplates: () -> Unit,
     onPickAudio: () -> Unit,
     onPickImage: () -> Unit,
+    onPickVideo: () -> Unit,
     onOpenExport: () -> Unit,
     onPickLyrics: () -> Unit,
-    onOpenProject: () -> Unit
+    onOpenProject: () -> Unit,
+    onSaveProject: () -> Unit,
+    onSaveLrc: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     var languageDialog by remember { mutableStateOf(false) }
@@ -336,6 +400,11 @@ private fun StudioTopAppBar(
                             onClick = { menuExpanded = false; onPickImage() }
                         )
                         DropdownMenuItem(
+                            text = { Text("Insert Video") },
+                            leadingIcon = { Icon(Icons.Default.VideoFile, null, tint = NeonMagenta) },
+                            onClick = { menuExpanded = false; onPickVideo() }
+                        )
+                        DropdownMenuItem(
                             text = { Text("Insert Lyrics (.TXT / .LRC)") },
                             leadingIcon = { Icon(Icons.Default.Subtitles, null, tint = NeonCyan) },
                             onClick = { menuExpanded = false; onPickLyrics() }
@@ -349,7 +418,12 @@ private fun StudioTopAppBar(
                         DropdownMenuItem(
                             text = { Text("Save Project") },
                             leadingIcon = { Icon(Icons.Default.Save, null) },
-                            onClick = { menuExpanded = false }
+                            onClick = { menuExpanded = false; onSaveProject() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Save Lyrics (.LRC)") },
+                            leadingIcon = { Icon(Icons.Default.Subtitles, null, tint = NeonCyan) },
+                            onClick = { menuExpanded = false; onSaveLrc() }
                         )
                         HorizontalDivider(color = StudioCardBorder)
                         DropdownMenuItem(
