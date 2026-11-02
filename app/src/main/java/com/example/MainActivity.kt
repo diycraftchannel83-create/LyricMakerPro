@@ -1,6 +1,7 @@
 package com.example
 
 import android.net.Uri
+import android.media.MediaMetadataRetriever
 import android.os.Bundle
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
@@ -94,9 +95,10 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val imagePicker = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.PickVisualMedia()
+                    contract = ActivityResultContracts.OpenDocument()
                 ) { uri: Uri? ->
                     if (uri != null) {
+                        runCatching { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
                         var fileName = "Imported Image"
                         contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                             val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
@@ -107,15 +109,26 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val videoPicker = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.GetContent()
+                    contract = ActivityResultContracts.OpenDocument()
                 ) { uri: Uri? ->
                     if (uri != null) {
+                        runCatching { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
                         var fileName = "Imported Video"
                         contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                             val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                             if (cursor.moveToFirst() && nameIndex != -1) fileName = cursor.getString(nameIndex)
                         }
-                        viewModel.addMediaClip(uri.toString(), fileName, com.example.model.MediaClipType.VIDEO)
+                        val durationMs = runCatching {
+                            MediaMetadataRetriever().let { retriever ->
+                                try {
+                                    retriever.setDataSource(this@MainActivity, uri)
+                                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 10_000L
+                                } finally {
+                                    retriever.release()
+                                }
+                            }
+                        }.getOrDefault(10_000L).coerceAtLeast(500L)
+                        viewModel.addMediaClip(uri.toString(), fileName, com.example.model.MediaClipType.VIDEO, durationMs)
                     }
                 }
 
@@ -130,11 +143,9 @@ class MainActivity : ComponentActivity() {
                             onOpenTemplates = { viewModel.setShowTemplatesSheet(true) },
                             onPickAudio = { audioPicker.launch("audio/*") },
                             onPickImage = {
-                                imagePicker.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                )
+                                imagePicker.launch(arrayOf("image/*"))
                             },
-                            onPickVideo = { videoPicker.launch("video/*") },
+                            onPickVideo = { videoPicker.launch(arrayOf("video/*")) },
                             onOpenExport = { viewModel.setShowExportDialog(true) },
                             onPickLyrics = { lyricsPicker.launch("text/*") },
                             onOpenProject = { viewModel.setShowTemplatesSheet(true) }
