@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -64,6 +65,18 @@ class MainActivity : ComponentActivity() {
 
                 val showTemplatesSheet by viewModel.showTemplatesSheet.collectAsStateWithLifecycle()
 
+                val lyricsPicker = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.GetContent()
+                ) { uri: Uri? ->
+                    if (uri != null) {
+                        runCatching {
+                            contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                        }.onSuccess { text ->
+                            if (!text.isNullOrBlank()) viewModel.importLyricsText(text)
+                        }
+                    }
+                }
+
                 // File Pickers
                 val audioPicker = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.GetContent()
@@ -109,7 +122,9 @@ class MainActivity : ComponentActivity() {
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                 )
                             },
-                            onOpenExport = { viewModel.setShowExportDialog(true) }
+                            onOpenExport = { viewModel.setShowExportDialog(true) },
+                            onPickLyrics = { lyricsPicker.launch("text/*") },
+                            onOpenProject = { viewModel.setShowTemplatesSheet(true) }
                         )
                     }
                 ) { innerPadding ->
@@ -265,8 +280,14 @@ private fun StudioTopAppBar(
     onOpenTemplates: () -> Unit,
     onPickAudio: () -> Unit,
     onPickImage: () -> Unit,
-    onOpenExport: () -> Unit
+    onOpenExport: () -> Unit,
+    onPickLyrics: () -> Unit,
+    onOpenProject: () -> Unit
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    var languageDialog by remember { mutableStateOf(false) }
+    var selectedLanguage by remember { mutableStateOf("English") }
+
     Surface(
         modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
         color = StudioSurface,
@@ -287,6 +308,7 @@ private fun StudioTopAppBar(
                 Box(
                     modifier = Modifier
                         .size(36.dp)
+                        .clickable { menuExpanded = true }
                         .clip(RoundedCornerShape(8.dp))
                         .background(ElectricPurple)
                         .border(1.dp, NeonCyan, RoundedCornerShape(8.dp)),
@@ -294,10 +316,65 @@ private fun StudioTopAppBar(
                 ) {
                     Icon(
                         imageVector = Icons.Default.MusicVideo,
-                        contentDescription = "LyricMaker",
+                        contentDescription = "Open application menu",
                         tint = NeonCyan,
                         modifier = Modifier.size(20.dp)
                     )
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                        modifier = Modifier.widthIn(min = 230.dp).background(StudioSurface)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Insert Audio") },
+                            leadingIcon = { Icon(Icons.Default.AudioFile, null, tint = NeonCyan) },
+                            onClick = { menuExpanded = false; onPickAudio() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Insert Picture") },
+                            leadingIcon = { Icon(Icons.Default.Image, null, tint = NeonCyan) },
+                            onClick = { menuExpanded = false; onPickImage() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Insert Lyrics (.TXT / .LRC)") },
+                            leadingIcon = { Icon(Icons.Default.Subtitles, null, tint = NeonCyan) },
+                            onClick = { menuExpanded = false; onPickLyrics() }
+                        )
+                        HorizontalDivider(color = StudioCardBorder)
+                        DropdownMenuItem(
+                            text = { Text("Open Project") },
+                            leadingIcon = { Icon(Icons.Default.FolderOpen, null) },
+                            onClick = { menuExpanded = false; onOpenProject() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Save Project") },
+                            leadingIcon = { Icon(Icons.Default.Save, null) },
+                            onClick = { menuExpanded = false }
+                        )
+                        HorizontalDivider(color = StudioCardBorder)
+                        DropdownMenuItem(
+                            text = { Text("Privacy Policy") },
+                            leadingIcon = { Icon(Icons.Default.PrivacyTip, null) },
+                            onClick = { menuExpanded = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Language  ·  $selectedLanguage") },
+                            leadingIcon = { Icon(Icons.Default.Language, null, tint = NeonCyan) },
+                            trailingIcon = { Icon(Icons.Default.ChevronRight, null) },
+                            onClick = { menuExpanded = false; languageDialog = true }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("About") },
+                            leadingIcon = { Icon(Icons.Default.Info, null) },
+                            onClick = { menuExpanded = false }
+                        )
+                        HorizontalDivider(color = StudioCardBorder)
+                        DropdownMenuItem(
+                            text = { Text("Exit", color = Color(0xFFFF5370)) },
+                            leadingIcon = { Icon(Icons.Default.ExitToApp, null, tint = Color(0xFFFF5370)) },
+                            onClick = { menuExpanded = false }
+                        )
+                    }
                 }
 
                 Column {
@@ -393,4 +470,45 @@ private fun StudioTopAppBar(
             }
         }
     }
+    
+    if (languageDialog) {
+        AlertDialog(
+            onDismissRequest = { languageDialog = false },
+            containerColor = StudioSurface,
+            title = { Text("Language", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    listOf("English", "Bahasa Indonesia").forEach { language ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedLanguage = language
+                                    languageDialog = false
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedLanguage == language,
+                                onClick = {
+                                    selectedLanguage = language
+                                    languageDialog = false
+                                },
+                                colors = RadioButtonDefaults.colors(selectedColor = NeonCyan)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(language, color = TextPrimary)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { languageDialog = false }) {
+                    Text("Close", color = NeonCyan)
+                }
+            }
+        )
+    }
+
 }
