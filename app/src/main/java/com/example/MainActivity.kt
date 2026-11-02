@@ -172,12 +172,12 @@ class MainActivity : ComponentActivity() {
                             onOpenProject = { openProjectLauncher.launch(arrayOf("application/json", "text/plain")) },
                             onSaveProject = {
                                 runCatching { LyricMakerStorage.saveProject(this@MainActivity, project) }
-                                    .onSuccess { Toast.makeText(this@MainActivity, "Project saved to LyricMakerPro/Project", Toast.LENGTH_LONG).show() }
+                                    .onSuccess { Toast.makeText(this@MainActivity, "Project saved successfully", Toast.LENGTH_LONG).show() }
                                     .onFailure { Toast.makeText(this@MainActivity, "Save failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show() }
                             },
                             onSaveLrc = {
                                 runCatching { LyricMakerStorage.saveLrc(this@MainActivity, project) }
-                                    .onSuccess { Toast.makeText(this@MainActivity, "LRC saved to LyricMakerPro/LrcLyric", Toast.LENGTH_LONG).show() }
+                                    .onSuccess { Toast.makeText(this@MainActivity, "LRC saved successfully", Toast.LENGTH_LONG).show() }
                                     .onFailure { Toast.makeText(this@MainActivity, "LRC save failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show() }
                             },
                             onExit = {
