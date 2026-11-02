@@ -340,11 +340,12 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         val clips = _project.value.mediaClips.map { clip ->
             if (clip.id == id) {
                 val minimum = if (clip.type == MediaClipType.VIDEO) 500L else 1_000L
-                val sourceRemaining = if (clip.type == MediaClipType.VIDEO) {
+                val maximum = if (clip.type == MediaClipType.VIDEO) {
+                    // Video timeline length follows its source duration, even when it exceeds song length.
                     (clip.sourceDurationMs - clip.sourceOffsetMs).coerceAtLeast(minimum)
-                } else 3_600_000L
-                val projectRemaining = (_project.value.durationMs - clip.startMs).coerceAtLeast(minimum)
-                val maximum = minOf(sourceRemaining, projectRemaining)
+                } else {
+                    (_project.value.durationMs - clip.startMs).coerceIn(minimum, 3_600_000L)
+                }
                 clip.copy(durationMs = (clip.durationMs + deltaMs).coerceIn(minimum, maximum))
             } else clip
         }
