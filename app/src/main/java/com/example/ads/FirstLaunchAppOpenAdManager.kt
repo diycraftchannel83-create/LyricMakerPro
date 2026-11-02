@@ -79,7 +79,7 @@ class FirstLaunchAppOpenAdManager(private val activity: Activity) {
     companion object {
         private const val PREFS_NAME = "lyricmakerpro_ad_preferences"
         private const val KEY_SHOWN = "first_launch_app_open_shown"
-        private const val TEST_APP_OPEN_AD_UNIT_ID = "ca-app-pub-3940256099942544/1"
+        private const val TEST_APP_OPEN_AD_UNIT_ID = "ca-app-pub-3940256099942544/9257395921"
         private const val PRODUCTION_APP_OPEN_AD_UNIT_ID = "ca-app-pub-1254774552944426/5183216826"
     }
 }
