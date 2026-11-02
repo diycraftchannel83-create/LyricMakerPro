@@ -131,6 +131,21 @@ fun ExportDialog(
                             )
                         }
                     }
+                    // Export the complete song instead of a short social-media clip.
+                    FilterChip(
+                        selected = selectedDurationSec == 0,
+                        onClick = { selectedDurationSec = 0 },
+                        label = {
+                            Text(
+                                "Full Song • ${formatExportDuration(project.durationMs)}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("export_full_song_duration")
+                    )
                 }
 
                 // Live Export Progress
@@ -221,4 +236,16 @@ fun ExportDialog(
         },
         containerColor = StudioSurface
     )
+}
+
+private fun formatExportDuration(durationMs: Long): String {
+    val totalSeconds = (durationMs.coerceAtLeast(0L) + 999L) / 1000L
+    val hours = totalSeconds / 3600L
+    val minutes = (totalSeconds % 3600L) / 60L
+    val seconds = totalSeconds % 60L
+    return if (hours > 0L) {
+        String.format(java.util.Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format(java.util.Locale.US, "%02d:%02d", minutes, seconds)
+    }
 }
