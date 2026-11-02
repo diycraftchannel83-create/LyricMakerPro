@@ -9,11 +9,11 @@ plugins {
 }
 
 android {
-  namespace = "com.example"
+  namespace = "com.winsmediatama.lyricmakerpro"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.videolyrics.vlmx"
+    applicationId = "com.winsmediatama.lyricmakerpro"
     minSdk = 24
     targetSdk = 36
     // CI can supply monotonically increasing Play Store version values.
