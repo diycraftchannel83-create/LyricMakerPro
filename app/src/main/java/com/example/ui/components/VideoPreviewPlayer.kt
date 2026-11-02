@@ -1,5 +1,11 @@
 package com.example.ui.components
 
+import android.net.Uri
+import android.widget.VideoView
+import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
+import coil.compose.AsyncImageContentScale
+
 import android.graphics.Color as AndroidColor
 import android.graphics.LinearGradient
 import android.graphics.Paint as AndroidPaint
@@ -297,6 +303,48 @@ fun VideoPreviewPlayer(
                     .testTag("preview_canvas_container"),
                 contentAlignment = Alignment.Center
             ) {
+                val activeMedia = project.mediaClips.lastOrNull {
+                    playheadMs >= it.startMs && playheadMs < it.endMs
+                }
+
+                // Imported media is rendered behind the lyric/effect canvas.
+                when (activeMedia?.type) {
+                    MediaClipType.IMAGE -> {
+                        AsyncImage(
+                            model = Uri.parse(activeMedia.uri),
+                            contentDescription = activeMedia.displayName,
+                            contentScale = AsyncImageContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    MediaClipType.VIDEO -> {
+                        key(activeMedia.id) {
+                            AndroidView(
+                                factory = { context ->
+                                    VideoView(context).apply {
+                                        setVideoURI(Uri.parse(activeMedia.uri))
+                                        setOnPreparedListener { player ->
+                                            player.isLooping = true
+                                            seekTo((playheadMs - activeMedia.startMs).toInt().coerceAtLeast(0))
+                                            if (isPlaying) start()
+                                        }
+                                    }
+                                },
+                                update = { player ->
+                                    val target = (playheadMs - activeMedia.startMs).toInt().coerceAtLeast(0)
+                                    if (kotlin.math.abs(player.currentPosition - target) > 700) {
+                                        player.seekTo(target)
+                                    }
+                                    if (isPlaying && !player.isPlaying) player.start()
+                                    if (!isPlaying && player.isPlaying) player.pause()
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                    null -> Unit
+                }
+
                 // Real-time Canvas Rendering
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val canvasWidth = size.width.toInt()
@@ -310,7 +358,8 @@ fun VideoPreviewPlayer(
                         width = canvasWidth,
                         height = canvasHeight,
                         spectrumBands = spectrumBands,
-                        bassEnergy = bassEnergy
+                        bassEnergy = bassEnergy,
+                        drawBackground = activeMedia == null
                     )
                 }
 
@@ -391,14 +440,15 @@ private fun drawInto(
     width: Int,
     height: Int,
     spectrumBands: FloatArray,
-    bassEnergy: Float
+    bassEnergy: Float,
+    drawBackground: Boolean = true
 ) {
     val native = drawScope.drawContext.canvas.nativeCanvas
 
     // 1. Background
     val bg = project.background
     val bgPaint = AndroidPaint()
-    when (bg.type) {
+    if (drawBackground) when (bg.type) {
         BackgroundType.SOLID -> {
             native.drawColor(AndroidColor.parseColor(bg.primaryColorHex))
         }
