@@ -274,6 +274,22 @@ private fun TypographyTab(viewModel: LyricMakerViewModel, project: VideoProject)
             )
         }
 
+        // Global lyric placement controls (applies to every lyric line).
+        item {
+            Text("Lyric Position (all lines)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Horizontal", fontSize = 12.sp, color = TextSecondary)
+                Text("${typography.positionXPercent.toInt()}%", fontSize = 12.sp, color = NeonCyan)
+            }
+            Slider(value = typography.positionXPercent, onValueChange = { viewModel.updateTypographyProperties(positionXPercent = it) }, valueRange = 5f..95f)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Vertical", fontSize = 12.sp, color = TextSecondary)
+                Text("${typography.positionYPercent.toInt()}%", fontSize = 12.sp, color = NeonCyan)
+            }
+            Slider(value = typography.positionYPercent, onValueChange = { viewModel.updateTypographyProperties(positionYPercent = it) }, valueRange = 5f..95f)
+            Text("Drag directly on the preview to reposition all lyric lines.", fontSize = 10.sp, color = TextSecondary)
+        }
+
         // Glow Radius Slider
         item {
             Row(
