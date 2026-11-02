@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.winsmediatama.lyricmakerpro.ads.FirstLaunchAppOpenAdManager
 import com.winsmediatama.lyricmakerpro.ads.RewardedAdManager
 import com.winsmediatama.lyricmakerpro.model.BackgroundConfig
 import com.winsmediatama.lyricmakerpro.model.BackgroundType
@@ -46,13 +47,17 @@ import com.winsmediatama.lyricmakerpro.viewmodel.LyricMakerViewModel
 class MainActivity : ComponentActivity() {
 
     private lateinit var rewardedAdManager: RewardedAdManager
+    private lateinit var firstLaunchAppOpenAdManager: FirstLaunchAppOpenAdManager
     private val viewModel: LyricMakerViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         rewardedAdManager = RewardedAdManager(this)
-        rewardedAdManager.initialize()
+        firstLaunchAppOpenAdManager = FirstLaunchAppOpenAdManager(this)
+        rewardedAdManager.initialize {
+            firstLaunchAppOpenAdManager.loadForFirstLaunch()
+        }
 
         setContent {
             MyApplicationTheme {
