@@ -1,4 +1,4 @@
-package com.example.audio
+package com.winsmediatama.lyricmakerpro.audio
 
 import android.content.Context
 import android.media.AudioAttributes
@@ -6,8 +6,8 @@ import android.media.AudioFormat
 import android.media.AudioTrack
 import android.media.MediaPlayer
 import android.net.Uri
-import com.example.model.AudioBeatType
-import com.example.model.AudioTrackConfig
+import com.winsmediatama.lyricmakerpro.model.AudioBeatType
+import com.winsmediatama.lyricmakerpro.model.AudioTrackConfig
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
