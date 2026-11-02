@@ -148,7 +148,7 @@ fun MultiTrackTimeline(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(180.dp)
+                .height(208.dp)
                 .padding(vertical = 4.dp)
                 .horizontalScroll(scrollState)
         ) {
