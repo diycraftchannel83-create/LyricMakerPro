@@ -495,7 +495,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
                 _exportStatus.value = "Ready to Share!"
             } catch (e: Exception) {
                 e.printStackTrace()
-                _exportStatus.value = "Export completed with cover clip."
+                _exportStatus.value = "Export failed: ${e.localizedMessage ?: "Unknown error"}"
             } finally {
                 _isExporting.value = false
             }

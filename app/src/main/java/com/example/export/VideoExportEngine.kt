@@ -63,153 +63,167 @@ class VideoExportEngine(private val context: Context) {
         val statusMessage: String
     )
 
+    @androidx.media3.common.util.UnstableApi
     suspend fun exportVideo(
         project: VideoProject,
         quality: ExportQuality,
         durationSeconds: Int = 15,
         onProgress: (ExportProgress) -> Unit
-    ): File = withContext(Dispatchers.Default) {
-        val exportDir = File(context.cacheDir, "clips").apply { mkdirs() }
-        val outputFile = File(exportDir, "LyricVideo_${System.currentTimeMillis()}.mp4")
-        val videoOnlyFile = File(exportDir, "LyricVideo_${System.currentTimeMillis()}_video.mp4")
-        val audioOnlyFile = File(exportDir, "LyricAudio_${System.currentTimeMillis()}.m4a")
-
-        val targetWidth = (project.canvasRatio.exportWidth * quality.scaleFactor).toInt().let { if (it % 2 != 0) it + 1 else it }
-        val targetHeight = (project.canvasRatio.exportHeight * quality.scaleFactor).toInt().let { if (it % 2 != 0) it + 1 else it }
-
-        val fps = 30
-        // A duration of 0 is the explicit "full song" selection from ExportDialog.
-        // Keep the project's exact audio duration; do not clamp it to the 10/15/30s presets.
+    ): File = withContext(Dispatchers.Main.immediate) {
+        val audioUri = project.audioTrack.customUri
+            ?: error("Import a song before exporting an MP4 with audio")
         val totalDurationMs = if (durationSeconds <= 0) {
             project.durationMs.coerceAtLeast(1L)
         } else {
             min(project.durationMs, durationSeconds * 1000L).coerceAtLeast(1L)
         }
-        // Round up so the final partial second is included in the encoded video.
-        val totalFrames = ceil((totalDurationMs / 1000.0) * fps).toInt().coerceAtLeast(1)
-
-        val mimeType = "video/avc"
-        val format = MediaFormat.createVideoFormat(mimeType, targetWidth, targetHeight).apply {
-            setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            setInteger(MediaFormat.KEY_BIT_RATE, quality.targetBitrate)
-            setInteger(MediaFormat.KEY_FRAME_RATE, fps)
-            setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
-        }
-
-        val codec = MediaCodec.createEncoderByType(mimeType)
-        codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-        val inputSurface = codec.createInputSurface()
-        codec.start()
-
-        val muxer = MediaMuxer(videoOnlyFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-        var trackIndex = -1
-        var muxerStarted = false
-        val bufferInfo = MediaCodec.BufferInfo()
-
-        val bitmap = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val mediaAssets = prepareMediaAssets(project.mediaClips)
+        val exportDir = File(context.cacheDir, "clips").apply { mkdirs() }
+        val outputFile = File(exportDir, "LyricVideo_${System.currentTimeMillis()}.mp4")
+        val backgroundFile = File(exportDir, "LyricBackground_${System.currentTimeMillis()}.png")
+        val width = (project.canvasRatio.exportWidth * quality.scaleFactor).toInt().let { if (it % 2 != 0) it + 1 else it }
+        val height = (project.canvasRatio.exportHeight * quality.scaleFactor).toInt().let { if (it % 2 != 0) it + 1 else it }
 
         try {
-            val frameDurationUs = (1_000_000L / fps)
-
-            for (frame in 0 until totalFrames) {
-                val timeMs = (frame.toDouble() / fps * 1000).toLong()
-
-                // Render project frame to bitmap
-                renderFrameInternal(canvas, targetWidth, targetHeight, project, timeMs, mediaAssets)
-
-                // Draw to codec input surface
-                val surfaceCanvas = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    inputSurface.lockHardwareCanvas()
-                } else {
-                    inputSurface.lockCanvas(null)
-                }
-
-                surfaceCanvas.drawBitmap(bitmap, 0f, 0f, null)
-                inputSurface.unlockCanvasAndPost(surfaceCanvas)
-
-                // Drain encoder
-                while (true) {
-                    val outputIndex = codec.dequeueOutputBuffer(bufferInfo, 0)
-                    if (outputIndex == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                        break
-                    } else if (outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                        if (muxerStarted) throw RuntimeException("Format changed twice")
-                        trackIndex = muxer.addTrack(codec.outputFormat)
-                        muxer.start()
-                        muxerStarted = true
-                    } else if (outputIndex >= 0) {
-                        val encodedData = codec.getOutputBuffer(outputIndex)
-                        if (encodedData != null && bufferInfo.size > 0 && muxerStarted) {
-                            encodedData.position(bufferInfo.offset)
-                            encodedData.limit(bufferInfo.offset + bufferInfo.size)
-                            muxer.writeSampleData(trackIndex, encodedData, bufferInfo)
-                        }
-                        codec.releaseOutputBuffer(outputIndex, false)
-                    }
-                }
-
-                val progress = (frame + 1).toFloat() / totalFrames
-                onProgress(
-                    ExportProgress(
-                        currentFrame = frame + 1,
-                        totalFrames = totalFrames,
-                        percentage = progress,
-                        statusMessage = "Encoding frame ${frame + 1}/$totalFrames (${(progress * 100).toInt()}%)"
-                    )
-                )
-            }
-
-            // End of stream
-            codec.signalEndOfInputStream()
-
-            // Drain remaining buffers
-            var eos = false
-            while (!eos) {
-                val outputIndex = codec.dequeueOutputBuffer(bufferInfo, 10_000)
-                if (outputIndex >= 0) {
-                    if ((bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                        eos = true
-                    }
-                    val encodedData = codec.getOutputBuffer(outputIndex)
-                    if (encodedData != null && bufferInfo.size > 0 && muxerStarted) {
-                        encodedData.position(bufferInfo.offset)
-                        encodedData.limit(bufferInfo.offset + bufferInfo.size)
-                        muxer.writeSampleData(trackIndex, encodedData, bufferInfo)
-                    }
-                    codec.releaseOutputBuffer(outputIndex, false)
-                } else if (outputIndex == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                    break
-                }
-            }
-        } catch (e: Exception) {
-            throw IllegalStateException("Video encoding failed; MP4 was not created", e)
-        } finally {
+            val bgBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             try {
-                codec.stop()
-                codec.release()
-                inputSurface.release()
-                if (muxerStarted) {
-                    muxer.stop()
-                    muxer.release()
+                drawBackground(Canvas(bgBitmap), width, height, project.background, 0L)
+                FileOutputStream(backgroundFile).use { stream ->
+                    check(bgBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)) {
+                        "Unable to prepare project background"
+                    }
                 }
-                bitmap.recycle()
-            } catch (_: Exception) {}
-            releaseMediaAssets(mediaAssets)
+            } finally {
+                bgBitmap.recycle()
+            }
+
+            val overlay = ProjectLyricOverlay(this@VideoExportEngine, width, height, project)
+            val effects = listOf<androidx.media3.common.Effect>(
+                androidx.media3.effect.Presentation.createForWidthAndHeight(
+                    width, height, androidx.media3.effect.Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
+                ),
+                androidx.media3.effect.OverlayEffect(listOf(overlay))
+            )
+            val backgroundItem = androidx.media3.common.MediaItem.Builder()
+                .setUri(Uri.fromFile(backgroundFile))
+                .setImageDurationMs(totalDurationMs)
+                .build()
+            val videoItem = androidx.media3.transformer.EditedMediaItem.Builder(backgroundItem)
+                .setFrameRate(30)
+                .setRemoveAudio(true)
+                .setEffects(androidx.media3.transformer.Effects(emptyList(), effects))
+                .build()
+            val clippedAudio = androidx.media3.common.MediaItem.Builder()
+                .setUri(Uri.parse(audioUri))
+                .setClippingConfiguration(
+                    androidx.media3.common.MediaItem.ClippingConfiguration.Builder()
+                        .setStartPositionMs(0L)
+                        .setEndPositionMs(totalDurationMs)
+                        .build()
+                )
+                .build()
+            val audioItem = androidx.media3.transformer.EditedMediaItem.Builder(clippedAudio)
+                .setRemoveVideo(true)
+                .build()
+            val videoSequence = androidx.media3.transformer.EditedMediaItemSequence.withVideoFrom(listOf(videoItem))
+            val audioSequence = androidx.media3.transformer.EditedMediaItemSequence.withAudioFrom(listOf(audioItem))
+            val composition = androidx.media3.transformer.Composition.Builder(videoSequence, audioSequence).build()
+
+            kotlinx.coroutines.suspendCancellableCoroutine<File> { continuation ->
+                val handler = android.os.Handler(android.os.Looper.getMainLooper())
+                val progressHolder = androidx.media3.transformer.ProgressHolder()
+                val active = java.util.concurrent.atomic.AtomicBoolean(true)
+                lateinit var transformer: androidx.media3.transformer.Transformer
+                transformer = androidx.media3.transformer.Transformer.Builder(context.applicationContext)
+                    .setVideoMimeType(androidx.media3.common.MimeTypes.VIDEO_H264)
+                    .setAudioMimeType(androidx.media3.common.MimeTypes.AUDIO_AAC)
+                    .setEnsureFileStartsOnVideoFrameEnabled(true)
+                    .addListener(object : androidx.media3.transformer.Transformer.Listener {
+                        override fun onCompleted(
+                            composition: androidx.media3.transformer.Composition,
+                            exportResult: androidx.media3.transformer.ExportResult
+                        ) {
+                            active.set(false)
+                            try {
+                                validateMp4HasAudioAndVideo(outputFile)
+                                LyricMakerStorage.copyExportedVideo(context, outputFile)
+                                if (continuation.isActive) continuation.resumeWith(Result.success(outputFile))
+                            } catch (failure: Throwable) {
+                                outputFile.delete()
+                                if (continuation.isActive) continuation.resumeWith(Result.failure(failure))
+                            }
+                        }
+
+                        override fun onError(
+                            composition: androidx.media3.transformer.Composition,
+                            exportResult: androidx.media3.transformer.ExportResult,
+                            exportException: androidx.media3.transformer.ExportException
+                        ) {
+                            active.set(false)
+                            outputFile.delete()
+                            if (continuation.isActive) continuation.resumeWith(
+                                Result.failure(IllegalStateException("Media3 export failed: ${exportException.message}", exportException))
+                            )
+                        }
+                    }).build()
+
+                val progressTask = object : Runnable {
+                    override fun run() {
+                        if (!active.get()) return
+                        try {
+                            if (transformer.getProgress(progressHolder) == androidx.media3.transformer.Transformer.PROGRESS_STATE_AVAILABLE) {
+                                val pct = progressHolder.progress.coerceIn(0, 100)
+                                onProgress(ExportProgress(pct, 100, pct / 100f, "Rendering synchronized video: $pct%"))
+                            }
+                            if (active.get()) handler.postDelayed(this, 250L)
+                        } catch (_: Throwable) {
+                            active.set(false)
+                        }
+                    }
+                }
+                continuation.invokeOnCancellation {
+                    active.set(false)
+                    handler.removeCallbacks(progressTask)
+                    transformer.cancel()
+                    outputFile.delete()
+                }
+                try {
+                    transformer.start(composition, outputFile.absolutePath)
+                    handler.post(progressTask)
+                } catch (failure: Throwable) {
+                    active.set(false)
+                    outputFile.delete()
+                    if (continuation.isActive) continuation.resumeWith(Result.failure(failure))
+                }
+            }
+        } finally {
+            backgroundFile.delete()
+        }
+    }
+
+    @androidx.media3.common.util.UnstableApi
+    private class ProjectLyricOverlay(
+        private val owner: VideoExportEngine,
+        private val width: Int,
+        private val height: Int,
+        private val project: VideoProject
+    ) : androidx.media3.effect.BitmapOverlay() {
+        private var cached: Bitmap? = null
+
+        override fun getBitmap(presentationTimeUs: Long): Bitmap {
+            val bitmap = cached?.takeIf { it.width == width && it.height == height }
+                ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { cached = it }
+            bitmap.eraseColor(Color.TRANSPARENT)
+            owner.drawLyrics(Canvas(bitmap), width, height, project, (presentationTimeUs / 1000L).coerceAtLeast(0L))
+            if (project.showWatermark && project.watermarkText.isNotBlank()) {
+                owner.drawWatermark(Canvas(bitmap), width, height, project.watermarkText)
+            }
+            return bitmap
         }
 
-        try {
-            val audioUri = project.audioTrack.customUri
-                ?: error("Import a song before exporting an MP4 with audio")
-            AudioTrackTranscoder.transcodeToAac(context, audioUri, audioOnlyFile, totalDurationMs)
-            muxVideoAndAudio(videoOnlyFile, audioOnlyFile, outputFile, totalDurationMs)
-            validateMp4HasAudioAndVideo(outputFile)
-            LyricMakerStorage.copyExportedVideo(context, outputFile)
-            outputFile
-        } finally {
-            videoOnlyFile.delete()
-            audioOnlyFile.delete()
+        override fun release() {
+            cached?.recycle()
+            cached = null
+            super.release()
         }
     }
 
