@@ -94,7 +94,10 @@ object PresetLibrary {
     )
 
     fun createDefaultProject(): VideoProject {
-        return sampleProjects.first()
+        return VideoProject(title = "Untitled Project", artist = "",
+            audioTrack = AudioTrackConfig(title = "No audio", artist = "", bpm = 120,
+                durationMs = 0L, beatType = AudioBeatType.NONE, customUri = null, waveformPeaks = emptyList()),
+            lyrics = emptyList(), typography = typographyPresets.first())
     }
 
     val sampleProjects: List<VideoProject> by lazy {
