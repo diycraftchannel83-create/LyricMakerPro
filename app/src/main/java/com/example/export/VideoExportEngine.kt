@@ -3,7 +3,13 @@ package com.example.export
 import android.content.Context
 import android.content.Intent
 import android.graphics.*
+import android.media.MediaCodec
+import android.media.MediaCodecInfo
+import android.media.MediaFormat
+import android.media.MediaMuxer
+import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
 import androidx.core.content.FileProvider
 import com.example.model.*
 import com.example.data.LyricMakerStorage
@@ -11,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.nio.ByteBuffer
 import kotlin.math.*
 
 class VideoExportEngine(private val context: Context) {
@@ -21,35 +28,40 @@ class VideoExportEngine(private val context: Context) {
         val retriever: MediaMetadataRetriever? = null
     )
 
-    @androidx.media3.common.util.UnstableApi
-    private class ProjectLyricOverlay(
-        private val owner: VideoExportEngine,
-        private val width: Int,
-        private val height: Int,
-        private val project: VideoProject
-    ) : androidx.media3.effect.BitmapOverlay() {
-        private var cached: Bitmap? = null
-
-        override fun getBitmap(presentationTimeUs: Long): Bitmap {
-            val bitmap = cached?.takeIf { it.width == width && it.height == height }
-                ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { cached = it }
-            bitmap.eraseColor(Color.TRANSPARENT)
-            owner.drawLyrics(
-                Canvas(bitmap), width, height, project,
-                (presentationTimeUs / 1000L).coerceAtLeast(0L)
-            )
-            if (project.showWatermark && project.watermarkText.isNotBlank()) {
-                owner.drawWatermark(Canvas(bitmap), width, height, project.watermarkText)
+    private fun prepareMediaAssets(clips: List<MediaClip>): List<ExportMediaAsset> = clips.mapNotNull { clip ->
+        runCatching {
+            when (clip.type) {
+                MediaClipType.IMAGE -> {
+                    val bitmap = context.contentResolver.openInputStream(Uri.parse(clip.uri))?.use { BitmapFactory.decodeStream(it) }
+                    bitmap?.let { ExportMediaAsset(clip = clip, image = it) }
+                }
+                MediaClipType.VIDEO -> {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(context, Uri.parse(clip.uri))
+                        ExportMediaAsset(clip = clip, retriever = retriever)
+                    } catch (error: Exception) {
+                        retriever.release()
+                        throw error
+                    }
+                }
             }
-            return bitmap
-        }
+        }.getOrNull()
+    }
 
-        override fun release() {
-            cached?.recycle()
-            cached = null
-            super.release()
+    private fun releaseMediaAssets(assets: List<ExportMediaAsset>) {
+        assets.forEach { asset ->
+            runCatching { asset.image?.recycle() }
+            runCatching { asset.retriever?.release() }
         }
     }
+
+    data class ExportProgress(
+        val currentFrame: Int,
+        val totalFrames: Int,
+        val percentage: Float,
+        val statusMessage: String
+    )
 
     @androidx.media3.common.util.UnstableApi
     suspend fun exportVideo(
@@ -84,13 +96,12 @@ class VideoExportEngine(private val context: Context) {
                 bgBitmap.recycle()
             }
 
-            val videoEffects = listOf<androidx.media3.common.Effect>(
+            val overlay = ProjectLyricOverlay(this@VideoExportEngine, width, height, project)
+            val effects = listOf<androidx.media3.common.Effect>(
                 androidx.media3.effect.Presentation.createForWidthAndHeight(
                     width, height, androidx.media3.effect.Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
                 ),
-                androidx.media3.effect.OverlayEffect(
-                    listOf(ProjectLyricOverlay(this@VideoExportEngine, width, height, project))
-                )
+                androidx.media3.effect.OverlayEffect(listOf(overlay))
             )
             val backgroundItem = androidx.media3.common.MediaItem.Builder()
                 .setUri(Uri.fromFile(backgroundFile))
@@ -99,11 +110,20 @@ class VideoExportEngine(private val context: Context) {
             val videoItem = androidx.media3.transformer.EditedMediaItem.Builder(backgroundItem)
                 .setFrameRate(30)
                 .setRemoveAudio(true)
-                .setEffects(androidx.media3.transformer.Effects(emptyList(), videoEffects))
+                .setEffects(androidx.media3.transformer.Effects(emptyList(), effects))
                 .build()
-            val audioItem = androidx.media3.transformer.EditedMediaItem.Builder(
-                androidx.media3.common.MediaItem.fromUri(Uri.parse(audioUri))
-            ).setRemoveVideo(true).build()
+            val clippedAudio = androidx.media3.common.MediaItem.Builder()
+                .setUri(Uri.parse(audioUri))
+                .setClippingConfiguration(
+                    androidx.media3.common.MediaItem.ClippingConfiguration.Builder()
+                        .setStartPositionMs(0L)
+                        .setEndPositionMs(totalDurationMs)
+                        .build()
+                )
+                .build()
+            val audioItem = androidx.media3.transformer.EditedMediaItem.Builder(clippedAudio)
+                .setRemoveVideo(true)
+                .build()
             val videoSequence = androidx.media3.transformer.EditedMediaItemSequence.withVideoFrom(listOf(videoItem))
             val audioSequence = androidx.media3.transformer.EditedMediaItemSequence.withAudioFrom(listOf(audioItem))
             val composition = androidx.media3.transformer.Composition.Builder(videoSequence, audioSequence).build()
@@ -126,7 +146,7 @@ class VideoExportEngine(private val context: Context) {
                             try {
                                 validateMp4HasAudioAndVideo(outputFile)
                                 LyricMakerStorage.copyExportedVideo(context, outputFile)
-                                if (continuation.isActive) continuation.resume(outputFile)
+                                if (continuation.isActive) continuation.resumeWith(Result.success(outputFile))
                             } catch (failure: Throwable) {
                                 outputFile.delete()
                                 if (continuation.isActive) continuation.resumeWith(Result.failure(failure))
@@ -177,6 +197,214 @@ class VideoExportEngine(private val context: Context) {
             }
         } finally {
             backgroundFile.delete()
+        }
+    }
+
+    @androidx.media3.common.util.UnstableApi
+    private class ProjectLyricOverlay(
+        private val owner: VideoExportEngine,
+        private val width: Int,
+        private val height: Int,
+        private val project: VideoProject
+    ) : androidx.media3.effect.BitmapOverlay() {
+        private var cached: Bitmap? = null
+
+        override fun getBitmap(presentationTimeUs: Long): Bitmap {
+            val bitmap = cached?.takeIf { it.width == width && it.height == height }
+                ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { cached = it }
+            bitmap.eraseColor(Color.TRANSPARENT)
+            owner.drawLyrics(Canvas(bitmap), width, height, project, (presentationTimeUs / 1000L).coerceAtLeast(0L))
+            if (project.showWatermark && project.watermarkText.isNotBlank()) {
+                owner.drawWatermark(Canvas(bitmap), width, height, project.watermarkText)
+            }
+            return bitmap
+        }
+
+        override fun release() {
+            cached?.recycle()
+            cached = null
+            super.release()
+        }
+    }
+
+    private fun muxVideoAndAudio(videoFile: File, audioFile: File, outputFile: File, durationMs: Long) {
+        val videoExtractor = android.media.MediaExtractor()
+        val audioExtractor = android.media.MediaExtractor()
+        val muxer = MediaMuxer(outputFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        var started = false
+        try {
+            videoExtractor.setDataSource(videoFile.absolutePath)
+            audioExtractor.setDataSource(audioFile.absolutePath)
+            var videoSourceTrack = -1
+            var audioSourceTrack = -1
+            for (i in 0 until videoExtractor.trackCount) {
+                if (videoExtractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true) {
+                    videoSourceTrack = i
+                    videoExtractor.selectTrack(i)
+                    break
+                }
+            }
+            for (i in 0 until audioExtractor.trackCount) {
+                if (audioExtractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true) {
+                    audioSourceTrack = i
+                    audioExtractor.selectTrack(i)
+                    break
+                }
+            }
+            check(videoSourceTrack >= 0) { "Encoded video track is missing" }
+            check(audioSourceTrack >= 0) { "Encoded AAC audio track is missing" }
+            val videoOutTrack = muxer.addTrack(videoExtractor.getTrackFormat(videoSourceTrack))
+            val audioOutTrack = muxer.addTrack(audioExtractor.getTrackFormat(audioSourceTrack))
+            muxer.start()
+            started = true
+            copySamples(videoExtractor, muxer, videoOutTrack, durationMs)
+            copySamples(audioExtractor, muxer, audioOutTrack, durationMs)
+        } finally {
+            runCatching { if (started) muxer.stop() }
+            runCatching { muxer.release() }
+            runCatching { videoExtractor.release() }
+            runCatching { audioExtractor.release() }
+        }
+    }
+
+    private fun copySamples(
+        extractor: android.media.MediaExtractor,
+        muxer: MediaMuxer,
+        outputTrack: Int,
+        durationMs: Long
+    ) {
+        val buffer = ByteBuffer.allocate(1 shl 20)
+        val info = MediaCodec.BufferInfo()
+        while (true) {
+            buffer.clear()
+            val size = extractor.readSampleData(buffer, 0)
+            if (size < 0) break
+            val pts = extractor.sampleTime
+            if (pts < 0L || pts >= durationMs * 1000L) break
+            info.set(0, size, pts, extractor.sampleFlags)
+            muxer.writeSampleData(outputTrack, buffer, info)
+            if (!extractor.advance()) break
+        }
+    }
+
+    private fun validateMp4HasAudioAndVideo(file: File) {
+        val extractor = android.media.MediaExtractor()
+        try {
+            extractor.setDataSource(file.absolutePath)
+            var hasAudio = false
+            var hasVideo = false
+            for (i in 0 until extractor.trackCount) {
+                when (extractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.substringBefore('/')) {
+                    "audio" -> hasAudio = true
+                    "video" -> hasVideo = true
+                }
+            }
+            check(hasAudio && hasVideo) { "Export validation failed: MP4 must contain audio and video tracks" }
+        } finally {
+            extractor.release()
+        }
+    }
+
+    private fun exportStillFrameFallback(project: VideoProject, outputFile: File, mediaAssets: List<ExportMediaAsset>): File {
+        val width = 1080
+        val height = (width / project.canvasRatio.aspectRatio).toInt()
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val activeLine = project.lyrics.firstOrNull()
+        val timeMs = activeLine?.startMs ?: 1500L
+        renderFrameInternal(canvas, width, height, project, timeMs, mediaAssets)
+
+        val pngFile = File(outputFile.parentFile, "LyricPoster_${System.currentTimeMillis()}.png")
+        FileOutputStream(pngFile).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
+        bitmap.recycle()
+        return pngFile
+    }
+
+    fun exportPosterImage(project: VideoProject, timeMs: Long): File {
+        val exportDir = File(context.cacheDir, "clips").apply { mkdirs() }
+        val pngFile = File(exportDir, "LyricCover_${System.currentTimeMillis()}.png")
+
+        val width = 1080
+        val height = (width / project.canvasRatio.aspectRatio).toInt()
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+
+        val mediaAssets = prepareMediaAssets(project.mediaClips)
+        try {
+            renderFrameInternal(canvas, width, height, project, timeMs, mediaAssets)
+        } finally {
+            releaseMediaAssets(mediaAssets)
+        }
+
+        FileOutputStream(pngFile).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
+        bitmap.recycle()
+        return pngFile
+    }
+
+    fun shareFile(file: File, isVideo: Boolean) {
+        val authority = "${context.packageName}.fileprovider"
+        val contentUri: Uri = FileProvider.getUriForFile(context, authority, file)
+
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = if (isVideo) "video/mp4" else "image/png"
+            putExtra(Intent.EXTRA_STREAM, contentUri)
+            putExtra(Intent.EXTRA_SUBJECT, "Created with LyricMaker")
+            putExtra(Intent.EXTRA_TEXT, "Check out my lyric video made with LyricMaker! #LyricMaker #LyricVideo")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        val chooser = Intent.createChooser(intent, "Share Lyric Video to Social Media")
+        chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(chooser)
+    }
+
+    fun renderFrame(canvas: Canvas, width: Int, height: Int, project: VideoProject, timeMs: Long) {
+        renderFrameInternal(canvas, width, height, project, timeMs, emptyList())
+    }
+
+    private fun renderFrameInternal(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        project: VideoProject,
+        timeMs: Long,
+        mediaAssets: List<ExportMediaAsset>
+    ) {
+        val activeAsset = mediaAssets
+            .filter { asset -> timeMs >= asset.clip.startMs && timeMs < asset.clip.startMs + asset.clip.exportDurationMs }
+            .maxByOrNull { it.clip.startMs }
+        val frameBitmap = when {
+            activeAsset?.image != null -> activeAsset.image
+            activeAsset?.retriever != null -> runCatching {
+                activeAsset.retriever.getFrameAtTime(
+                    (activeAsset.clip.sourceOffsetMs +
+                        (timeMs - activeAsset.clip.startMs).coerceAtLeast(0L)) * 1_000L,
+                    MediaMetadataRetriever.OPTION_CLOSEST
+                )
+            }.getOrNull()
+            else -> null
+        }
+
+        if (frameBitmap != null) {
+            drawMediaFrame(canvas, width, height, frameBitmap)
+            if (frameBitmap !== activeAsset?.image) frameBitmap.recycle()
+        } else {
+            drawBackground(canvas, width, height, project.background, timeMs)
+        }
+
+        // 2. Visualizer Overlay
+        drawVisualizer(canvas, width, height, project.visualizer, project.visualizerColorHex, timeMs, project.audioTrack.bpm)
+
+        // 3. Lyrics with Typography & Transitions
+        drawLyrics(canvas, width, height, project, timeMs)
+
+        // 4. Watermark / Creator Tag
+        if (project.showWatermark && project.watermarkText.isNotBlank()) {
+            drawWatermark(canvas, width, height, project.watermarkText)
         }
     }
 
