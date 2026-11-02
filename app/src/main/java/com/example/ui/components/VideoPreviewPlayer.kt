@@ -48,7 +48,8 @@ fun VideoPreviewPlayer(
     onRatioChange: (CanvasRatio) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showRatioMenu by remember { mutableStateOf(false) }\n    var showStyleDialog by remember { mutableStateOf(false) }
+    var showRatioMenu by remember { mutableStateOf(false) }
+    var showStyleDialog by remember { mutableStateOf(false) }\n    var showStyleDialog by remember { mutableStateOf(false) }
     val latestPositionX by rememberUpdatedState(project.typography.positionXPercent)
     val latestPositionY by rememberUpdatedState(project.typography.positionYPercent)
     val latestOnPositionChange by rememberUpdatedState(onTextPositionChange)
@@ -130,6 +131,19 @@ fun VideoPreviewPlayer(
                 }
             }
 
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = StudioSurfaceVariant,
+                border = androidx.compose.foundation.BorderStroke(1.dp, NeonMagenta.copy(alpha = 0.7f)),
+                modifier = Modifier.clickable { showStyleDialog = true }.testTag("preview_style_button")
+            ) {
+                Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.TextFields, contentDescription = null, tint = NeonMagenta, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Style", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
             // Real-time timecode badge
             Surface(
                 shape = RoundedCornerShape(12.dp),
@@ -144,6 +158,58 @@ fun VideoPreviewPlayer(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                 )
             }
+        }
+
+        if (showStyleDialog) {
+            AlertDialog(
+                onDismissRequest = { showStyleDialog = false },
+                title = { Text("Lyric Style Studio", color = TextPrimary, fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("Font Size • ${project.typography.fontSizeSp.toInt()} sp", color = NeonCyan, fontWeight = FontWeight.Bold)
+                        Slider(value = project.typography.fontSizeSp, onValueChange = { onTypographyChange(project.typography.copy(fontSizeSp = it)) }, valueRange = 18f..96f)
+                        Text("Font Family", color = TextSecondary, fontSize = 12.sp)
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            listOf("SansSerif", "Serif", "Monospace", "Casual", "Cursive").chunked(3).forEach { row ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                    row.forEach { family ->
+                                        FilterChip(
+                                            selected = project.typography.fontFamilyName == family,
+                                            onClick = { onTypographyChange(project.typography.copy(fontFamilyName = family)) },
+                                            label = { Text(family, fontSize = 10.sp) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(selected = project.typography.isBold, onClick = { onTypographyChange(project.typography.copy(isBold = !project.typography.isBold)) }, label = { Text("Bold") })
+                            FilterChip(selected = project.typography.isItalic, onClick = { onTypographyChange(project.typography.copy(isItalic = !project.typography.isItalic)) }, label = { Text("Italic") })
+                        }
+                        Text("Visual Font Effect", color = TextSecondary, fontSize = 12.sp)
+                        FontVisualEffect.entries.forEach { effect ->
+                            FilterChip(
+                                selected = project.typography.visualEffect == effect,
+                                onClick = { onTypographyChange(project.typography.copy(visualEffect = effect)) },
+                                label = { Text(effect.label) }
+                            )
+                        }
+                        Text("Karaoke Layout", color = TextSecondary, fontSize = 12.sp)
+                        LyricLayoutMode.entries.forEach { mode ->
+                            FilterChip(
+                                selected = project.typography.lyricLayout == mode,
+                                onClick = { onTypographyChange(project.typography.copy(lyricLayout = mode)) },
+                                label = { Text(mode.label) }
+                            )
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showStyleDialog = false }) { Text("Done", color = NeonCyan) } },
+                containerColor = StudioSurface
+            )
         }
 
         // The Viewport Frame
