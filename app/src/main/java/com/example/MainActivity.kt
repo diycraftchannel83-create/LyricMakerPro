@@ -257,6 +257,9 @@ class MainActivity : ComponentActivity() {
                                         currentTab = currentTab,
                                         onTabSelected = { viewModel.selectTab(it) },
                                         onOpenTapToSync = { viewModel.startTapToSync() },
+                                        onPickAudio = { audioPicker.launch("audio/*") },
+                                        onPickVideo = { videoPicker.launch(arrayOf("video/*")) },
+                                        onPickImage = { imagePicker.launch(arrayOf("image/*")) },
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
@@ -309,6 +312,9 @@ class MainActivity : ComponentActivity() {
                                     currentTab = currentTab,
                                     onTabSelected = { viewModel.selectTab(it) },
                                     onOpenTapToSync = { viewModel.startTapToSync() },
+                                    onPickAudio = { audioPicker.launch("audio/*") },
+                                    onPickVideo = { videoPicker.launch(arrayOf("video/*")) },
+                                    onPickImage = { imagePicker.launch(arrayOf("image/*")) },
                                     isExpanded = studioSheetExpanded,
                                     onToggleExpanded = { studioSheetExpanded = it },
                                     modifier = Modifier
@@ -504,51 +510,6 @@ private fun StudioTopAppBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Templates button
-                IconButton(
-                    onClick = onOpenTemplates,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("templates_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.LibraryMusic,
-                        contentDescription = "Templates",
-                        tint = CyberYellow,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                // Import Custom Audio button
-                IconButton(
-                    onClick = onPickAudio,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("import_audio_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AudioFile,
-                        contentDescription = "Import Audio",
-                        tint = NeonCyan,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                // Import Custom Photo Background
-                IconButton(
-                    onClick = onPickImage,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("import_image_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Image,
-                        contentDescription = "Custom Background",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
                 // Primary Export Button
                 Button(
                     onClick = onOpenExport,
