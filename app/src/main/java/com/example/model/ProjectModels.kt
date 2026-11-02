@@ -123,9 +123,17 @@ data class MediaClip(
     val displayName: String,
     val type: MediaClipType,
     val startMs: Long,
-    val durationMs: Long = if (type == MediaClipType.IMAGE) 5000L else 10000L
+    // Timeline duration: full source duration for video, editable remaining project span for stills.
+    val durationMs: Long
 ) {
     val endMs: Long get() = startMs + durationMs.coerceAtLeast(500L)
+
+    // Export defaults are intentionally separate from timeline/source duration.
+    val exportDurationMs: Long
+        get() = when (type) {
+            MediaClipType.IMAGE -> 5_000L
+            MediaClipType.VIDEO -> durationMs.coerceAtMost(10_000L)
+        }
 }
 
 data class VideoProject(
