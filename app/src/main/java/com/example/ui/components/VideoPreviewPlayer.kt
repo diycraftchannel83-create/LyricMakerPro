@@ -483,7 +483,7 @@ private fun drawInto(
                 if (timeMs < lineToDraw.startMs) 0f else 1f
             }
 
-            val fontSize = (typography.fontSizeSp * (width / 360f)).coerceAtLeast(24f)
+            val fontSize = (typography.fontSizeSp * (width / 360f)).coerceAtLeast(2f)
             val tf = when (typography.fontFamilyName.lowercase()) {
                 "monospace" -> Typeface.MONOSPACE
                 "serif" -> Typeface.SERIF

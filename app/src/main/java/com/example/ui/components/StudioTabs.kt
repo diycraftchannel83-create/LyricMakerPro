@@ -297,11 +297,18 @@ private fun TypographyTab(viewModel: LyricMakerViewModel, project: VideoProject)
         item {
             Text(text = "Font Family", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
             Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("SansSerif" to "Sans", "Monospace" to "Mono", "Serif" to "Serif").forEach { (fam, label) ->
-                    val isSelected = typography.fontFamilyName.equals(fam, ignoreCase = true)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(
+                    listOf(
+                        "SansSerif" to "Sans",
+                        "Serif" to "Serif",
+                        "Monospace" to "Mono",
+                        "casual" to "Casual",
+                        "cursive" to "Cursive"
+                    )
+                ) { (fam, label) ->
                     FilterChip(
-                        selected = isSelected,
+                        selected = typography.fontFamilyName.equals(fam, ignoreCase = true),
                         onClick = { viewModel.updateTypographyProperties(fontFamily = fam) },
                         label = { Text(label, fontSize = 12.sp) }
                     )

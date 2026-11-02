@@ -232,16 +232,7 @@ fun MultiTrackTimeline(
                              .height(42.dp)
                     )
 
-                    Spacer(Modifier.height(2.dp))
 
-                    // Track 4: Visualizer & Background Effects Track
-                    EffectsTrackRow(
-                        project = project,
-                        pxPerMs = pxPerMs,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                             .height(16.dp)
-                    )
                 }
 
                 // Vertical Playhead Scrub Needle
@@ -333,30 +324,6 @@ private fun MediaClipsTrackRow(
 ) {
     var selectedClipId by remember { mutableStateOf<String?>(null) }
     Column(modifier = modifier) {
-        Row(
-            modifier = Modifier.fillMaxWidth().height(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                "VIDEO / PHOTO  •  DRAG TO MOVE  •  LEFT + RIGHT TRIM",
-                color = NeonCyan,
-                fontSize = 7.sp,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            if (selectedClipId != null && clips.any { it.id == selectedClipId }) {
-                IconButton(
-                    onClick = { selectedClipId?.let(onRemoveClip); selectedClipId = null },
-                    modifier = Modifier.size(20.dp)
-                ) {
-                    Icon(Icons.Default.Delete, contentDescription = "Remove selected media", tint = Color(0xFFFF6B78), modifier = Modifier.size(13.dp))
-                }
-            }
-        }
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -481,11 +448,19 @@ private fun MediaClipsTrackRow(
             }
             if (clips.isEmpty()) {
                 Text(
-                    text = "Import photos or videos to add media clips",
+                    text = "Import photos or videos",
                     color = TextMuted,
                     fontSize = 9.sp,
                     modifier = Modifier.align(Alignment.Center)
                 )
+            }
+            if (selectedClipId != null && clips.any { it.id == selectedClipId }) {
+                IconButton(
+                    onClick = { selectedClipId?.let(onRemoveClip); selectedClipId = null },
+                    modifier = Modifier.align(Alignment.TopEnd).size(20.dp)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = "Remove selected media", tint = Color(0xFFFF6B78), modifier = Modifier.size(13.dp))
+                }
             }
         }
     }
@@ -549,58 +524,61 @@ private fun AudioTrackRow(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF161926))
+            .background(Color(0xFF101722))
             .border(1.dp, StudioCardBorder, RoundedCornerShape(8.dp))
-            .padding(horizontal = 6.dp),
-        contentAlignment = Alignment.CenterStart
+            .padding(horizontal = 5.dp, vertical = 2.dp)
     ) {
-        // Simulated Waveform Bars
         Canvas(modifier = Modifier.fillMaxSize()) {
             val peaks = project.audioTrack.waveformPeaks
+            val centerY = size.height / 2f
+            drawLine(
+                color = WaveformBlue.copy(alpha = 0.28f),
+                start = Offset(0f, centerY),
+                end = Offset(size.width, centerY),
+                strokeWidth = 1f
+            )
             if (peaks.isNotEmpty()) {
                 val step = size.width / peaks.size
-                val barW = (step * 0.7f).coerceAtLeast(1.5f)
-                val cy = size.height / 2f
-
-                for (i in peaks.indices) {
-                    val peak = peaks[i]
-                    val x = i * step
-                    val barH = (peak * (size.height * 0.8f)).coerceAtLeast(4f)
+                val barWidth = (step * 0.62f).coerceIn(1f, 4f)
+                peaks.forEachIndexed { index, rawPeak ->
+                    val amplitude = rawPeak.coerceIn(0.035f, 1f)
+                    val halfHeight = (amplitude * size.height * 0.46f).coerceAtLeast(1.5f)
+                    val x = index * step + step / 2f
                     drawLine(
-                        color = WaveformBlue.copy(alpha = 0.6f),
-                        start = Offset(x, cy - barH / 2f),
-                        end = Offset(x, cy + barH / 2f),
-                        strokeWidth = barW
+                        color = if (index % 5 == 0) NeonCyan else WaveformBlue,
+                        start = Offset(x, centerY - halfHeight),
+                        end = Offset(x, centerY + halfHeight),
+                        strokeWidth = barWidth
+                    )
+                }
+            } else {
+                // Keep a clear loading/empty state until decoded PCM peaks are ready.
+                for (index in 0 until 96) {
+                    val x = index * size.width / 96f
+                    drawLine(
+                        color = WaveformBlue.copy(alpha = 0.25f),
+                        start = Offset(x, centerY - 2f),
+                        end = Offset(x, centerY + 2f),
+                        strokeWidth = 1.5f
                     )
                 }
             }
         }
 
-        // Track Tag Overlay
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        Text(
+            text = project.audioTrack.title,
+            fontSize = 7.sp,
+            color = Color.White.copy(alpha = 0.82f),
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier
-                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
-                .padding(horizontal = 6.dp, vertical = 2.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.GraphicEq,
-                contentDescription = null,
-                tint = WaveformBlue,
-                modifier = Modifier.size(12.dp)
-            )
-            Text(
-                text = "${project.audioTrack.title} (${project.audioTrack.bpm} BPM)",
-                fontSize = 9.sp,
-                color = TextPrimary,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 220.dp)
-            )
-        }
+                .align(Alignment.TopStart)
+                .background(Color(0xB8000000), RoundedCornerShape(bottomEnd = 4.dp))
+                .padding(horizontal = 4.dp, vertical = 1.dp)
+                .widthIn(max = 180.dp)
+        )
     }
 }
 
@@ -738,58 +716,6 @@ private fun LyricsTrackRow(
     }
 }
 
-@Composable
-private fun EffectsTrackRow(
-    project: VideoProject,
-    pxPerMs: Float,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF10121C))
-            .border(1.dp, StudioCardBorder, RoundedCornerShape(8.dp))
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        // Visualizer Tag
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Icon(Icons.Default.Equalizer, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(11.dp))
-            Text(
-                text = "FX: ${project.visualizer.label}",
-                fontSize = 8.sp,
-                color = TextSecondary,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        // Motion Transition Tag
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Icon(Icons.Default.Animation, contentDescription = null, tint = NeonMagenta, modifier = Modifier.size(11.dp))
-            Text(
-                text = "Motion: ${project.transitionEffect.label}",
-                fontSize = 8.sp,
-                color = TextSecondary,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
 
 private fun formatTimelineTime(ms: Long): String {
     val totalSeconds = ms / 1000L

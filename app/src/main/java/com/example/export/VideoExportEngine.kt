@@ -587,7 +587,7 @@ class VideoExportEngine(private val context: Context) {
             if (timeMs < lineToDraw.startMs) 0f else 1f
         }
 
-        val baseFontSize = (typography.fontSizeSp * (width / 360f)).coerceAtLeast(32f)
+        val baseFontSize = (typography.fontSizeSp * (width / 360f)).coerceAtLeast(2f)
 
         // Typeface
         val baseTypeface = when (typography.fontFamilyName.lowercase()) {

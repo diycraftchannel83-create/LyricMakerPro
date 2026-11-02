@@ -7,6 +7,7 @@ import android.os.Vibrator
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.audio.AudioEngine
+import com.example.audio.AudioWaveformExtractor
 import com.example.data.PresetLibrary
 import com.example.export.VideoExportEngine
 import com.example.model.*
@@ -410,18 +411,34 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun importCustomAudio(uriString: String, fileName: String) {
+    fun importCustomAudio(uriString: String, fileName: String, durationMs: Long) {
+        val safeDurationMs = durationMs.coerceAtLeast(500L)
         val customTrack = AudioTrackConfig(
             id = UUID.randomUUID().toString(),
             title = fileName.ifBlank { "Imported Track" },
             artist = "Local Device",
             bpm = 120,
-            durationMs = 45_000L,
+            durationMs = safeDurationMs,
             beatType = AudioBeatType.CUSTOM_FILE,
             customUri = uriString
         )
         _project.value = _project.value.copy(audioTrack = customTrack)
         audioEngine.loadTrack(customTrack)
+
+        // Decode real PCM samples off the UI thread; only apply them if this track
+        // is still selected when extraction completes.
+        viewModelScope.launch {
+            val peaks = AudioWaveformExtractor.extract(
+                context = getApplication(),
+                uriString = uriString,
+                durationMs = safeDurationMs
+            )
+            if (peaks.isNotEmpty() && _project.value.audioTrack.id == customTrack.id) {
+                _project.value = _project.value.copy(
+                    audioTrack = _project.value.audioTrack.copy(waveformPeaks = peaks)
+                )
+            }
+        }
     }
 
     // --- Export Video Workflow ---

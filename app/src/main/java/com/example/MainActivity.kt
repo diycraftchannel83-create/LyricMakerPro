@@ -91,9 +91,15 @@ class MainActivity : ComponentActivity() {
 
                 // File Pickers
                 val audioPicker = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.GetContent()
+                    contract = ActivityResultContracts.OpenDocument()
                 ) { uri: Uri? ->
                     if (uri != null) {
+                        runCatching {
+                            contentResolver.takePersistableUriPermission(
+                                uri,
+                                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                            )
+                        }
                         var fileName = "Imported Audio"
                         contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                             val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
@@ -101,7 +107,18 @@ class MainActivity : ComponentActivity() {
                                 fileName = cursor.getString(nameIndex)
                             }
                         }
-                        viewModel.importCustomAudio(uri.toString(), fileName)
+                        val durationMs = runCatching {
+                            MediaMetadataRetriever().let { retriever ->
+                                try {
+                                    retriever.setDataSource(this@MainActivity, uri)
+                                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                        ?.toLongOrNull() ?: 45_000L
+                                } finally {
+                                    retriever.release()
+                                }
+                            }
+                        }.getOrDefault(45_000L).coerceAtLeast(500L)
+                        viewModel.importCustomAudio(uri.toString(), fileName, durationMs)
                     }
                 }
 
@@ -170,7 +187,7 @@ class MainActivity : ComponentActivity() {
                         StudioTopAppBar(
                             projectTitle = project.title,
                             onOpenTemplates = { viewModel.setShowTemplatesSheet(true) },
-                            onPickAudio = { audioPicker.launch("audio/*") },
+                            onPickAudio = { audioPicker.launch(arrayOf("audio/*")) },
                             onPickImage = {
                                 imagePicker.launch(arrayOf("image/*"))
                             },
