@@ -245,37 +245,16 @@ fun MultiTrackTimeline(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    if (selectedLine != null && editingLineId == selectedLine.id) {
-                        OutlinedTextField(
-                            value = selectedLine.text,
-                            onValueChange = { text -> onTextChange(selectedLine.id, text) },
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp).testTag("lyric_inline_editor"),
-                            textStyle = LocalTextStyle.current.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary),
-                            placeholder = { Text("Edit lyric text", fontSize = 12.sp) },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = NeonCyan,
-                                unfocusedBorderColor = StudioCardBorder,
-                                cursorColor = NeonCyan
-                            )
-                        )
-                        TextButton(onClick = { editingLineId = null }, contentPadding = PaddingValues(horizontal = 4.dp)) {
-                            Text("Done", color = NeonCyan, fontSize = 11.sp)
-                        }
-                    } else {
-                        Text(
-                            text = selectedLine?.text ?: "Selected Line",
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                selectedLine?.let { editingLineId = it.id }
-                            },
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text("Double tap lyric block to edit", fontSize = 10.sp, color = TextSecondary)
-                    }
+                    Text(
+                        text = selectedLine?.text ?: "Selected Line",
+                        modifier = Modifier.fillMaxWidth(),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text("Double tap lyric block to edit", fontSize = 10.sp, color = TextSecondary)
                     Text(
                         text = "${formatMs(selectedLine?.startMs ?: 0L)} → ${formatMs(selectedLine?.endMs ?: 0L)} (${selectedLine?.durationMs ?: 0L}ms)",
                         fontSize = 11.sp,
@@ -332,6 +311,55 @@ fun MultiTrackTimeline(
                 }
             }
         }
+    }
+
+    // Floating lyric editor dialog: stays separate from the bottom navigation area.
+    val editingLine = project.lyrics.find { it.id == editingLineId }
+    if (editingLine != null) {
+        AlertDialog(
+            onDismissRequest = { editingLineId = null },
+            title = {
+                Text(
+                    text = "Edit Lyric",
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                OutlinedTextField(
+                    value = editingLine.text,
+                    onValueChange = { text -> onTextChange(editingLine.id, text) },
+                    modifier = Modifier.fillMaxWidth().testTag("lyric_popup_editor"),
+                    textStyle = LocalTextStyle.current.copy(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = TextPrimary
+                    ),
+                    placeholder = { Text("Correct lyric text") },
+                    singleLine = false,
+                    minLines = 2,
+                    maxLines = 5,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = NeonCyan,
+                        unfocusedBorderColor = StudioCardBorder,
+                        cursorColor = NeonCyan
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { editingLineId = null }) {
+                    Text("Done", color = NeonCyan)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingLineId = null }) {
+                    Text("Close", color = TextSecondary)
+                }
+            },
+            containerColor = StudioSurface,
+            titleContentColor = TextPrimary,
+            textContentColor = TextPrimary
+        )
     }
 }
 
