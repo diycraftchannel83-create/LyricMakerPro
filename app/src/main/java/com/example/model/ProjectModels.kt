@@ -101,7 +101,8 @@ enum class AudioBeatType(val label: String, val bpm: Int, val description: Strin
     SYNTH_LOFI("Midnight Lo-Fi", 80, "Warm sub bass, vinyl crackle, gentle chill chords"),
     SYNTH_CYBERPUNK("Cyberpunk Beat", 135, "Deep 808 glide, crisp rolling hi-hats, laser arp"),
     SYNTH_ACOUSTIC("Acoustic Groove", 105, "Organic drum snaps, warm rhythm bounce"),
-    CUSTOM_FILE("Custom Audio File", 120, "Imported sound from your device storage")
+    CUSTOM_FILE("Custom Audio File", 120, "Imported sound from your device storage"),
+    NONE("No Audio", 120, "No audio selected")
 }
 
 data class AudioTrackConfig(
