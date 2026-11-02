@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.model.BackgroundConfig
 import com.example.model.BackgroundType
 import com.example.data.ProjectFileCodec
+import com.example.data.LyricMakerStorage
 import com.example.ui.components.*
 import com.example.ui.theme.*
 import com.example.viewmodel.LyricMakerViewModel
@@ -134,22 +135,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                val saveProjectLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.CreateDocument("application/json")
-                ) { uri: Uri? ->
-                    if (uri != null) {
-                        runCatching {
-                            contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
-                                writer.write(ProjectFileCodec.encode(project))
-                            } ?: error("Unable to open destination file")
-                        }.onSuccess {
-                            Toast.makeText(this@MainActivity, "Project saved", Toast.LENGTH_SHORT).show()
-                        }.onFailure {
-                            Toast.makeText(this@MainActivity, "Save failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show()
-                        }
-                    }
-                }
-
                 val openProjectLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.OpenDocument()
                 ) { uri: Uri? ->
@@ -185,7 +170,16 @@ class MainActivity : ComponentActivity() {
                             onOpenExport = { viewModel.setShowExportDialog(true) },
                             onPickLyrics = { lyricsPicker.launch("text/*") },
                             onOpenProject = { openProjectLauncher.launch(arrayOf("application/json", "text/plain")) },
-                            onSaveProject = { saveProjectLauncher.launch("${project.title.replace(Regex("[^A-Za-z0-9_-]"), "_")}.lyricmaker.json") }
+                            onSaveProject = {
+                                runCatching { LyricMakerStorage.saveProject(this@MainActivity, project) }
+                                    .onSuccess { Toast.makeText(this@MainActivity, "Project saved to LyricMakerPro/Project", Toast.LENGTH_LONG).show() }
+                                    .onFailure { Toast.makeText(this@MainActivity, "Save failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show() }
+                            },
+                            onSaveLrc = {
+                                runCatching { LyricMakerStorage.saveLrc(this@MainActivity, project) }
+                                    .onSuccess { Toast.makeText(this@MainActivity, "LRC saved to LyricMakerPro/LrcLyric", Toast.LENGTH_LONG).show() }
+                                    .onFailure { Toast.makeText(this@MainActivity, "LRC save failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show() }
+                            }
                         )
                     }
                 ) { innerPadding ->
@@ -351,7 +345,8 @@ private fun StudioTopAppBar(
     onOpenExport: () -> Unit,
     onPickLyrics: () -> Unit,
     onOpenProject: () -> Unit,
-    onSaveProject: () -> Unit
+    onSaveProject: () -> Unit,
+    onSaveLrc: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     var languageDialog by remember { mutableStateOf(false) }
@@ -424,6 +419,11 @@ private fun StudioTopAppBar(
                             text = { Text("Save Project") },
                             leadingIcon = { Icon(Icons.Default.Save, null) },
                             onClick = { menuExpanded = false; onSaveProject() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Save Lyrics (.LRC)") },
+                            leadingIcon = { Icon(Icons.Default.Subtitles, null, tint = NeonCyan) },
+                            onClick = { menuExpanded = false; onSaveLrc() }
                         )
                         HorizontalDivider(color = StudioCardBorder)
                         DropdownMenuItem(
