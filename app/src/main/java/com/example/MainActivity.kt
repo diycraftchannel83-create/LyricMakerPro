@@ -176,8 +176,28 @@ class MainActivity : ComponentActivity() {
                                 ?: error("Unable to read project file")
                         }.mapCatching { json -> ProjectFileCodec.decode(json) }
                             .onSuccess { loaded ->
+                                val audioUri = loaded.audioTrack.customUri?.let(Uri::parse)
+                                val audioCanBeReopened = if (
+                                    loaded.audioTrack.beatType == com.example.model.AudioBeatType.CUSTOM_FILE &&
+                                    audioUri != null
+                                ) {
+                                    runCatching {
+                                        contentResolver.openFileDescriptor(audioUri, "r")?.use { }
+                                            ?: error("Audio file is unavailable")
+                                    }.isSuccess
+                                } else {
+                                    loaded.audioTrack.beatType != com.example.model.AudioBeatType.CUSTOM_FILE
+                                }
+
+                                // Restore lyrics, word-level sync and timeline even if the
+                                // original audio permission/file is no longer available.
                                 viewModel.loadProject(loaded)
-                                Toast.makeText(this@MainActivity, "Project opened", Toast.LENGTH_SHORT).show()
+                                val message = if (audioCanBeReopened) {
+                                    "Project opened"
+                                } else {
+                                    "Project opened. Audio access expired: re-import the original audio file to play it."
+                                }
+                                Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
                             }.onFailure {
                                 Toast.makeText(this@MainActivity, "Open failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show()
                             }
