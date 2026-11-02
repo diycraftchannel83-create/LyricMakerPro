@@ -1,4 +1,4 @@
-package com.example.audio
+package com.winsmediatama.lyricmakerpro.audio
 
 import android.content.Context
 import android.media.AudioFormat
