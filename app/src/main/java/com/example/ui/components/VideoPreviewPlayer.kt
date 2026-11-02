@@ -48,7 +48,7 @@ fun VideoPreviewPlayer(
     onRatioChange: (CanvasRatio) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showRatioMenu by remember { mutableStateOf(false) }
+    var showRatioMenu by remember { mutableStateOf(false) }\n    var showStyleDialog by remember { mutableStateOf(false) }
     val latestPositionX by rememberUpdatedState(project.typography.positionXPercent)
     val latestPositionY by rememberUpdatedState(project.typography.positionYPercent)
     val latestOnPositionChange by rememberUpdatedState(onTextPositionChange)
