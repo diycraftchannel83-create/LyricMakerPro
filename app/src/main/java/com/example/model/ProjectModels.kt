@@ -55,7 +55,11 @@ data class BackgroundConfig(
     val darkOverlayOpacity: Float = 0.45f
 )
 
-enum class FontVisualEffect(val label: String) { NONE("Clean"), NEON_GLOW("Neon Glow"), SOFT_SHADOW("Soft Shadow"), DOUBLE_OUTLINE("Double Outline") }\n\nenum class LyricLayoutMode(val label: String) { SINGLE_LINE("Single Line"), KARAOKE_TWO_LINE("Two-Line Karaoke") }\n\ndata class TypographyPreset(
+enum class FontVisualEffect(val label: String) { NONE("Clean"), NEON_GLOW("Neon Glow"), SOFT_SHADOW("Soft Shadow"), DOUBLE_OUTLINE("Double Outline") }
+
+enum class LyricLayoutMode(val label: String) { SINGLE_LINE("Single Line"), KARAOKE_TWO_LINE("Two-Line Karaoke") }
+
+data class TypographyPreset(
     val id: String = UUID.randomUUID().toString(),
     val name: String,
     val fontFamilyName: String = "SansSerif",
@@ -71,7 +75,9 @@ enum class FontVisualEffect(val label: String) { NONE("Clean"), NEON_GLOW("Neon 
     val isItalic: Boolean = false,
     val textAlign: TextAlign = TextAlign.Center,
     val positionXPercent: Float = 50f,
-    val positionYPercent: Float = 56f
+    val positionYPercent: Float = 56f,
+    val visualEffect: FontVisualEffect = FontVisualEffect.NEON_GLOW,
+    val lyricLayout: LyricLayoutMode = LyricLayoutMode.SINGLE_LINE
 )
 
 data class LyricWord(
