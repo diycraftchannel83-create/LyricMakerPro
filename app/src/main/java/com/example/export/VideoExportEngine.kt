@@ -262,9 +262,9 @@ class VideoExportEngine(private val context: Context) {
         timeMs: Long,
         mediaAssets: List<ExportMediaAsset>
     ) {
-        val activeAsset = mediaAssets.lastOrNull { asset ->
-            timeMs >= asset.clip.startMs && timeMs < asset.clip.startMs + asset.clip.exportDurationMs
-        }
+        val activeAsset = mediaAssets
+            .filter { asset -> timeMs >= asset.clip.startMs && timeMs < asset.clip.startMs + asset.clip.exportDurationMs }
+            .maxByOrNull { it.clip.startMs }
         val frameBitmap = when {
             activeAsset?.image != null -> activeAsset.image
             activeAsset?.retriever != null -> runCatching {
