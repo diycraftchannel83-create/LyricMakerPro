@@ -1,4 +1,4 @@
-package com.example
+package com.winsmediatama.lyricmakerpro
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
