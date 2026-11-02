@@ -890,7 +890,7 @@ class VideoExportEngine(private val context: Context) {
     private fun drawWatermark(canvas: Canvas, width: Int, height: Int, text: String) {
         // Compact creator mark: target width is 10% of the exported frame.
         // 70% alpha keeps the branding visible without competing with the lyrics.
-        val label = "Created with LyricMakerPro"
+        val label = text.ifBlank { "Created with LyricMakerPro" }
         val targetWidth = width * 0.10f
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textSize = (width * 0.018f).coerceAtLeast(12f)
