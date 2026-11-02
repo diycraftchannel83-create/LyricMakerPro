@@ -55,8 +55,6 @@ fun VideoPreviewPlayer(
     onSeek: (Long) -> Unit,
     onTextPositionChange: (Float, Float) -> Unit,
     onTextScaleChange: (Float) -> Unit,
-    onTypographyChange: (TypographyPreset) -> Unit,
-    onRatioChange: (CanvasRatio) -> Unit,
     videoAudioMuted: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -79,15 +77,12 @@ fun VideoPreviewPlayer(
             .background(StudioBackground),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Top Toolbar: Aspect Ratio Selector & Timecode
+        // Minimal preview header: keep only the timecode; editing controls live in bottom tabs.
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Real-time timecode badge
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = StudioSurfaceVariant.copy(alpha = 0.8f),
