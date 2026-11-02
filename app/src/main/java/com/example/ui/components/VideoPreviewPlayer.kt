@@ -49,6 +49,10 @@ fun VideoPreviewPlayer(
     modifier: Modifier = Modifier
 ) {
     var showRatioMenu by remember { mutableStateOf(false) }
+    val latestPositionX by rememberUpdatedState(project.typography.positionXPercent)
+    val latestPositionY by rememberUpdatedState(project.typography.positionYPercent)
+    val latestOnPositionChange by rememberUpdatedState(onTextPositionChange)
+    val latestOnScaleChange by rememberUpdatedState(onTextScaleChange)
 
     Column(
         modifier = modifier
@@ -158,17 +162,17 @@ fun VideoPreviewPlayer(
                     .clip(RoundedCornerShape(14.dp))
                     .border(1.5.dp, StudioCardBorder, RoundedCornerShape(14.dp))
                     .shadow(12.dp, RoundedCornerShape(14.dp))
-                    .pointerInput(project.typography.positionXPercent, project.typography.positionYPercent, project.typography.fontSizeSp) {
+                    .pointerInput(Unit) {
                         detectTransformGestures { _, pan, zoom, _ ->
                             if (size.width > 0 && size.height > 0) {
-                                val currentX = project.typography.positionXPercent
-                                val currentY = project.typography.positionYPercent
+                                val currentX = latestPositionX
+                                val currentY = latestPositionY
                                 val proposedX = (currentX + pan.x / size.width * 100f).coerceIn(5f, 95f)
                                 val proposedY = (currentY + pan.y / size.height * 100f).coerceIn(5f, 95f)
                                 val snapX = if (kotlin.math.abs(proposedX - 50f) <= 2.5f) 50f else proposedX
                                 val snapY = if (kotlin.math.abs(proposedY - 50f) <= 2.5f) 50f else proposedY
-                                onTextPositionChange(snapX - currentX, snapY - currentY)
-                                if (zoom != 1f) onTextScaleChange(zoom)
+                                latestOnPositionChange(snapX - currentX, snapY - currentY)
+                                if (zoom != 1f) latestOnScaleChange(zoom)
                             }
                         }
                     }
