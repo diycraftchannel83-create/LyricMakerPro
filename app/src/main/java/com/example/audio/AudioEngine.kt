@@ -79,16 +79,19 @@ class AudioEngine(private val context: Context) {
         if (_isPlaying.value) return
         val track = currentTrack ?: return
 
+        // Built-in beat types are visual/demo presets only. Real playback is
+        // available only when the user imports an audio file.
+        if (track.beatType != AudioBeatType.CUSTOM_FILE || mediaPlayer == null) {
+            _isPlaying.value = false
+            return
+        }
+
         _isPlaying.value = true
         playbackStartSystemTime = System.currentTimeMillis()
         playheadOffsetOnStart = _playheadMs.value
 
-        if (isCustomFile && mediaPlayer != null) {
-            mediaPlayer?.seekTo(_playheadMs.value.toInt())
-            mediaPlayer?.start()
-        } else {
-            startSynthesizedPlayback(track, _playheadMs.value)
-        }
+        mediaPlayer?.seekTo(_playheadMs.value.toInt())
+        mediaPlayer?.start()
 
         startTicker(track)
     }
