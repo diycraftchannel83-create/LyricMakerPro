@@ -32,6 +32,10 @@ class PermanentWatermarkBilling(context: Context) : PurchasesUpdatedListener {
     private val _isOwned = MutableStateFlow(prefs.getBoolean(KEY_OWNED, false))
     val isOwned = _isOwned.asStateFlow()
 
+    // Ads are initialized only after Play Billing confirms that this is not a premium owner.
+    private val _isEntitlementResolved = MutableStateFlow(false)
+    val isEntitlementResolved = _isEntitlementResolved.asStateFlow()
+
     private val _price = MutableStateFlow<String?>(null)
     val price = _price.asStateFlow()
 
@@ -144,6 +148,7 @@ class PermanentWatermarkBilling(context: Context) : PurchasesUpdatedListener {
                     PRODUCT_ID in it.products && it.purchaseState == Purchase.PurchaseState.PURCHASED
                 }
                 setOwned(owned)
+                _isEntitlementResolved.value = true
                 purchases.filter { PRODUCT_ID in it.products }.forEach(::processPurchase)
             } else {
                 _message.value = "Gagal memulihkan pembelian: ${result.debugMessage}"
