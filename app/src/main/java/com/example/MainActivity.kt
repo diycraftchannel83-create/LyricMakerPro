@@ -27,6 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -314,7 +315,6 @@ class MainActivity : ComponentActivity() {
                                         .align(Alignment.BottomCenter)
                                         .fillMaxWidth()
                                         .height(studioSheetHeight)
-                                        .navigationBarsPadding()
                                         .shadow(18.dp, RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
                                         .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
                                         .border(1.dp, StudioCardBorder, RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
