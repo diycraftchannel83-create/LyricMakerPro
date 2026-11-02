@@ -198,7 +198,10 @@ class MainActivity : ComponentActivity() {
                                         onTextChange = { id, text -> viewModel.updateLyricText(id, text) },
                                         onAddLine = { viewModel.addLyricLine() },
                                         onDeleteLine = { viewModel.deleteSelectedLyric() },
-                                        onOpenTapToSync = { viewModel.startTapToSync() }
+                                        onOpenTapToSync = { viewModel.startTapToSync() },
+                                        onMoveMediaClip = { id, delta -> viewModel.moveMediaClip(id, delta) },
+                                        onResizeMediaClip = { id, delta -> viewModel.resizeMediaClip(id, delta) },
+                                        onRemoveMediaClip = { id -> viewModel.removeMediaClip(id) }
                                     )
 
                                     StudioTabs(
@@ -241,7 +244,10 @@ class MainActivity : ComponentActivity() {
                                         onTextChange = { id, text -> viewModel.updateLyricText(id, text) },
                                     onAddLine = { viewModel.addLyricLine() },
                                     onDeleteLine = { viewModel.deleteSelectedLyric() },
-                                    onOpenTapToSync = { viewModel.startTapToSync() }
+                                    onOpenTapToSync = { viewModel.startTapToSync() },
+                                    onMoveMediaClip = { id, delta -> viewModel.moveMediaClip(id, delta) },
+                                    onResizeMediaClip = { id, delta -> viewModel.resizeMediaClip(id, delta) },
+                                    onRemoveMediaClip = { id -> viewModel.removeMediaClip(id) }
                                 )
 
                                 StudioTabs(
