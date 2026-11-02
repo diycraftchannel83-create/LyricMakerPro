@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.winsmediatama.lyricmakerpro.ads.RewardedAdManager
+import com.winsmediatama.lyricmakerpro.billing.PermanentWatermarkBilling
 import com.winsmediatama.lyricmakerpro.model.BackgroundConfig
 import com.winsmediatama.lyricmakerpro.model.BackgroundType
 import com.winsmediatama.lyricmakerpro.data.ProjectFileCodec
@@ -52,13 +53,21 @@ import com.winsmediatama.lyricmakerpro.viewmodel.LyricMakerViewModel
 class MainActivity : ComponentActivity() {
 
     private lateinit var rewardedAdManager: RewardedAdManager
+    private lateinit var watermarkBilling: PermanentWatermarkBilling
     private val viewModel: LyricMakerViewModel by viewModels()
+
+    override fun onDestroy() {
+        if (::watermarkBilling.isInitialized) watermarkBilling.close()
+        super.onDestroy()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         rewardedAdManager = RewardedAdManager(this)
         rewardedAdManager.initialize()
+        watermarkBilling = PermanentWatermarkBilling(this)
+        watermarkBilling.connect()
 
         setContent {
             MyApplicationTheme {
@@ -84,6 +93,15 @@ class MainActivity : ComponentActivity() {
                 val exportProgress by viewModel.exportProgress.collectAsStateWithLifecycle()
                 val exportStatus by viewModel.exportStatus.collectAsStateWithLifecycle()
                 val lastExportedFile by viewModel.lastExportedFile.collectAsStateWithLifecycle()
+                val permanentWatermarkRemoved by watermarkBilling.isOwned.collectAsStateWithLifecycle()
+                val permanentWatermarkPrice by watermarkBilling.price.collectAsStateWithLifecycle()
+                val billingMessage by watermarkBilling.message.collectAsStateWithLifecycle()
+                LaunchedEffect(billingMessage) {
+                    billingMessage?.let {
+                        Toast.makeText(this@MainActivity, it, Toast.LENGTH_LONG).show()
+                        watermarkBilling.clearMessage()
+                    }
+                }
 
                 val showTemplatesSheet by viewModel.showTemplatesSheet.collectAsStateWithLifecycle()
                 var showSaveProjectDialog by rememberSaveable { mutableStateOf(false) }
@@ -441,8 +459,12 @@ class MainActivity : ComponentActivity() {
                             exportProgress = exportProgress,
                             exportStatus = exportStatus,
                             lastExportedFile = lastExportedFile,
+                            isPermanentWatermarkRemoved = permanentWatermarkRemoved,
+                            permanentWatermarkPrice = permanentWatermarkPrice,
+                            onBuyPermanentWatermark = { watermarkBilling.launchPurchase(this@MainActivity) },
+                            onRestorePurchases = { watermarkBilling.restorePurchases() },
                             onStartExport = { quality, durationSec ->
-                                viewModel.startExport(quality, durationSec, removeWatermark = false)
+                                viewModel.startExport(quality, durationSec, removeWatermark = permanentWatermarkRemoved)
                             },
                             onWatchAdAndExport = { quality, durationSec ->
                                 rewardedAdManager.show(
