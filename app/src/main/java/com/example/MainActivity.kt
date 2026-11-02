@@ -132,6 +132,7 @@ class MainActivity : ComponentActivity() {
                                     bassEnergy = bassEnergy,
                                     onTogglePlay = { viewModel.audioEngine.togglePlayPause() },
                                     onSeek = { viewModel.audioEngine.seekTo(it) },
+                                    onTextPositionChange = { dx, dy -> viewModel.updateTypographyProperties(positionXPercent = project.typography.positionXPercent + dx, positionYPercent = project.typography.positionYPercent + dy) },
                                     onRatioChange = { viewModel.setCanvasRatio(it) },
                                     modifier = Modifier
                                         .weight(0.5f)
