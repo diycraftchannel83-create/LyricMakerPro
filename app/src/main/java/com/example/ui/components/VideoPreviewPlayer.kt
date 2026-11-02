@@ -4,7 +4,7 @@ import android.net.Uri
 import android.widget.VideoView
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
-import coil.compose.AsyncImageContentScale
+import androidx.compose.ui.layout.ContentScale
 
 import android.graphics.Color as AndroidColor
 import android.graphics.LinearGradient
@@ -313,7 +313,7 @@ fun VideoPreviewPlayer(
                         AsyncImage(
                             model = Uri.parse(activeMedia.uri),
                             contentDescription = activeMedia.displayName,
-                            contentScale = AsyncImageContentScale.Crop,
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
