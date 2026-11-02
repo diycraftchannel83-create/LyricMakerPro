@@ -124,7 +124,10 @@ data class MediaClip(
     val type: MediaClipType,
     val startMs: Long,
     // Timeline duration: full source duration for video, editable remaining project span for stills.
-    val durationMs: Long
+    val durationMs: Long,
+    // Full source duration and source in-point make both trim handles reversible.
+    val sourceDurationMs: Long = durationMs,
+    val sourceOffsetMs: Long = 0L
 ) {
     val endMs: Long get() = startMs + durationMs.coerceAtLeast(500L)
 
@@ -151,7 +154,8 @@ data class VideoProject(
     val watermarkText: String = "@LyricMaker",
     val showWatermark: Boolean = false,
     val playbackSpeed: Float = 1.0f,
-    val mediaClips: List<MediaClip> = emptyList()
+    val mediaClips: List<MediaClip> = emptyList(),
+    val videoAudioMuted: Boolean = false
 ) {
     val durationMs: Long get() = audioTrack.durationMs
 }
