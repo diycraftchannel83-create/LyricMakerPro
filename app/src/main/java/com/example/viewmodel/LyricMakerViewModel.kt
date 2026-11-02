@@ -474,7 +474,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // --- Export Video Workflow ---
-    fun startExport(quality: ExportQuality, durationSec: Int = 15) {
+    fun startExport(quality: ExportQuality, durationSec: Int = 15, removeWatermark: Boolean = false) {
         if (_isExporting.value) return
         audioEngine.pause()
         _isExporting.value = true
@@ -484,7 +484,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             try {
                 val exported = exportEngine.exportVideo(
-                    project = _project.value,
+                    project = if (removeWatermark) _project.value.copy(showWatermark = false) else _project.value,
                     quality = quality,
                     durationSeconds = durationSec
                 ) { progress ->
