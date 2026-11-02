@@ -322,10 +322,10 @@ fun VideoPreviewPlayer(
                 // Keep a handle to the active VideoView player so the project-wide
                 // mute switch updates audio immediately without recreating the video.
                 var activeVideoPlayer by remember(activeMedia?.id) { mutableStateOf<MediaPlayer?>(null) }
-                LaunchedEffect(activeVideoPlayer, project.videoAudioMuted) {
+                LaunchedEffect(activeVideoPlayer, videoAudioMuted) {
                     activeVideoPlayer?.setVolume(
-                        if (project.videoAudioMuted) 0f else 1f,
-                        if (project.videoAudioMuted) 0f else 1f
+                        if (videoAudioMuted) 0f else 1f,
+                        if (videoAudioMuted) 0f else 1f
                     )
                 }
 
@@ -352,8 +352,8 @@ fun VideoPreviewPlayer(
                                                 val sourcePosition = activeMedia.sourceOffsetMs +
                                                     (playheadMs - activeMedia.startMs).coerceAtLeast(0L)
                                                 player.setVolume(
-                                                    if (project.videoAudioMuted) 0f else 1f,
-                                                    if (project.videoAudioMuted) 0f else 1f
+                                                    if (videoAudioMuted) 0f else 1f,
+                                                    if (videoAudioMuted) 0f else 1f
                                                 )
                                                 seekTo(sourcePosition.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
                                                 if (isPlaying) start()
