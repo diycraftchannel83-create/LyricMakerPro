@@ -301,6 +301,26 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         _project.value = _project.value.copy(background = config)
     }
 
+    fun addMediaClip(uri: String, displayName: String, type: MediaClipType) {
+        val defaultDuration = if (type == MediaClipType.IMAGE) 5000L else 10000L
+        val clip = MediaClip(
+            uri = uri,
+            displayName = displayName,
+            type = type,
+            startMs = audioEngine.playheadMs.value,
+            durationMs = defaultDuration
+        )
+        _project.value = _project.value.copy(
+            mediaClips = _project.value.mediaClips + clip
+        )
+    }
+
+    fun removeMediaClip(id: String) {
+        _project.value = _project.value.copy(
+            mediaClips = _project.value.mediaClips.filterNot { it.id == id }
+        )
+    }
+
     fun toggleWatermark(show: Boolean) {
         _project.value = _project.value.copy(showWatermark = show)
     }
