@@ -11,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -41,6 +43,7 @@ fun VideoPreviewPlayer(
     bassEnergy: Float,
     onTogglePlay: () -> Unit,
     onSeek: (Long) -> Unit,
+    onTextPositionChange: (Float, Float) -> Unit,
     onRatioChange: (CanvasRatio) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -154,7 +157,14 @@ fun VideoPreviewPlayer(
                     .clip(RoundedCornerShape(14.dp))
                     .border(1.5.dp, StudioCardBorder, RoundedCornerShape(14.dp))
                     .shadow(12.dp, RoundedCornerShape(14.dp))
-                    .clickable { onTogglePlay() }
+                    .pointerInput(project.typography.positionXPercent, project.typography.positionYPercent) {
+                        detectDragGestures { change, dragAmount ->
+                            change.consume()
+                            if (size.width > 0 && size.height > 0) {
+                                onTextPositionChange(dragAmount.x / size.width * 100f, dragAmount.y / size.height * 100f)
+                            }
+                        }
+                    }
                     .testTag("preview_canvas_container"),
                 contentAlignment = Alignment.Center
             ) {
@@ -175,25 +185,6 @@ fun VideoPreviewPlayer(
                     )
                 }
 
-                // Play / Pause Overlay Badge if paused
-                if (!isPlaying) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .size(54.dp)
-                            .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.65f))
-                            .border(1.5.dp, NeonCyan, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = "Play Video",
-                            tint = NeonCyan,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                }
             }
         }
 
@@ -461,8 +452,8 @@ private fun drawInto(
                 color = try { AndroidColor.parseColor(typography.strokeColorHex) } catch (_: Exception) { AndroidColor.BLACK }
             }
 
-            val cx = width / 2f
-            val cy = height * 0.56f
+            val cx = width * (typography.positionXPercent / 100f)
+            val cy = height * (typography.positionYPercent / 100f)
 
             native.save()
 
