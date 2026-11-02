@@ -26,6 +26,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -58,6 +60,7 @@ fun VideoPreviewPlayer(
     videoAudioMuted: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    var isFullscreen by remember { mutableStateOf(false) }
     var isTextDragging by remember { mutableStateOf(false) }
     val latestPositionX by rememberUpdatedState(project.typography.positionXPercent)
     val latestPositionY by rememberUpdatedState(project.typography.positionYPercent)
@@ -77,12 +80,18 @@ fun VideoPreviewPlayer(
             .background(StudioBackground),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Minimal preview header: keep only the timecode; editing controls live in bottom tabs.
+        // Preview toolbar with fullscreen action above playback controls.
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.End,
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            IconButton(
+                onClick = { isFullscreen = true },
+                modifier = Modifier.size(34.dp).testTag("preview_fullscreen_button")
+            ) {
+                Icon(Icons.Default.Fullscreen, contentDescription = "Open fullscreen preview", tint = NeonCyan)
+            }
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = StudioSurfaceVariant.copy(alpha = 0.8f),
@@ -278,6 +287,104 @@ fun VideoPreviewPlayer(
                     .weight(1f)
                     .testTag("timeline_scrub_slider")
             )
+        }
+    }
+
+    if (isFullscreen) {
+        Dialog(
+            onDismissRequest = { isFullscreen = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize().background(StudioBackground).padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    IconButton(onClick = { isFullscreen = false }, modifier = Modifier.testTag("preview_exit_fullscreen_button")) {
+                        Icon(Icons.Default.FullscreenExit, contentDescription = "Exit fullscreen", tint = NeonCyan)
+                    }
+                }
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    FullscreenPreviewCanvas(project, playheadMs, isPlaying, spectrumBands, bassEnergy, videoAudioMuted)
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IconButton(onClick = onTogglePlay, modifier = Modifier.testTag("fullscreen_play_pause_button")) {
+                        Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Play", tint = NeonCyan)
+                    }
+                    Slider(
+                        value = playheadMs.toFloat().coerceIn(0f, project.durationMs.toFloat()),
+                        onValueChange = { onSeek(it.toLong()) },
+                        valueRange = 0f..project.durationMs.toFloat(),
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(thumbColor = NeonMagenta, activeTrackColor = NeonCyan, inactiveTrackColor = StudioSurfaceVariant)
+                    )
+                    Text("${formatTime(playheadMs)} / ${formatTime(project.durationMs)}", color = TextPrimary, fontSize = 11.sp)
+                }
+            }
+        }
+    }
+
+}
+
+
+@Composable
+private fun FullscreenPreviewCanvas(
+    project: VideoProject,
+    playheadMs: Long,
+    isPlaying: Boolean,
+    spectrumBands: FloatArray,
+    bassEnergy: Float,
+    videoAudioMuted: Boolean
+) {
+    val activeMedia = project.mediaClips.filter { playheadMs >= it.startMs && playheadMs < it.endMs }.maxByOrNull { it.startMs }
+    var activeVideoPlayer by remember(activeMedia?.id) { mutableStateOf<MediaPlayer?>(null) }
+    LaunchedEffect(activeVideoPlayer, videoAudioMuted) {
+        activeVideoPlayer?.setVolume(if (videoAudioMuted) 0f else 1f, if (videoAudioMuted) 0f else 1f)
+    }
+    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        val ratio = project.canvasRatio.aspectRatio
+        val canvasModifier = if (maxHeight * ratio <= maxWidth) Modifier.fillMaxHeight().aspectRatio(ratio)
+            else Modifier.fillMaxWidth().aspectRatio(ratio)
+        Box(canvasModifier.clip(RoundedCornerShape(12.dp)).border(1.dp, StudioCardBorder, RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center) {
+            if (activeMedia != null) {
+                when (activeMedia.type) {
+                    MediaClipType.IMAGE -> AsyncImage(
+                        model = Uri.parse(activeMedia.uri),
+                        contentDescription = activeMedia.displayName,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    MediaClipType.VIDEO -> key(activeMedia.id) {
+                        AndroidView(
+                            factory = { context ->
+                                VideoView(context).apply {
+                                    setVideoURI(Uri.parse(activeMedia.uri))
+                                    setOnPreparedListener { player ->
+                                        activeVideoPlayer = player
+                                        player.isLooping = false
+                                        player.setVolume(if (videoAudioMuted) 0f else 1f, if (videoAudioMuted) 0f else 1f)
+                                        val pos = activeMedia.sourceOffsetMs + (playheadMs - activeMedia.startMs).coerceAtLeast(0L)
+                                        seekTo(pos.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+                                        if (isPlaying) start()
+                                    }
+                                }
+                            },
+                            update = { player ->
+                                val target = (activeMedia.sourceOffsetMs + (playheadMs - activeMedia.startMs).coerceAtLeast(0L)).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                                if (kotlin.math.abs(player.currentPosition - target) > 700) player.seekTo(target)
+                                if (isPlaying && !player.isPlaying) player.start()
+                                if (!isPlaying && player.isPlaying) player.pause()
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+            }
+            Canvas(Modifier.fillMaxSize()) {
+                drawInto(this, project, playheadMs, size.width.toInt(), size.height.toInt(), spectrumBands, bassEnergy, activeMedia == null)
+            }
         }
     }
 }
