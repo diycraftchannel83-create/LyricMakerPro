@@ -2,6 +2,7 @@ package com.example.ui.components
 
 import android.net.Uri
 import android.widget.VideoView
+import android.media.MediaPlayer
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
@@ -56,6 +57,7 @@ fun VideoPreviewPlayer(
     onTextScaleChange: (Float) -> Unit,
     onTypographyChange: (TypographyPreset) -> Unit,
     onRatioChange: (CanvasRatio) -> Unit,
+    videoAudioMuted: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var showRatioMenu by remember { mutableStateOf(false) }
@@ -317,6 +319,16 @@ fun VideoPreviewPlayer(
                     .filter { playheadMs >= it.startMs && playheadMs < it.endMs }
                     .maxByOrNull { it.startMs }
 
+                // Keep a handle to the active VideoView player so the project-wide
+                // mute switch updates audio immediately without recreating the video.
+                var activeVideoPlayer by remember(activeMedia?.id) { mutableStateOf<MediaPlayer?>(null) }
+                LaunchedEffect(activeVideoPlayer, project.videoAudioMuted) {
+                    activeVideoPlayer?.setVolume(
+                        if (project.videoAudioMuted) 0f else 1f,
+                        if (project.videoAudioMuted) 0f else 1f
+                    )
+                }
+
                 // Imported media is rendered behind the lyric/effect canvas.
                 if (activeMedia != null) {
                     when (activeMedia.type) {
@@ -335,14 +347,23 @@ fun VideoPreviewPlayer(
                                         VideoView(context).apply {
                                             setVideoURI(Uri.parse(activeMedia.uri))
                                             setOnPreparedListener { player ->
+                                                activeVideoPlayer = player
                                                 player.isLooping = false
-                                                seekTo((playheadMs - activeMedia.startMs).toInt().coerceAtLeast(0))
+                                                val sourcePosition = activeMedia.sourceOffsetMs +
+                                                    (playheadMs - activeMedia.startMs).coerceAtLeast(0L)
+                                                player.setVolume(
+                                                    if (project.videoAudioMuted) 0f else 1f,
+                                                    if (project.videoAudioMuted) 0f else 1f
+                                                )
+                                                seekTo(sourcePosition.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
                                                 if (isPlaying) start()
                                             }
                                         }
                                     },
                                     update = { player ->
-                                        val target = (playheadMs - activeMedia.startMs).toInt().coerceAtLeast(0)
+                                        val target = (activeMedia.sourceOffsetMs +
+                                            (playheadMs - activeMedia.startMs).coerceAtLeast(0L))
+                                            .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
                                         if (kotlin.math.abs(player.currentPosition - target) > 700) {
                                             player.seekTo(target)
                                         }
