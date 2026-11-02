@@ -172,13 +172,17 @@ class MainActivity : ComponentActivity() {
                             onOpenProject = { openProjectLauncher.launch(arrayOf("application/json", "text/plain")) },
                             onSaveProject = {
                                 runCatching { LyricMakerStorage.saveProject(this@MainActivity, project) }
-                                    .onSuccess { Toast.makeText(this@MainActivity, "Project saved to LyricMakerPro/Project", Toast.LENGTH_LONG).show() }
+                                    .onSuccess { Toast.makeText(this@MainActivity, "Project saved successfully", Toast.LENGTH_LONG).show() }
                                     .onFailure { Toast.makeText(this@MainActivity, "Save failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show() }
                             },
                             onSaveLrc = {
                                 runCatching { LyricMakerStorage.saveLrc(this@MainActivity, project) }
-                                    .onSuccess { Toast.makeText(this@MainActivity, "LRC saved to LyricMakerPro/LrcLyric", Toast.LENGTH_LONG).show() }
+                                    .onSuccess { Toast.makeText(this@MainActivity, "LRC saved successfully", Toast.LENGTH_LONG).show() }
                                     .onFailure { Toast.makeText(this@MainActivity, "LRC save failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show() }
+                            },
+                            onExit = {
+                                viewModel.audioEngine.stop()
+                                finishAffinity()
                             }
                         )
                     }
@@ -346,7 +350,8 @@ private fun StudioTopAppBar(
     onPickLyrics: () -> Unit,
     onOpenProject: () -> Unit,
     onSaveProject: () -> Unit,
-    onSaveLrc: () -> Unit
+    onSaveLrc: () -> Unit,
+    onExit: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     var languageDialog by remember { mutableStateOf(false) }
@@ -446,7 +451,10 @@ private fun StudioTopAppBar(
                         DropdownMenuItem(
                             text = { Text("Exit", color = Color(0xFFFF5370)) },
                             leadingIcon = { Icon(Icons.Default.ExitToApp, null, tint = Color(0xFFFF5370)) },
-                            onClick = { menuExpanded = false }
+                            onClick = {
+                                menuExpanded = false
+                                onExit()
+                            }
                         )
                     }
                 }
@@ -552,7 +560,7 @@ private fun StudioTopAppBar(
             title = { Text("Language", color = TextPrimary, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    listOf("English", "Bahasa Indonesia").forEach { language ->
+                    listOf("English").forEach { language ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

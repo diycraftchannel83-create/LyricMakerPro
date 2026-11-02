@@ -323,10 +323,15 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun moveMediaClip(id: String, deltaMs: Long) {
-        val clips = _project.value.mediaClips.map { clip ->
-            if (clip.id == id) clip.copy(startMs = (clip.startMs + deltaMs).coerceAtLeast(0L)) else clip
+        val project = _project.value
+        val clips = project.mediaClips.map { clip ->
+            if (clip.id == id) {
+                val latestStart = (project.durationMs - clip.durationMs).coerceAtLeast(0L)
+                val targetStart = (clip.startMs + deltaMs).coerceIn(0L, latestStart)
+                clip.copy(startMs = targetStart)
+            } else clip
         }
-        _project.value = _project.value.copy(mediaClips = clips.sortedBy { it.startMs })
+        _project.value = project.copy(mediaClips = clips.sortedBy { it.startMs })
     }
 
     fun resizeMediaClip(id: String, deltaMs: Long) {
