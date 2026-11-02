@@ -1,6 +1,6 @@
-package com.example.data
+package com.winsmediatama.lyricmakerpro.data
 
-import com.example.model.*
+import com.winsmediatama.lyricmakerpro.model.*
 import java.util.UUID
 
 object PresetLibrary {
