@@ -63,7 +63,7 @@ data class TypographyPreset(
     val id: String = UUID.randomUUID().toString(),
     val name: String,
     val fontFamilyName: String = "SansSerif",
-    val fontSizeSp: Float = 30f,
+    val fontSizeSp: Float = 18f,
     val primaryColorHex: String = "#FFFFFF",
     val highlightColorHex: String = "#00F5D4",
     val strokeColorHex: String = "#000000",
