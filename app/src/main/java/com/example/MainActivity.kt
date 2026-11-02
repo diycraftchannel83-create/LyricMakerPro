@@ -210,6 +210,7 @@ class MainActivity : ComponentActivity() {
                                     onTextScaleChange = { factor -> viewModel.updateTypographyProperties(fontSizeSp = (project.typography.fontSizeSp * factor).coerceIn(2f, 96f)) },
                                     onTypographyChange = { viewModel.setTypographyPreset(it) },
                                     onRatioChange = { viewModel.setCanvasRatio(it) },
+                                    videoAudioMuted = project.videoAudioMuted,
                                     modifier = Modifier
                                         .weight(0.5f)
                                         .fillMaxHeight()
@@ -236,6 +237,9 @@ class MainActivity : ComponentActivity() {
                                         onOpenTapToSync = { viewModel.startTapToSync() },
                                         onMoveMediaClip = { id, delta -> viewModel.moveMediaClip(id, delta) },
                                         onResizeMediaClip = { id, delta -> viewModel.resizeMediaClip(id, delta) },
+                                        onTrimMediaClipStart = { id, delta -> viewModel.trimMediaClipStart(id, delta) },
+                                        videoAudioMuted = project.videoAudioMuted,
+                                        onToggleVideoMute = { viewModel.setVideoAudioMuted(!project.videoAudioMuted) },
                                         onRemoveMediaClip = { id -> viewModel.removeMediaClip(id) }
                                     )
 
@@ -263,7 +267,8 @@ class MainActivity : ComponentActivity() {
                                     onTextPositionChange = { dx, dy -> viewModel.updateTypographyProperties(positionXPercent = project.typography.positionXPercent + dx, positionYPercent = project.typography.positionYPercent + dy) },
                                     onTextScaleChange = { factor -> viewModel.updateTypographyProperties(fontSizeSp = (project.typography.fontSizeSp * factor).coerceIn(18f, 96f)) },
                                     onTypographyChange = { viewModel.setTypographyPreset(it) },
-                                    onRatioChange = { viewModel.setCanvasRatio(it) }
+                                    onRatioChange = { viewModel.setCanvasRatio(it) },
+                                    videoAudioMuted = project.videoAudioMuted
                                 )
 
                                 MultiTrackTimeline(
@@ -282,6 +287,9 @@ class MainActivity : ComponentActivity() {
                                     onOpenTapToSync = { viewModel.startTapToSync() },
                                     onMoveMediaClip = { id, delta -> viewModel.moveMediaClip(id, delta) },
                                     onResizeMediaClip = { id, delta -> viewModel.resizeMediaClip(id, delta) },
+                                    onTrimMediaClipStart = { id, delta -> viewModel.trimMediaClipStart(id, delta) },
+                                    videoAudioMuted = project.videoAudioMuted,
+                                    onToggleVideoMute = { viewModel.setVideoAudioMuted(!project.videoAudioMuted) },
                                     onRemoveMediaClip = { id -> viewModel.removeMediaClip(id) }
                                 )
 
