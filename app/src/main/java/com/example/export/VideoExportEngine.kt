@@ -75,8 +75,15 @@ class VideoExportEngine(private val context: Context) {
         val targetHeight = (project.canvasRatio.exportHeight * quality.scaleFactor).toInt().let { if (it % 2 != 0) it + 1 else it }
 
         val fps = 30
-        val totalDurationMs = min(project.durationMs, durationSeconds * 1000L).coerceAtLeast(3000L)
-        val totalFrames = ((totalDurationMs / 1000.0) * fps).toInt()
+        // A duration of 0 is the explicit "full song" selection from ExportDialog.
+        // Keep the project's exact audio duration; do not clamp it to the 10/15/30s presets.
+        val totalDurationMs = if (durationSeconds <= 0) {
+            project.durationMs.coerceAtLeast(1L)
+        } else {
+            min(project.durationMs, durationSeconds * 1000L).coerceAtLeast(1L)
+        }
+        // Round up so the final partial second is included in the encoded video.
+        val totalFrames = ceil((totalDurationMs / 1000.0) * fps).toInt().coerceAtLeast(1)
 
         val mimeType = "video/avc"
         val format = MediaFormat.createVideoFormat(mimeType, targetWidth, targetHeight).apply {

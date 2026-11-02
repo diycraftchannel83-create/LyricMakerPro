@@ -22,6 +22,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -128,7 +129,7 @@ fun MultiTrackTimeline(
                     Icon(Icons.Default.ZoomIn, contentDescription = "Zoom In", tint = TextSecondary, modifier = Modifier.size(16.dp))
                 }
                 TextButton(
-                    onClick = { pxPerMs = (340f / project.durationMs.coerceAtLeast(1L)).coerceIn(minZoom, maxZoom) },
+                    onClick = { pxPerMs = (360f / project.durationMs.coerceAtLeast(1L)).coerceIn(minZoom, maxZoom) },
                     contentPadding = PaddingValues(horizontal = 4.dp),
                     modifier = Modifier.height(28.dp).testTag("timeline_fit_button")
                 ) {
@@ -156,14 +157,36 @@ fun MultiTrackTimeline(
             }
         }
 
-        // Horizontal Scrollable Multi-Track Canvas
-        Box(
+        // Horizontal Scrollable Multi-Track Canvas. Keep the playhead in view
+        // during playback/seeking so the ruler can be followed all the way to song end.
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(166.dp)
                 .padding(vertical = 2.dp)
-                .horizontalScroll(scrollState)
         ) {
+            val density = LocalDensity.current
+            val viewportWidthPx = constraints.maxWidth
+            LaunchedEffect(playheadMs, pxPerMs, viewportWidthPx, project.durationMs, scrollState.maxValue) {
+                val playheadPx = with(density) { (playheadMs * pxPerMs).dp.roundToPx() }
+                val visibleStart = scrollState.value
+                val visibleEnd = visibleStart + viewportWidthPx
+                if (playheadPx < visibleStart || playheadPx > visibleEnd) {
+                    val targetScroll = if (playheadMs >= project.durationMs) {
+                        scrollState.maxValue
+                    } else {
+                        (playheadPx - (viewportWidthPx * 0.65f).toInt())
+                            .coerceIn(0, scrollState.maxValue)
+                    }
+                    scrollState.animateScrollTo(targetScroll)
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .horizontalScroll(scrollState)
+            ) {
             Box(
                 modifier = Modifier
                     .width(totalTimelineWidthDp)
@@ -254,6 +277,7 @@ fun MultiTrackTimeline(
                         .background(TimelinePlayhead)
                         .border(1.dp, Color.White, CircleShape)
                 )
+            }
             }
         }
 
@@ -472,7 +496,7 @@ private fun TimeRuler(
     pxPerMs: Float,
     modifier: Modifier = Modifier
 ) {
-    val totalSec = (durationMs / 1000).toInt()
+    val totalSec = (durationMs / 1000L).toInt()
     val majorStep = when {
         pxPerMs < 0.001f -> 120
         pxPerMs < 0.002f -> 60
@@ -495,6 +519,15 @@ private fun TimeRuler(
                     strokeWidth = if (isMajor) 1.4f else 1f
                 )
             }
+            // Draw a dedicated end tick at the exact audio duration, including
+            // the final fractional second (for example 05:23.8).
+            val endX = durationMs * pxPerMs
+            drawLine(
+                color = NeonCyan,
+                start = Offset(endX, size.height * 0.28f),
+                end = Offset(endX, size.height),
+                strokeWidth = 2f
+            )
         }
         for (sec in 0..totalSec step majorStep) {
             Text(
