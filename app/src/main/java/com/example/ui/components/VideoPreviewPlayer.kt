@@ -11,8 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -44,6 +44,7 @@ fun VideoPreviewPlayer(
     onTogglePlay: () -> Unit,
     onSeek: (Long) -> Unit,
     onTextPositionChange: (Float, Float) -> Unit,
+    onTextScaleChange: (Float) -> Unit,
     onRatioChange: (CanvasRatio) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -157,11 +158,17 @@ fun VideoPreviewPlayer(
                     .clip(RoundedCornerShape(14.dp))
                     .border(1.5.dp, StudioCardBorder, RoundedCornerShape(14.dp))
                     .shadow(12.dp, RoundedCornerShape(14.dp))
-                    .pointerInput(project.typography.positionXPercent, project.typography.positionYPercent) {
-                        detectDragGestures { change, dragAmount ->
-                            change.consume()
+                    .pointerInput(project.typography.positionXPercent, project.typography.positionYPercent, project.typography.fontSizeSp) {
+                        detectTransformGestures { _, pan, zoom, _ ->
                             if (size.width > 0 && size.height > 0) {
-                                onTextPositionChange(dragAmount.x / size.width * 100f, dragAmount.y / size.height * 100f)
+                                val currentX = project.typography.positionXPercent
+                                val currentY = project.typography.positionYPercent
+                                val proposedX = (currentX + pan.x / size.width * 100f).coerceIn(5f, 95f)
+                                val proposedY = (currentY + pan.y / size.height * 100f).coerceIn(5f, 95f)
+                                val snapX = if (kotlin.math.abs(proposedX - 50f) <= 2.5f) 50f else proposedX
+                                val snapY = if (kotlin.math.abs(proposedY - 50f) <= 2.5f) 50f else proposedY
+                                onTextPositionChange(snapX - currentX, snapY - currentY)
+                                if (zoom != 1f) onTextScaleChange(zoom)
                             }
                         }
                     }
@@ -183,6 +190,31 @@ fun VideoPreviewPlayer(
                         spectrumBands = spectrumBands,
                         bassEnergy = bassEnergy
                     )
+                }
+
+                // Center alignment guides appear while lyric position is snapped to canvas center.
+                val verticalAligned = kotlin.math.abs(project.typography.positionXPercent - 50f) < 0.01f
+                val horizontalAligned = kotlin.math.abs(project.typography.positionYPercent - 50f) < 0.01f
+                if (verticalAligned || horizontalAligned) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val guidePaintColor = NeonCyan
+                        if (verticalAligned) {
+                            drawLine(
+                                color = guidePaintColor,
+                                start = androidx.compose.ui.geometry.Offset(size.width / 2f, 0f),
+                                end = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height),
+                                strokeWidth = 1.5.dp.toPx()
+                            )
+                        }
+                        if (horizontalAligned) {
+                            drawLine(
+                                color = guidePaintColor,
+                                start = androidx.compose.ui.geometry.Offset(0f, size.height / 2f),
+                                end = androidx.compose.ui.geometry.Offset(size.width, size.height / 2f),
+                                strokeWidth = 1.5.dp.toPx()
+                            )
+                        }
+                    }
                 }
 
             }
