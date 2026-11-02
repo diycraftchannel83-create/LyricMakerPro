@@ -579,7 +579,7 @@ private fun StudioTopAppBar(
                             onClick = { menuExpanded = false; privacyDialog = true }
                         )
                         DropdownMenuItem(
-                            text = { Text("\${tr("Language")}  ·  $selectedLanguage") },
+                            text = { Text("${tr("Language")}  ·  $selectedLanguage") },
                             leadingIcon = { Icon(Icons.Default.Language, null, tint = NeonCyan) },
                             trailingIcon = { Icon(Icons.Default.ChevronRight, null) },
                             onClick = { menuExpanded = false; languageDialog = true }
