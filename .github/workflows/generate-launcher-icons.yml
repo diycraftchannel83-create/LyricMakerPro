@@ -1,0 +1,130 @@
+name: Generate Android Launcher Icons
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "lyricmakepro-ico.png"
+      - ".github/workflows/generate-launcher-icons.yml"
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow
+        run: python -m pip install --disable-pip-version-check Pillow
+
+      - name: Generate density-specific launcher resources
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageOps
+
+          source = Path("lyricmakepro-ico.png")
+          if not source.is_file():
+              raise SystemExit(f"Missing source image: {source}")
+
+          with Image.open(source) as original:
+              image = ImageOps.fit(original.convert("RGBA"), (1024, 1024),
+                                   method=Image.Resampling.LANCZOS,
+                                   centering=(0.5, 0.5))
+
+          res = Path("app/src/main/res")
+          for folder, size in {
+              "mipmap-mdpi": 48,
+              "mipmap-hdpi": 72,
+              "mipmap-xhdpi": 96,
+              "mipmap-xxhdpi": 144,
+              "mipmap-xxxhdpi": 192,
+          }.items():
+              out = res / folder
+              out.mkdir(parents=True, exist_ok=True)
+              icon = image.resize((size, size), Image.Resampling.LANCZOS)
+              icon.save(out / "ic_launcher.png", optimize=True)
+              icon.save(out / "ic_launcher_round.png", optimize=True)
+
+          # Adaptive icon foreground layer: 108dp = 432px at xxxhdpi.
+          # Center artwork within the Android adaptive-icon safe zone.
+          foreground = Image.new("RGBA", (432, 432), (0, 0, 0, 0))
+          artwork = image.resize((288, 288), Image.Resampling.LANCZOS)
+          foreground.alpha_composite(artwork, (72, 72))
+          nodpi = res / "drawable-nodpi"
+          nodpi.mkdir(parents=True, exist_ok=True)
+          foreground.save(nodpi / "ic_launcher_foreground.png", optimize=True)
+
+          (res / "drawable" / "ic_launcher_background.xml").write_text(
+              '''<?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp" android:height="108dp"
+              android:viewportWidth="108" android:viewportHeight="108">
+              <path android:fillColor="#10131D" android:pathData="M0,0h108v108h-108z"/>
+          </vector>
+          ''', encoding="utf-8")
+
+          (res / "drawable" / "ic_launcher_foreground.xml").write_text(
+              '''<?xml version="1.0" encoding="utf-8"?>
+          <bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+              android:src="@drawable-nodpi/ic_launcher_foreground"
+              android:gravity="center" />
+          ''', encoding="utf-8")
+
+          adaptive_xml = '''<?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@drawable/ic_launcher_background" />
+              <foreground android:drawable="@drawable/ic_launcher_foreground" />
+          </adaptive-icon>
+          '''
+          v26 = res / "mipmap-anydpi-v26"
+          v26.mkdir(parents=True, exist_ok=True)
+          (v26 / "ic_launcher.xml").write_text(adaptive_xml, encoding="utf-8")
+          (v26 / "ic_launcher_round.xml").write_text(adaptive_xml, encoding="utf-8")
+          print("Launcher icon resources generated.")
+          PY
+
+      - name: Validate generated PNG dimensions
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          root = Path("app/src/main/res")
+          sizes = {
+              "mipmap-mdpi": 48,
+              "mipmap-hdpi": 72,
+              "mipmap-xhdpi": 96,
+              "mipmap-xxhdpi": 144,
+              "mipmap-xxxhdpi": 192,
+          }
+          for folder, size in sizes.items():
+              for name in ("ic_launcher.png", "ic_launcher_round.png"):
+                  path = root / folder / name
+                  with Image.open(path) as im:
+                      assert im.size == (size, size), f"{path}: {im.size}"
+          with Image.open(root / "drawable-nodpi/ic_launcher_foreground.png") as im:
+              assert im.size == (432, 432) and im.mode == "RGBA"
+          print("All launcher image sizes passed validation.")
+          PY
+
+      - name: Commit generated resources
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/res
+          if git diff --cached --quiet; then
+            echo "Launcher resources are already up to date."
+          else
+            git commit -m "chore(android): generate launcher icon density resources"
+            git push
+          fi
