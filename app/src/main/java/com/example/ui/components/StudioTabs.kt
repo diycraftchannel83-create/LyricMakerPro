@@ -321,9 +321,50 @@ private fun TypographyTab(viewModel: LyricMakerViewModel, project: VideoProject)
             Slider(
                 value = typography.fontSizeSp,
                 onValueChange = { viewModel.updateTypographyProperties(fontSizeSp = it) },
-                valueRange = 18f..48f,
+                valueRange = 2f..96f,
                 colors = SliderDefaults.colors(thumbColor = NeonCyan, activeTrackColor = NeonCyan)
             )
+        }
+
+        // Style options previously shown in the preview popup now live here only.
+        item {
+            Text("Font Style", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = typography.isBold,
+                    onClick = { viewModel.updateTypographyProperties(isBold = !typography.isBold) },
+                    label = { Text("Bold") }
+                )
+                FilterChip(
+                    selected = typography.isItalic,
+                    onClick = { viewModel.updateTypographyProperties(isItalic = !typography.isItalic) },
+                    label = { Text("Italic") }
+                )
+            }
+        }
+        item {
+            Text("Visual Font Effects", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(FontVisualEffect.entries) { effect ->
+                    FilterChip(
+                        selected = typography.visualEffect == effect,
+                        onClick = { viewModel.updateTypographyProperties(visualEffect = effect) },
+                        label = { Text(effect.label, fontSize = 10.sp) }
+                    )
+                }
+            }
+        }
+        item {
+            Text("Karaoke Layout", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(LyricLayoutMode.entries) { mode ->
+                    FilterChip(
+                        selected = typography.lyricLayout == mode,
+                        onClick = { viewModel.updateTypographyProperties(lyricLayout = mode) },
+                        label = { Text(mode.label, fontSize = 10.sp) }
+                    )
+                }
+            }
         }
 
         // Global lyric placement controls (applies to every lyric line).
@@ -554,17 +595,6 @@ private fun BackgroundTab(viewModel: LyricMakerViewModel, project: VideoProject,
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Canvas media import controls.
-        item {
-            Text("Media", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton(onClick = onPickAudio, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 3.dp)) { Text("Audio", fontSize = 11.sp) }
-                OutlinedButton(onClick = onPickVideo, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 3.dp)) { Text("Video", fontSize = 11.sp) }
-                OutlinedButton(onClick = onPickImage, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 3.dp)) { Text("Photo", fontSize = 11.sp) }
-            }
-        }
-
         // Aspect Ratio
         item {
             Text(text = "Export Aspect Ratio", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
