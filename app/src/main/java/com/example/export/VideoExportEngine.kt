@@ -70,6 +70,8 @@ class VideoExportEngine(private val context: Context) {
     ): File = withContext(Dispatchers.Default) {
         val exportDir = File(context.cacheDir, "clips").apply { mkdirs() }
         val outputFile = File(exportDir, "LyricVideo_${System.currentTimeMillis()}.mp4")
+        val videoOnlyFile = File(exportDir, "LyricVideo_${System.currentTimeMillis()}_video.mp4")
+        val audioOnlyFile = File(exportDir, "LyricAudio_${System.currentTimeMillis()}.m4a")
 
         val targetWidth = (project.canvasRatio.exportWidth * quality.scaleFactor).toInt().let { if (it % 2 != 0) it + 1 else it }
         val targetHeight = (project.canvasRatio.exportHeight * quality.scaleFactor).toInt().let { if (it % 2 != 0) it + 1 else it }
@@ -98,7 +100,7 @@ class VideoExportEngine(private val context: Context) {
         val inputSurface = codec.createInputSurface()
         codec.start()
 
-        val muxer = MediaMuxer(outputFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        val muxer = MediaMuxer(videoOnlyFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
         var trackIndex = -1
         var muxerStarted = false
         val bufferInfo = MediaCodec.BufferInfo()
@@ -181,9 +183,7 @@ class VideoExportEngine(private val context: Context) {
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
-            // Fallback: If hardware surface encoding fails on virtual device, generate high-res still image as video clip
-            return@withContext exportStillFrameFallback(project, outputFile, mediaAssets)
+            throw IllegalStateException("Video encoding failed; MP4 was not created", e)
         } finally {
             try {
                 codec.stop()
@@ -198,8 +198,96 @@ class VideoExportEngine(private val context: Context) {
             releaseMediaAssets(mediaAssets)
         }
 
-        LyricMakerStorage.copyExportedVideo(context, outputFile)
-        outputFile
+        try {
+            val audioUri = project.audioTrack.customUri
+                ?: error("Import a song before exporting an MP4 with audio")
+            AudioTrackTranscoder.transcodeToAac(context, audioUri, audioOnlyFile, totalDurationMs)
+            muxVideoAndAudio(videoOnlyFile, audioOnlyFile, outputFile, totalDurationMs)
+            validateMp4HasAudioAndVideo(outputFile)
+            LyricMakerStorage.copyExportedVideo(context, outputFile)
+            outputFile
+        } finally {
+            videoOnlyFile.delete()
+            audioOnlyFile.delete()
+        }
+    }
+
+    private fun muxVideoAndAudio(videoFile: File, audioFile: File, outputFile: File, durationMs: Long) {
+        val videoExtractor = android.media.MediaExtractor()
+        val audioExtractor = android.media.MediaExtractor()
+        val muxer = MediaMuxer(outputFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        var started = false
+        try {
+            videoExtractor.setDataSource(videoFile.absolutePath)
+            audioExtractor.setDataSource(audioFile.absolutePath)
+            var videoSourceTrack = -1
+            var audioSourceTrack = -1
+            for (i in 0 until videoExtractor.trackCount) {
+                if (videoExtractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true) {
+                    videoSourceTrack = i
+                    videoExtractor.selectTrack(i)
+                    break
+                }
+            }
+            for (i in 0 until audioExtractor.trackCount) {
+                if (audioExtractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true) {
+                    audioSourceTrack = i
+                    audioExtractor.selectTrack(i)
+                    break
+                }
+            }
+            check(videoSourceTrack >= 0) { "Encoded video track is missing" }
+            check(audioSourceTrack >= 0) { "Encoded AAC audio track is missing" }
+            val videoOutTrack = muxer.addTrack(videoExtractor.getTrackFormat(videoSourceTrack))
+            val audioOutTrack = muxer.addTrack(audioExtractor.getTrackFormat(audioSourceTrack))
+            muxer.start()
+            started = true
+            copySamples(videoExtractor, muxer, videoOutTrack, durationMs)
+            copySamples(audioExtractor, muxer, audioOutTrack, durationMs)
+        } finally {
+            runCatching { if (started) muxer.stop() }
+            runCatching { muxer.release() }
+            runCatching { videoExtractor.release() }
+            runCatching { audioExtractor.release() }
+        }
+    }
+
+    private fun copySamples(
+        extractor: android.media.MediaExtractor,
+        muxer: MediaMuxer,
+        outputTrack: Int,
+        durationMs: Long
+    ) {
+        val buffer = ByteBuffer.allocate(1 shl 20)
+        val info = MediaCodec.BufferInfo()
+        while (true) {
+            buffer.clear()
+            val size = extractor.readSampleData(buffer, 0)
+            if (size < 0) break
+            val pts = extractor.sampleTime
+            if (pts < 0L || pts >= durationMs * 1000L) break
+            info.set(0, size, pts, extractor.sampleFlags)
+            muxer.writeSampleData(outputTrack, buffer, info)
+            if (!extractor.advance()) break
+        }
+    }
+
+    private fun validateMp4HasAudioAndVideo(file: File) {
+        val extractor = android.media.MediaExtractor()
+        try {
+            extractor.setDataSource(file.absolutePath)
+            var hasAudio = false
+            var hasVideo = false
+            for (i in 0 until extractor.trackCount) {
+                when (extractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.substringBefore('/')) {
+                    "audio" -> hasAudio = true
+                    "video" -> hasVideo = true
+                }
+            }
+            check(hasAudio && hasVideo) { "Export validation failed: MP4 must contain audio and video tracks" }
+        } finally {
+            extractor.release()
+        }
     }
 
     private fun exportStillFrameFallback(project: VideoProject, outputFile: File, mediaAssets: List<ExportMediaAsset>): File {
