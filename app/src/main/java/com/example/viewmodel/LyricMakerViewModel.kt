@@ -413,16 +413,23 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
 
     fun importCustomAudio(uriString: String, fileName: String, durationMs: Long) {
         val safeDurationMs = durationMs.coerceAtLeast(500L)
+        val songTitle = fileName.substringBeforeLast('.', fileName)
+            .trim()
+            .ifBlank { "Untitled Song" }
         val customTrack = AudioTrackConfig(
             id = UUID.randomUUID().toString(),
-            title = fileName.ifBlank { "Imported Track" },
+            title = songTitle,
             artist = "Local Device",
             bpm = 120,
             durationMs = safeDurationMs,
             beatType = AudioBeatType.CUSTOM_FILE,
             customUri = uriString
         )
-        _project.value = _project.value.copy(audioTrack = customTrack)
+        // Use the imported song's filename (without extension) as the project name.
+        _project.value = _project.value.copy(
+            title = songTitle,
+            audioTrack = customTrack
+        )
         audioEngine.loadTrack(customTrack)
 
         // Decode real PCM samples off the UI thread; only apply them if this track
