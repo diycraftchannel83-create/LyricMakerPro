@@ -146,6 +146,13 @@ fun ExportDialog(
                             .fillMaxWidth()
                             .testTag("export_full_song_duration")
                     )
+                    if (project.audioTrack.beatType != com.example.model.AudioBeatType.CUSTOM_FILE) {
+                        Text(
+                            text = "Import an MP3/WAV song to enable video export. Built-in demo beats are not exported.",
+                            fontSize = 11.sp,
+                            color = CyberYellow
+                        )
+                    }
                 }
 
                 // Live Export Progress
@@ -213,7 +220,12 @@ fun ExportDialog(
             } else if (!isExporting) {
                 Button(
                     onClick = { onStartExport(selectedQuality, selectedDurationSec) },
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonMagenta),
+                    enabled = project.audioTrack.beatType == com.example.model.AudioBeatType.CUSTOM_FILE &&
+                        project.durationMs > 0L,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = NeonMagenta,
+                        disabledContainerColor = StudioSurfaceVariant
+                    ),
                     modifier = Modifier.testTag("start_export_button")
                 ) {
                     Icon(Icons.Default.MovieCreation, contentDescription = null, modifier = Modifier.size(16.dp))
