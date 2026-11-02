@@ -83,6 +83,13 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         _showExportDialog.value = show
     }
 
+    fun prepareAnotherExport() {
+        if (_isExporting.value) return
+        _lastExportedFile.value = null
+        _exportProgress.value = 0f
+        _exportStatus.value = ""
+    }
+
     fun setShowTemplatesSheet(show: Boolean) {
         _showTemplatesSheet.value = show
     }
@@ -477,6 +484,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
     fun startExport(quality: ExportQuality, durationSec: Int = 15, removeWatermark: Boolean = false) {
         if (_isExporting.value) return
         audioEngine.pause()
+        _lastExportedFile.value = null
         _isExporting.value = true
         _exportProgress.value = 0f
         _exportStatus.value = "Preparing frames..."
