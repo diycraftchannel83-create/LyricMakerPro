@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.winsmediatama.lyricmakerpro.ads.RewardedAdManager
 import com.winsmediatama.lyricmakerpro.model.BackgroundConfig
 import com.winsmediatama.lyricmakerpro.model.BackgroundType
 import com.winsmediatama.lyricmakerpro.data.ProjectFileCodec
@@ -44,11 +45,14 @@ import com.winsmediatama.lyricmakerpro.viewmodel.LyricMakerViewModel
 
 class MainActivity : ComponentActivity() {
 
+    private lateinit var rewardedAdManager: RewardedAdManager
     private val viewModel: LyricMakerViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        rewardedAdManager = RewardedAdManager(this)
+        rewardedAdManager.initialize()
 
         setContent {
             MyApplicationTheme {
@@ -388,7 +392,17 @@ class MainActivity : ComponentActivity() {
                             exportStatus = exportStatus,
                             lastExportedFile = lastExportedFile,
                             onStartExport = { quality, durationSec ->
-                                viewModel.startExport(quality, durationSec)
+                                viewModel.startExport(quality, durationSec, removeWatermark = false)
+                            },
+                            onWatchAdAndExport = { quality, durationSec ->
+                                rewardedAdManager.show(
+                                    onRewardEarned = {
+                                        viewModel.startExport(quality, durationSec, removeWatermark = true)
+                                    },
+                                    onUnavailable = {
+                                        Toast.makeText(this@MainActivity, "Rewarded ad belum tersedia. Coba beberapa saat lagi atau ekspor dengan watermark.", Toast.LENGTH_LONG).show()
+                                    }
+                                )
                             },
                             onExportCover = { viewModel.exportCoverImage() },
                             onShare = { viewModel.shareLastExported() },
