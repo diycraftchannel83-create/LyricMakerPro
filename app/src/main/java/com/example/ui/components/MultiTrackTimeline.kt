@@ -27,6 +27,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.LyricLine
+import com.example.model.MediaClip
+import com.example.model.MediaClipType
 import com.example.model.VideoProject
 import com.example.ui.theme.*
 
@@ -181,7 +183,19 @@ fun MultiTrackTimeline(
 
                     Spacer(Modifier.height(4.dp))
 
-                    // Track 2: Lyrics Blocks Track
+                    // Track 2: Imported photo/video clips, placed above lyrics.
+                    MediaClipsTrackRow(
+                        clips = project.mediaClips,
+                        pxPerMs = pxPerMs,
+                        onSeek = onSeek,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp)
+                    )
+
+                    Spacer(Modifier.height(4.dp))
+
+                    // Track 3: Lyrics Blocks Track
                     LyricsTrackRow(
                         lyrics = project.lyrics,
                         playheadMs = playheadMs,
@@ -201,7 +215,7 @@ fun MultiTrackTimeline(
 
                     Spacer(Modifier.height(4.dp))
 
-                    // Track 3: Visualizer & Background Effects Track
+                    // Track 4: Visualizer & Background Effects Track
                     EffectsTrackRow(
                         project = project,
                         pxPerMs = pxPerMs,
@@ -283,6 +297,73 @@ fun MultiTrackTimeline(
             titleContentColor = TextPrimary,
             textContentColor = TextPrimary
         )
+    }
+}
+
+
+@Composable
+private fun MediaClipsTrackRow(
+    clips: List<MediaClip>,
+    pxPerMs: Float,
+    onSeek: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFF101722))
+            .border(1.dp, StudioCardBorder, RoundedCornerShape(8.dp))
+    ) {
+        Text(
+            text = "MEDIA",
+            color = NeonCyan,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.ExtraBold,
+            modifier = Modifier.align(Alignment.TopStart).padding(start = 5.dp, top = 2.dp)
+        )
+        clips.forEach { clip ->
+            val left = (clip.startMs * pxPerMs).dp
+            val clipWidth = (clip.durationMs * pxPerMs).dp.coerceAtLeast(42.dp)
+            val tint = if (clip.type == MediaClipType.VIDEO) Color(0xFF6D45B5) else Color(0xFF167D78)
+            Box(
+                modifier = Modifier
+                    .offset(x = left, y = 13.dp)
+                    .width(clipWidth)
+                    .height(28.dp)
+                    .padding(end = 2.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(tint)
+                    .border(1.dp, if (clip.type == MediaClipType.VIDEO) NeonMagenta else NeonCyan, RoundedCornerShape(6.dp))
+                    .clickable { onSeek(clip.startMs) }
+                    .padding(horizontal = 6.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (clip.type == MediaClipType.VIDEO) Icons.Default.Videocam else Icons.Default.Image,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = clip.displayName,
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        if (clips.isEmpty()) {
+            Text(
+                text = "Import photos or videos to add media clips",
+                color = TextMuted,
+                fontSize = 9.sp,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
     }
 }
 
