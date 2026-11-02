@@ -3,13 +3,7 @@ package com.example.export
 import android.content.Context
 import android.content.Intent
 import android.graphics.*
-import android.media.MediaCodec
-import android.media.MediaCodecInfo
-import android.media.MediaFormat
-import android.media.MediaMuxer
-import android.media.MediaMetadataRetriever
 import android.net.Uri
-import android.os.Build
 import androidx.core.content.FileProvider
 import com.example.model.*
 import com.example.data.LyricMakerStorage
@@ -17,7 +11,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import java.nio.ByteBuffer
 import kotlin.math.*
 
 class VideoExportEngine(private val context: Context) {
