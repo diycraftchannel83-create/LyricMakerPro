@@ -109,7 +109,7 @@ object PresetLibrary {
                 waveformPeaks = emptyList()
             ),
             lyrics = emptyList(),
-            typography = typographyPresets.first()
+            typography = typographyPresets.first().copy(fontSizeSp = 18f)
         )
     }
 
