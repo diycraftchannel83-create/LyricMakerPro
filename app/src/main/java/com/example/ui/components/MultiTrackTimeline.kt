@@ -497,7 +497,6 @@ private fun TimeRuler(
     modifier: Modifier = Modifier
 ) {
     val totalSec = (durationMs / 1000L).toInt()
-    val hasPartialSecond = durationMs % 1000L != 0L
     val majorStep = when {
         pxPerMs < 0.001f -> 120
         pxPerMs < 0.002f -> 60
