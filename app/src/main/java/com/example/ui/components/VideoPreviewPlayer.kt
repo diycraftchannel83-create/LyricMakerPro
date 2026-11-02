@@ -303,9 +303,9 @@ fun VideoPreviewPlayer(
                     .testTag("preview_canvas_container"),
                 contentAlignment = Alignment.Center
             ) {
-                val activeMedia = project.mediaClips.lastOrNull {
-                    playheadMs >= it.startMs && playheadMs < it.endMs
-                }
+                val activeMedia = project.mediaClips
+                    .filter { playheadMs >= it.startMs && playheadMs < it.endMs }
+                    .maxByOrNull { it.startMs }
 
                 // Imported media is rendered behind the lyric/effect canvas.
                 if (activeMedia != null) {
