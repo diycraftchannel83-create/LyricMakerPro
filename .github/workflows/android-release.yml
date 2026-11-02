@@ -86,9 +86,9 @@ jobs:
             -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
 
-      - name: Run tests and build debug APK
+      - name: Run tests, build debug APK, and validate release lint
         if: env.IS_RELEASE != 'true'
-        run: gradle :app:testDebugUnitTest :app:assembleDebug
+        run: gradle :app:testDebugUnitTest :app:assembleDebug :app:lintVitalRelease
 
       - name: Build signed release AAB and APK
         if: env.IS_RELEASE == 'true'
