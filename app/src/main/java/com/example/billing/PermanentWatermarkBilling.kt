@@ -111,9 +111,15 @@ class PermanentWatermarkBilling(context: Context) : PurchasesUpdatedListener {
             return
         }
 
+        val offerToken = offer.offerToken
+        if (offerToken.isNullOrBlank()) {
+            _message.value = "Token penawaran produk tidak tersedia. Periksa konfigurasi produk di Play Console."
+            return
+        }
+
         val productParams = BillingFlowParams.ProductDetailsParams.newBuilder()
             .setProductDetails(details)
-            .setOfferToken(offer.offerToken)
+            .setOfferToken(offerToken)
             .build()
         val flowParams = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(listOf(productParams))
