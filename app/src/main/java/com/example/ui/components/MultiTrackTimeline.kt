@@ -356,11 +356,24 @@ private fun MediaClipsTrackRow(
                         .background(tint)
                         .border(if (selected) 2.dp else 1.dp, if (selected) NeonCyan else if (clip.type == MediaClipType.VIDEO) NeonMagenta else NeonCyan, RoundedCornerShape(6.dp))
                         .pointerInput(clip.id, pxPerMs) {
+                            // Accumulate fractional milliseconds so short finger movements
+                            // are not discarded by Long rounding at the current zoom level.
+                            var dragRemainderMs = 0f
                             detectDragGestures(
-                                onDragStart = { selectedClipId = clip.id },
+                                onDragStart = {
+                                    selectedClipId = clip.id
+                                    dragRemainderMs = 0f
+                                },
+                                onDragEnd = { dragRemainderMs = 0f },
+                                onDragCancel = { dragRemainderMs = 0f },
                                 onDrag = { change, dragAmount ->
                                     change.consume()
-                                    onMoveClip(clip.id, (dragAmount.x / pxPerMs).toLong())
+                                    dragRemainderMs += dragAmount.x / pxPerMs
+                                    val deltaMs = dragRemainderMs.toLong()
+                                    if (deltaMs != 0L) {
+                                        onMoveClip(clip.id, deltaMs)
+                                        dragRemainderMs -= deltaMs
+                                    }
                                 }
                             )
                         }
