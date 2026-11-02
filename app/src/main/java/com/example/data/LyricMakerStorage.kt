@@ -1,4 +1,4 @@
-package com.example.data
+package com.winsmediatama.lyricmakerpro.data
 
 import android.content.ContentValues
 import android.content.Context
@@ -6,7 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
-import com.example.model.VideoProject
+import com.winsmediatama.lyricmakerpro.model.VideoProject
 import java.io.File
 import java.io.FileInputStream
 import java.text.SimpleDateFormat
