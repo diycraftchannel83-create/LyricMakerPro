@@ -501,6 +501,8 @@ class VideoExportEngine(private val context: Context) {
         val baseTypeface = when (typography.fontFamilyName.lowercase()) {
             "monospace" -> Typeface.MONOSPACE
             "serif" -> Typeface.SERIF
+            "casual" -> Typeface.create("casual", Typeface.NORMAL)
+            "cursive" -> Typeface.create("cursive", Typeface.NORMAL)
             else -> Typeface.SANS_SERIF
         }
         val style = when {
@@ -529,8 +531,9 @@ class VideoExportEngine(private val context: Context) {
             color = parseColor(typography.strokeColorHex, Color.BLACK)
         }
 
-        val centerX = width / 2f
-        val centerY = height * 0.55f
+        val centerX = width * (typography.positionXPercent / 100f)
+        val baseCenterY = height * (typography.positionYPercent / 100f)
+        val centerY = if (typography.lyricLayout == LyricLayoutMode.KARAOKE_TWO_LINE) baseCenterY - baseFontSize * 0.72f else baseCenterY
 
         // Apply dynamic transition animation transforms
         canvas.save()
@@ -580,17 +583,18 @@ class VideoExportEngine(private val context: Context) {
 
         canvas.restore()
 
-        // Draw preview of next line in subtle opacity below active line
+        // Upcoming lyric preview: compact single-line mode or full two-line karaoke mode.
         if (activeLineIndex != -1 && activeLineIndex + 1 < lyrics.size) {
             val nextLine = lyrics[activeLineIndex + 1]
             val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 typeface = finalTypeface
-                textSize = baseFontSize * 0.65f
-                color = Color.parseColor("#7A809E")
-                alpha = 130
+                textSize = if (typography.lyricLayout == LyricLayoutMode.KARAOKE_TWO_LINE) baseFontSize else baseFontSize * 0.65f
+                color = if (typography.lyricLayout == LyricLayoutMode.KARAOKE_TWO_LINE) parseColor(typography.primaryColorHex, Color.WHITE) else Color.parseColor("#7A809E")
+                alpha = if (typography.lyricLayout == LyricLayoutMode.KARAOKE_TWO_LINE) 220 else 130
                 textAlign = Paint.Align.CENTER
             }
-            canvas.drawText(nextLine.text, centerX, centerY + baseFontSize * 1.6f, subPaint)
+            val nextY = if (typography.lyricLayout == LyricLayoutMode.KARAOKE_TWO_LINE) baseCenterY + baseFontSize * 0.72f else centerY + baseFontSize * 1.6f
+            canvas.drawText(nextLine.text, centerX, nextY, subPaint)
         }
     }
 
@@ -658,18 +662,20 @@ class VideoExportEngine(private val context: Context) {
         typography: TypographyPreset,
         fillColor: Int
     ) {
-        // Neon Glow / Shadow
-        if (typography.glowRadiusDp > 0f) {
-            textPaint.setShadowLayer(
-                typography.glowRadiusDp * 2.5f,
-                0f, 0f,
-                parseColor(typography.shadowColorHex, Color.CYAN)
-            )
-        } else {
-            textPaint.clearShadowLayer()
+        // Selectable visual font finish.
+        when (typography.visualEffect) {
+            FontVisualEffect.NEON_GLOW -> textPaint.setShadowLayer(typography.glowRadiusDp * 2.5f, 0f, 0f, parseColor(typography.highlightColorHex, Color.CYAN))
+            FontVisualEffect.SOFT_SHADOW -> textPaint.setShadowLayer(typography.glowRadiusDp * 1.5f, 2f, 3f, Color.BLACK)
+            else -> textPaint.clearShadowLayer()
         }
 
-        // Draw Stroke
+        if (typography.visualEffect == FontVisualEffect.DOUBLE_OUTLINE) {
+            val outer = Paint(strokePaint).apply {
+                strokeWidth = typography.strokeWidthDp * 2.4f * (canvas.width / 360f)
+                color = Color.parseColor("#FF00C8")
+            }
+            canvas.drawText(text, x, y, outer)
+        }
         if (typography.strokeWidthDp > 0f) {
             canvas.drawText(text, x, y, strokePaint)
         }
