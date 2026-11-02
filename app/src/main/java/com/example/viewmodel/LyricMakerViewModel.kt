@@ -88,10 +88,42 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun loadProject(newProject: VideoProject) {
+        // Restore the complete saved editor state before touching playback so Compose
+        // receives one consistent project snapshot (including the original word timings).
         audioEngine.stop()
-        _project.value = newProject
-        _selectedLineId.value = newProject.lyrics.firstOrNull()?.id
-        audioEngine.loadTrack(newProject.audioTrack)
+        val restoredLyrics = newProject.lyrics
+            .sortedWith(compareBy<LyricLine> { it.startMs }.thenBy { it.endMs })
+        val restoredProject = newProject.copy(lyrics = restoredLyrics)
+        _project.value = restoredProject
+        _selectedLineId.value = restoredLyrics.firstOrNull()?.id
+        _currentTab.value = StudioTab.TIMELINE
+        _isTapToSyncActive.value = false
+        _syncLineIndex.value = 0
+
+        // loadTrack reopens the persisted content:// URI. Keep the saved URI and
+        // per-word timing intact; do not rebuild lyric lines during project restore.
+        audioEngine.loadTrack(restoredProject.audioTrack)
+
+        // Older project files may not contain cached waveform data. Recreate it from
+        // the original audio URI without replacing any saved lyric/timing information.
+        val track = restoredProject.audioTrack
+        if (track.beatType == AudioBeatType.CUSTOM_FILE &&
+            !track.customUri.isNullOrBlank() &&
+            track.waveformPeaks.isEmpty()
+        ) {
+            viewModelScope.launch {
+                val peaks = AudioWaveformExtractor.extract(
+                    context = getApplication(),
+                    uriString = track.customUri,
+                    durationMs = track.durationMs
+                )
+                if (peaks.isNotEmpty() && _project.value.audioTrack.id == track.id) {
+                    _project.value = _project.value.copy(
+                        audioTrack = _project.value.audioTrack.copy(waveformPeaks = peaks)
+                    )
+                }
+            }
+        }
     }
 
     fun selectLyricLine(id: String?) {
