@@ -25,8 +25,11 @@ class RewardedAdManager(private val activity: Activity) {
             PRODUCTION_REWARDED_AD_UNIT_ID
         }
 
-    fun initialize() {
-        MobileAds.initialize(activity) { load() }
+    fun initialize(onInitialized: () -> Unit = {}) {
+        MobileAds.initialize(activity) {
+            load()
+            onInitialized()
+        }
     }
 
     fun load() {
