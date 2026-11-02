@@ -36,6 +36,9 @@ fun StudioTabs(
     currentTab: LyricMakerViewModel.StudioTab,
     onTabSelected: (LyricMakerViewModel.StudioTab) -> Unit,
     onOpenTapToSync: () -> Unit,
+    onPickAudio: () -> Unit = {},
+    onPickVideo: () -> Unit = {},
+    onPickImage: () -> Unit = {},
     isExpanded: Boolean = true,
     onToggleExpanded: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
@@ -137,7 +140,7 @@ fun StudioTabs(
                     VisualizerTab(viewModel, project)
                 }
                 LyricMakerViewModel.StudioTab.BACKGROUND -> {
-                    BackgroundTab(viewModel, project)
+                    BackgroundTab(viewModel, project, onPickAudio, onPickVideo, onPickImage)
                 }
                 LyricMakerViewModel.StudioTab.LYRICS_SYNC -> {
                     LyricsSyncTab(
@@ -318,9 +321,50 @@ private fun TypographyTab(viewModel: LyricMakerViewModel, project: VideoProject)
             Slider(
                 value = typography.fontSizeSp,
                 onValueChange = { viewModel.updateTypographyProperties(fontSizeSp = it) },
-                valueRange = 18f..48f,
+                valueRange = 2f..96f,
                 colors = SliderDefaults.colors(thumbColor = NeonCyan, activeTrackColor = NeonCyan)
             )
+        }
+
+        // Style options previously shown in the preview popup now live here only.
+        item {
+            Text("Font Style", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = typography.isBold,
+                    onClick = { viewModel.updateTypographyProperties(isBold = !typography.isBold) },
+                    label = { Text("Bold") }
+                )
+                FilterChip(
+                    selected = typography.isItalic,
+                    onClick = { viewModel.updateTypographyProperties(isItalic = !typography.isItalic) },
+                    label = { Text("Italic") }
+                )
+            }
+        }
+        item {
+            Text("Visual Font Effects", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(FontVisualEffect.entries) { effect ->
+                    FilterChip(
+                        selected = typography.visualEffect == effect,
+                        onClick = { viewModel.updateTypographyProperties(visualEffect = effect) },
+                        label = { Text(effect.label, fontSize = 10.sp) }
+                    )
+                }
+            }
+        }
+        item {
+            Text("Karaoke Layout", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(LyricLayoutMode.entries) { mode ->
+                    FilterChip(
+                        selected = typography.lyricLayout == mode,
+                        onClick = { viewModel.updateTypographyProperties(lyricLayout = mode) },
+                        label = { Text(mode.label, fontSize = 10.sp) }
+                    )
+                }
+            }
         }
 
         // Global lyric placement controls (applies to every lyric line).
@@ -544,7 +588,7 @@ private fun VisualizerTab(viewModel: LyricMakerViewModel, project: VideoProject)
 }
 
 @Composable
-private fun BackgroundTab(viewModel: LyricMakerViewModel, project: VideoProject) {
+private fun BackgroundTab(viewModel: LyricMakerViewModel, project: VideoProject, onPickAudio: () -> Unit, onPickVideo: () -> Unit, onPickImage: () -> Unit) {
     val bg = project.background
 
     LazyColumn(

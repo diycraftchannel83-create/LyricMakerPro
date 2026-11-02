@@ -55,14 +55,10 @@ fun VideoPreviewPlayer(
     onSeek: (Long) -> Unit,
     onTextPositionChange: (Float, Float) -> Unit,
     onTextScaleChange: (Float) -> Unit,
-    onTypographyChange: (TypographyPreset) -> Unit,
-    onRatioChange: (CanvasRatio) -> Unit,
     videoAudioMuted: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    var showRatioMenu by remember { mutableStateOf(false) }
     var isTextDragging by remember { mutableStateOf(false) }
-    var showStyleDialog by remember { mutableStateOf(false) }
     val latestPositionX by rememberUpdatedState(project.typography.positionXPercent)
     val latestPositionY by rememberUpdatedState(project.typography.positionYPercent)
     val latestOnPositionChange by rememberUpdatedState(onTextPositionChange)
@@ -81,90 +77,12 @@ fun VideoPreviewPlayer(
             .background(StudioBackground),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Top Toolbar: Aspect Ratio Selector & Timecode
+        // Minimal preview header: keep only the timecode; editing controls live in bottom tabs.
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Aspect Ratio Dropdown Pill
-            Box {
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = StudioSurfaceVariant,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, StudioCardBorder),
-                    modifier = Modifier
-                        .clickable { showRatioMenu = true }
-                        .testTag("ratio_selector_button")
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AspectRatio,
-                            contentDescription = "Canvas Ratio",
-                            tint = NeonCyan,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = project.canvasRatio.label,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                        Icon(
-                            imageVector = Icons.Default.ArrowDropDown,
-                            contentDescription = null,
-                            tint = TextSecondary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-
-                DropdownMenu(
-                    expanded = showRatioMenu,
-                    onDismissRequest = { showRatioMenu = false },
-                    modifier = Modifier.background(StudioSurface)
-                ) {
-                    CanvasRatio.entries.forEach { ratio ->
-                        DropdownMenuItem(
-                            text = {
-                                Column {
-                                    Text(
-                                        text = "${ratio.label}  •  ${ratio.iconDescription}",
-                                        fontWeight = if (ratio == project.canvasRatio) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (ratio == project.canvasRatio) NeonCyan else TextPrimary,
-                                        fontSize = 13.sp
-                                    )
-                                }
-                            },
-                            onClick = {
-                                onRatioChange(ratio)
-                                showRatioMenu = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = StudioSurfaceVariant,
-                border = androidx.compose.foundation.BorderStroke(1.dp, NeonMagenta.copy(alpha = 0.7f)),
-                modifier = Modifier.clickable { showStyleDialog = true }.testTag("preview_style_button")
-            ) {
-                Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.TextFields, contentDescription = null, tint = NeonMagenta, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Style", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-
-            // Real-time timecode badge
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = StudioSurfaceVariant.copy(alpha = 0.8f),
@@ -178,107 +96,6 @@ fun VideoPreviewPlayer(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                 )
             }
-        }
-
-        if (showStyleDialog) {
-            AlertDialog(
-                onDismissRequest = { showStyleDialog = false },
-                title = {
-                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text("TEXT STUDIO", color = NeonCyan, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
-                        Text("Lyric Typography", color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text("Customize text appearance for all lyric lines", color = TextSecondary, fontSize = 12.sp)
-                    }
-                },
-                text = {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 540.dp).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Surface(
-                            color = StudioSurfaceVariant,
-                            shape = RoundedCornerShape(14.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, StudioCardBorder)
-                        ) {
-                            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("FONT SIZE", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                                    Text("${project.typography.fontSizeSp.toInt()} sp", color = NeonCyan, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
-                                }
-                                Slider(
-                                    value = project.typography.fontSizeSp.coerceIn(2f, 96f),
-                                    onValueChange = { onTypographyChange(project.typography.copy(fontSizeSp = it)) },
-                                    valueRange = 2f..96f
-                                )
-                                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                    Text("2 sp • Tiny", color = TextSecondary, fontSize = 10.sp)
-                                    Text("96 sp • Large", color = TextSecondary, fontSize = 10.sp)
-                                }
-                            }
-                        }
-
-                        Surface(color = StudioSurfaceVariant, shape = RoundedCornerShape(14.dp), border = androidx.compose.foundation.BorderStroke(1.dp, StudioCardBorder)) {
-                            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                                Text("FONT FAMILY", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                                listOf("SansSerif", "Serif", "Monospace", "Casual", "Cursive").chunked(3).forEach { familyRow ->
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        familyRow.forEach { family ->
-                                            FilterChip(
-                                                selected = project.typography.fontFamilyName == family,
-                                                onClick = { onTypographyChange(project.typography.copy(fontFamilyName = family)) },
-                                                label = { Text(family, fontSize = 11.sp) }
-                                            )
-                                        }
-                                    }
-                                }
-                                androidx.compose.material3.HorizontalDivider(color = StudioCardBorder)
-                                Text("FONT STYLE", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    FilterChip(selected = project.typography.isBold, onClick = { onTypographyChange(project.typography.copy(isBold = !project.typography.isBold)) }, label = { Text("B  Bold") })
-                                    FilterChip(selected = project.typography.isItalic, onClick = { onTypographyChange(project.typography.copy(isItalic = !project.typography.isItalic)) }, label = { Text("I  Italic") })
-                                }
-                            }
-                        }
-
-                        Surface(color = StudioSurfaceVariant, shape = RoundedCornerShape(14.dp), border = androidx.compose.foundation.BorderStroke(1.dp, StudioCardBorder)) {
-                            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                                Text("VISUAL EFFECTS", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                                FontVisualEffect.entries.chunked(2).forEach { effectRow ->
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        effectRow.forEach { effect ->
-                                            FilterChip(
-                                                selected = project.typography.visualEffect == effect,
-                                                onClick = { onTypographyChange(project.typography.copy(visualEffect = effect)) },
-                                                label = { Text(effect.label, fontSize = 11.sp) }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Surface(color = StudioSurfaceVariant, shape = RoundedCornerShape(14.dp), border = androidx.compose.foundation.BorderStroke(1.dp, StudioCardBorder)) {
-                            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                                Text("KARAOKE LAYOUT", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                                LyricLayoutMode.entries.forEach { mode ->
-                                    FilterChip(
-                                        selected = project.typography.lyricLayout == mode,
-                                        onClick = { onTypographyChange(project.typography.copy(lyricLayout = mode)) },
-                                        label = { Text(mode.label, fontSize = 11.sp) }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { showStyleDialog = false }) {
-                        Text("Done", color = NeonCyan, fontWeight = FontWeight.Bold)
-                    }
-                },
-                containerColor = StudioSurface,
-                shape = RoundedCornerShape(24.dp)
-            )
         }
 
         // The Viewport Frame

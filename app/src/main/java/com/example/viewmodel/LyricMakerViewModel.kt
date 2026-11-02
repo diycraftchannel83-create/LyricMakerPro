@@ -268,7 +268,11 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         glowRadiusDp: Float? = null,
         fontFamily: String? = null,
         positionXPercent: Float? = null,
-        positionYPercent: Float? = null
+        positionYPercent: Float? = null,
+        isBold: Boolean? = null,
+        isItalic: Boolean? = null,
+        visualEffect: FontVisualEffect? = null,
+        lyricLayout: LyricLayoutMode? = null
     ) {
         val current = _project.value.typography
         _project.value = _project.value.copy(
@@ -280,7 +284,11 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
                 glowRadiusDp = glowRadiusDp ?: current.glowRadiusDp,
                 fontFamilyName = fontFamily ?: current.fontFamilyName,
                 positionXPercent = positionXPercent?.coerceIn(5f, 95f) ?: current.positionXPercent,
-                positionYPercent = positionYPercent?.coerceIn(5f, 95f) ?: current.positionYPercent
+                positionYPercent = positionYPercent?.coerceIn(5f, 95f) ?: current.positionYPercent,
+                isBold = isBold ?: current.isBold,
+                isItalic = isItalic ?: current.isItalic,
+                visualEffect = visualEffect ?: current.visualEffect,
+                lyricLayout = lyricLayout ?: current.lyricLayout
             )
         )
     }
