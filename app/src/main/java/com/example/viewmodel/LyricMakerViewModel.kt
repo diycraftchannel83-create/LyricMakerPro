@@ -301,24 +301,47 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         _project.value = _project.value.copy(background = config)
     }
 
-    fun addMediaClip(uri: String, displayName: String, type: MediaClipType) {
-        val defaultDuration = if (type == MediaClipType.IMAGE) 5000L else 10000L
+    fun addMediaClip(
+        uri: String,
+        displayName: String,
+        type: MediaClipType,
+        sourceDurationMs: Long? = null
+    ) {
+        val startMs = audioEngine.playheadMs.value.coerceAtLeast(0L)
+        val timelineDuration = when (type) {
+            MediaClipType.IMAGE -> (_project.value.durationMs - startMs).coerceAtLeast(5_000L)
+            MediaClipType.VIDEO -> (sourceDurationMs ?: 10_000L).coerceAtLeast(500L)
+        }
         val clip = MediaClip(
             uri = uri,
             displayName = displayName,
             type = type,
-            startMs = audioEngine.playheadMs.value,
-            durationMs = defaultDuration
+            startMs = startMs,
+            durationMs = timelineDuration
         )
-        _project.value = _project.value.copy(
-            mediaClips = _project.value.mediaClips + clip
-        )
+        _project.value = _project.value.copy(mediaClips = _project.value.mediaClips + clip)
+    }
+
+    fun moveMediaClip(id: String, deltaMs: Long) {
+        val clips = _project.value.mediaClips.map { clip ->
+            if (clip.id == id) clip.copy(startMs = (clip.startMs + deltaMs).coerceAtLeast(0L)) else clip
+        }
+        _project.value = _project.value.copy(mediaClips = clips.sortedBy { it.startMs })
+    }
+
+    fun resizeMediaClip(id: String, deltaMs: Long) {
+        val clips = _project.value.mediaClips.map { clip ->
+            if (clip.id == id) {
+                val minimum = if (clip.type == MediaClipType.VIDEO) 500L else 1_000L
+                val maximum = if (clip.type == MediaClipType.VIDEO) clip.durationMs else 3_600_000L
+                clip.copy(durationMs = (clip.durationMs + deltaMs).coerceIn(minimum, maximum))
+            } else clip
+        }
+        _project.value = _project.value.copy(mediaClips = clips)
     }
 
     fun removeMediaClip(id: String) {
-        _project.value = _project.value.copy(
-            mediaClips = _project.value.mediaClips.filterNot { it.id == id }
-        )
+        _project.value = _project.value.copy(mediaClips = _project.value.mediaClips.filterNot { it.id == id })
     }
 
     fun toggleWatermark(show: Boolean) {
