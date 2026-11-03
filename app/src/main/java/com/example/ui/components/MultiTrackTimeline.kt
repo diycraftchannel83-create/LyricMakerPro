@@ -27,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.winsmediatama.lyricmakerpro.audio.AudioEngine
 import com.winsmediatama.lyricmakerpro.model.LyricLine
 import com.winsmediatama.lyricmakerpro.model.MediaClip
 import com.winsmediatama.lyricmakerpro.model.MediaClipType
@@ -36,7 +38,7 @@ import com.winsmediatama.lyricmakerpro.ui.theme.*
 @Composable
 fun MultiTrackTimeline(
     project: VideoProject,
-    playheadMs: Long,
+    audioEngine: AudioEngine,
     selectedLineId: String?,
     onSelectLine: (String?) -> Unit,
     onSeek: (Long) -> Unit,
@@ -56,6 +58,7 @@ fun MultiTrackTimeline(
     onRemoveMediaClip: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val playheadMs by audioEngine.playheadMs.collectAsStateWithLifecycle()
     // Zoom factor: pixels per millisecond
     var pxPerMs by remember { mutableFloatStateOf(0.065f) } // pixels per millisecond
     val totalTimelineWidthDp = ((project.durationMs * pxPerMs) + 84f).dp.coerceAtLeast(360.dp)
