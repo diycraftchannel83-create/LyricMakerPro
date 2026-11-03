@@ -340,7 +340,7 @@ object AudioGlowVisualizerRenderer {
 
         // Fine, colorful floating particles over a pure black canvas.
         val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        for (i in 0 until if (exportPerformanceMode) 42 else 115) {
+        for (i in 0 until (if (exportPerformanceMode) 42 else 115)) {
             val seed = i * 127.1
             val x = ((sin(seed * 0.73) * 0.5 + 0.5) * width).toFloat()
             val y = ((cos(seed * 1.17) * 0.5 + 0.5) * height * 0.76f).toFloat()
@@ -481,7 +481,7 @@ object AudioGlowVisualizerRenderer {
         canvas.drawLine(0f,centerY,width.toFloat(),centerY,beam)
         beam.shader=null; beam.clearShadowLayer(); beam.strokeWidth=max(1f,minSide*0.0012f); beam.color=withAlpha(Color.WHITE,165)
         canvas.drawLine(0f,centerY,width.toFloat(),centerY,beam)
-        for (i in 0 until if (exportPerformanceMode) 20 else 48) {
+        for (i in 0 until (if (exportPerformanceMode) 20 else 48)) {
             val seed=i*91.7
             val x=((sin(seed*0.73)*0.5+0.5)*width).toFloat()
             val n=(x/width*(count-1)).toInt().coerceIn(0,count-1)
