@@ -28,12 +28,16 @@ enum class TextTransitionEffect(val label: String, val description: String) {
 }
 
 enum class VisualizerType(val label: String, val description: String) {
-    BARS_SPECTRUM("Spectrum Bars", "16-band gradient frequency spectrum equalizer"),
-    CIRCULAR_WAVE("Circular Ring", "Radial glowing pulse rings vibrating with audio bass"),
-    OSCILLOSCOPE("Oscilloscope", "Continuous smooth neon audio waveform wave"),
-    FLOATING_PARTICLES("Ambient Dust", "Dreamy floating bokeh dust particles"),
-    VINYL_SPINNER("Vinyl Disc", "Retro rotating vinyl record with groove reflections"),
-    BASS_PULSE("Bass Shockwave", "Expanding concentric acoustic ripples on kick beat"),
+    BARS_SPECTRUM("Spectrum Bars", "Audio-reactive frequency-style bars driven by the song waveform"),
+    CIRCULAR_WAVE("Circular Ring", "Radial glowing pulse rings reacting to the song"),
+    OSCILLOSCOPE("Oscilloscope", "Smooth neon waveform animation"),
+    FLOATING_PARTICLES("Ambient Dust", "Floating bokeh particles pulsing with audio energy"),
+    VINYL_SPINNER("Vinyl Disc", "Retro rotating vinyl record with beat-reactive glow"),
+    BASS_PULSE("Bass Shockwave", "Expanding acoustic ripples reacting to audio peaks"),
+    THREE_D_TUNNEL("3D Neon Tunnel", "Layered perspective tunnel pulsing with the music"),
+    THREE_D_RADIAL("3D Radial Spectrum", "Dimensional circular spectrum with depth and glow"),
+    THREE_D_WAVE("3D Wave Ribbon", "Layered flowing wave ribbons reacting to the track"),
+    THREE_D_ORBIT("3D Particle Orbit", "Depth-layered particles orbiting to the audio rhythm"),
     NONE("Off", "Clean background without visualizer overlay")
 }
 
