@@ -506,11 +506,17 @@ private fun TimeRuler(
         pxPerMs < 0.012f -> 10
         else -> 5
     }
+    val density = LocalDensity.current
     Box(modifier = modifier) {
         Canvas(Modifier.fillMaxSize()) {
-            val secStepPx = 1000f * pxPerMs
+            // Canvas coordinates are physical pixels, while pxPerMs is dp/ms.
+            // Convert once so ruler ticks stay aligned with the dp-positioned tracks
+            // at every device density and continue through the full song duration.
+            val pixelsPerMs = pxPerMs * density
+            val secStepPx = 1000f * pixelsPerMs
             for (sec in 0..totalSec) {
                 val x = sec * secStepPx
+                if (x > size.width) break
                 val isMajor = sec % majorStep == 0
                 val lineH = if (isMajor) size.height * 0.48f else size.height * 0.22f
                 val lineColor = if (isMajor) TextSecondary else TextMuted.copy(alpha = 0.45f)
@@ -521,15 +527,16 @@ private fun TimeRuler(
                     strokeWidth = if (isMajor) 1.4f else 1f
                 )
             }
-            // Draw a dedicated end tick at the exact audio duration, including
-            // the final fractional second (for example 05:23.8).
-            val endX = durationMs * pxPerMs
-            drawLine(
-                color = NeonCyan,
-                start = Offset(endX, size.height * 0.28f),
-                end = Offset(endX, size.height),
-                strokeWidth = 2f
-            )
+            // Dedicated end tick at the exact audio duration, including fractional seconds.
+            val endX = durationMs * pixelsPerMs
+            if (endX <= size.width) {
+                drawLine(
+                    color = NeonCyan,
+                    start = Offset(endX, size.height * 0.28f),
+                    end = Offset(endX, size.height),
+                    strokeWidth = 2f
+                )
+            }
         }
         for (sec in 0..totalSec step majorStep) {
             Text(
