@@ -214,6 +214,7 @@ fun MultiTrackTimeline(
                     AudioTrackRow(
                         project = project,
                         pxPerMs = pxPerMs,
+                        onSeek = onSeek,
                         modifier = Modifier
                             .fillMaxWidth()
                              .height(28.dp)
@@ -241,6 +242,7 @@ fun MultiTrackTimeline(
                     LyricsTrackRow(
                         lyrics = project.lyrics,
                         playheadMs = playheadMs,
+                        onSeek = onSeek,
                         selectedLineId = selectedLineId,
                         pxPerMs = pxPerMs,
                         onSelectLine = onSelectLine,
@@ -552,10 +554,20 @@ private fun TimeRuler(
 private fun AudioTrackRow(
     project: VideoProject,
     pxPerMs: Float,
+    onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val density = LocalDensity.current
+    val horizontalInsetPx = with(density) { 5.dp.toPx() }
     Box(
         modifier = modifier
+            .pointerInput(project.durationMs, pxPerMs) {
+                detectTapGestures { tap ->
+                    val timelineX = (tap.x - horizontalInsetPx).coerceAtLeast(0f)
+                    onSeek((timelineX / with(density) { pxPerMs.dp.toPx() }).toLong()
+                        .coerceIn(0L, project.durationMs))
+                }
+            }
             .clip(RoundedCornerShape(8.dp))
             .background(Color(0xFF101722))
             .border(1.dp, StudioCardBorder, RoundedCornerShape(8.dp))
@@ -619,6 +631,7 @@ private fun AudioTrackRow(
 private fun LyricsTrackRow(
     lyrics: List<LyricLine>,
     playheadMs: Long,
+    onSeek: (Long) -> Unit,
     selectedLineId: String?,
     pxPerMs: Float,
     onSelectLine: (String) -> Unit,
@@ -660,7 +673,10 @@ private fun LyricsTrackRow(
                     )
                     .pointerInput(line.id) {
                         detectTapGestures(
-                            onTap = { onSelectLine(line.id) },
+                            onTap = {
+                                onSelectLine(line.id)
+                                onSeek(line.startMs)
+                            },
                             onDoubleTap = { onEditLine(line.id) }
                         )
                     }
