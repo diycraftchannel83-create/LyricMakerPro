@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.winsmediatama.lyricmakerpro.ads.RewardedAdManager
+import com.winsmediatama.lyricmakerpro.ads.AdsConsentManager
 import com.winsmediatama.lyricmakerpro.ads.FreeAppOpenAdManager
 import com.winsmediatama.lyricmakerpro.ads.FreeBannerAd
 import com.winsmediatama.lyricmakerpro.ads.FreeNativeAd
@@ -57,11 +58,13 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var rewardedAdManager: RewardedAdManager
     private lateinit var appOpenAdManager: FreeAppOpenAdManager
+    private lateinit var adsConsentManager: AdsConsentManager
     private lateinit var watermarkBilling: PermanentWatermarkBilling
     private val viewModel: LyricMakerViewModel by viewModels()
 
     override fun onStart() {
         super.onStart()
+        if (::watermarkBilling.isInitialized) watermarkBilling.connect()
         if (::appOpenAdManager.isInitialized) appOpenAdManager.onForeground()
     }
 
@@ -80,8 +83,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         rewardedAdManager = RewardedAdManager(this)
         appOpenAdManager = FreeAppOpenAdManager(this)
+        adsConsentManager = AdsConsentManager()
         watermarkBilling = PermanentWatermarkBilling(this)
         watermarkBilling.connect()
+        adsConsentManager.requestConsent(this)
 
         setContent {
             MyApplicationTheme {
@@ -109,15 +114,15 @@ class MainActivity : ComponentActivity() {
                 val lastExportedFile by viewModel.lastExportedFile.collectAsStateWithLifecycle()
                 val permanentWatermarkRemoved by watermarkBilling.isOwned.collectAsStateWithLifecycle()
                 val watermarkEntitlementResolved by watermarkBilling.isEntitlementResolved.collectAsStateWithLifecycle()
+                val canRequestAds by adsConsentManager.canRequestAds.collectAsStateWithLifecycle()
+                val privacyOptionsRequired by adsConsentManager.privacyOptionsRequired.collectAsStateWithLifecycle()
                 // Cached Play purchase state is not trusted until the billing query resolves.
                 val hasConfirmedPermanentWatermarkRemoval = watermarkEntitlementResolved && permanentWatermarkRemoved
-                LaunchedEffect(watermarkEntitlementResolved, permanentWatermarkRemoved) {
-                    // All ad formats are enabled only after Play Billing confirms Free status.
-                    if (watermarkEntitlementResolved) {
-                        val isPremium = permanentWatermarkRemoved
-                        appOpenAdManager.setPremiumStatus(isPremium)
-                        if (!isPremium) rewardedAdManager.initialize()
-                    }
+                LaunchedEffect(watermarkEntitlementResolved, permanentWatermarkRemoved, canRequestAds) {
+                    val isPremium = watermarkEntitlementResolved && permanentWatermarkRemoved
+                    appOpenAdManager.setPremiumStatus(isPremium)
+                    appOpenAdManager.setAdsAllowed(canRequestAds && watermarkEntitlementResolved && !isPremium)
+                    rewardedAdManager.setAdsAllowed(canRequestAds && watermarkEntitlementResolved && !isPremium)
                 }
                 val permanentWatermarkPrice by watermarkBilling.price.collectAsStateWithLifecycle()
                 val billingMessage by watermarkBilling.message.collectAsStateWithLifecycle()
@@ -288,19 +293,21 @@ class MainActivity : ComponentActivity() {
                                     .onFailure { Toast.makeText(this@MainActivity, "LRC save failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show() }
                             },
                             onNewProject = { showNewProjectDialog = true },
+                            showPrivacyOptions = privacyOptionsRequired,
+                            onShowPrivacyOptions = { adsConsentManager.showPrivacyOptions(this@MainActivity) },
                             onExit = {
                                 viewModel.audioEngine.stop()
                                 finishAffinity()
                             }
                         )
                         if (watermarkEntitlementResolved && !hasConfirmedPermanentWatermarkRemoval) {
-                            FreeNativeAd(isPremium = false)
+                            FreeNativeAd(isPremium = false, canRequestAds = canRequestAds)
                         }
                         }
                     },
                     bottomBar = {
                         if (watermarkEntitlementResolved && !hasConfirmedPermanentWatermarkRemoval) {
-                            FreeBannerAd(isPremium = false)
+                            FreeBannerAd(isPremium = false, canRequestAds = canRequestAds)
                         }
                     }
                 ) { innerPadding ->
@@ -575,6 +582,8 @@ private fun StudioTopAppBar(
     onSaveProject: () -> Unit,
     onSaveLrc: () -> Unit,
     onNewProject: () -> Unit,
+    showPrivacyOptions: Boolean,
+    onShowPrivacyOptions: () -> Unit,
     onExit: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -668,6 +677,13 @@ private fun StudioTopAppBar(
                             onClick = { menuExpanded = false; onSaveLrc() }
                         )
                         HorizontalDivider(color = StudioCardBorder)
+                        if (showPrivacyOptions) {
+                            DropdownMenuItem(
+                                text = { Text(tr("Privacy Options")) },
+                                leadingIcon = { Icon(Icons.Default.PrivacyTip, null, tint = NeonCyan) },
+                                onClick = { menuExpanded = false; onShowPrivacyOptions() }
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text(tr("Privacy Policy")) },
                             leadingIcon = { Icon(Icons.Default.PrivacyTip, null) },
