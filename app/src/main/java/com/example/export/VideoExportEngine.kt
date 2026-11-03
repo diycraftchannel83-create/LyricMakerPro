@@ -36,11 +36,46 @@ class VideoExportEngine(private val context: Context) {
     // Reuse the paint for every frame instead of allocating one 30 times per second.
     private val mediaFramePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
-    private fun prepareMediaAssets(clips: List<MediaClip>): List<ExportMediaAsset> = clips.mapNotNull { clip ->
+    /**
+     * Decode still images close to the export canvas size instead of loading the
+     * camera's full-resolution bitmap into memory. The required dimensions keep
+     * enough pixels for the existing center-crop rendering path.
+     */
+    private fun decodeImageForCanvas(uri: Uri, canvasWidth: Int, canvasHeight: Int): Bitmap? {
+        val resolver = context.contentResolver
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        val scale = max(
+            canvasWidth.toFloat() / bounds.outWidth,
+            canvasHeight.toFloat() / bounds.outHeight
+        )
+        val requiredWidth = ceil(bounds.outWidth * scale).toInt().coerceAtMost(bounds.outWidth)
+        val requiredHeight = ceil(bounds.outHeight * scale).toInt().coerceAtMost(bounds.outHeight)
+        var sampleSize = 1
+        while (bounds.outWidth / (sampleSize * 2) >= requiredWidth &&
+            bounds.outHeight / (sampleSize * 2) >= requiredHeight
+        ) {
+            sampleSize *= 2
+        }
+
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        return resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+    }
+
+    private fun prepareMediaAssets(
+        clips: List<MediaClip>,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ): List<ExportMediaAsset> = clips.mapNotNull { clip ->
         runCatching {
             when (clip.type) {
                 MediaClipType.IMAGE -> {
-                    val bitmap = context.contentResolver.openInputStream(Uri.parse(clip.uri))?.use { BitmapFactory.decodeStream(it) }
+                    val bitmap = decodeImageForCanvas(Uri.parse(clip.uri), canvasWidth, canvasHeight)
                     bitmap?.let { ExportMediaAsset(clip = clip, image = it) }
                 }
                 MediaClipType.VIDEO -> {
@@ -122,7 +157,7 @@ class VideoExportEngine(private val context: Context) {
 
             // Prepare the actual timeline media once. Each encoded frame below will
             // select the clip active at that presentation timestamp.
-            mediaAssets = prepareMediaAssets(project.mediaClips)
+            mediaAssets = prepareMediaAssets(project.mediaClips, width, height)
             val watermarkBitmap = loadWatermarkBitmap()
             val overlay = ProjectLyricOverlay(
                 this@VideoExportEngine, width, height, project, watermarkBitmap, mediaAssets
@@ -366,7 +401,7 @@ class VideoExportEngine(private val context: Context) {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
-        val mediaAssets = prepareMediaAssets(project.mediaClips)
+        val mediaAssets = prepareMediaAssets(project.mediaClips, width, height)
         try {
             renderFrameInternal(canvas, width, height, project, timeMs, mediaAssets)
         } finally {
