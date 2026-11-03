@@ -24,6 +24,8 @@ object OpenGlVisualizerRenderer {
     private var display = EGL14.EGL_NO_DISPLAY
     private var context = EGL14.EGL_NO_CONTEXT
     private var surface = EGL14.EGL_NO_SURFACE
+    private var surfaceWidth = 0
+    private var surfaceHeight = 0
     private var program = 0
     private var positionLocation = -1
     private var resolutionLocation = -1
@@ -202,7 +204,7 @@ object OpenGlVisualizerRenderer {
                 float rays = abs(sin(atan(q.y,q.x)*8.0));
                 addGlow(rgb,alpha,uAccent,lineGlow(rays,0.025)*0.18);
             }
-            gl_FragColor = vec4(rgb, clamp(alpha,0.0,0.92));
+            float outAlpha = clamp(alpha,0.0,0.92);\n            gl_FragColor = vec4(clamp(rgb,0.0,1.0) * outAlpha, outAlpha);
         }
     """.trimIndent()
 
@@ -221,9 +223,21 @@ object OpenGlVisualizerRenderer {
         title: String = ""
     ) {
         if (width <= 0 || height <= 0 || visualizerOrdinal == 11) return
-        val bitmap = render(width, height, visualizerOrdinal, timeMs, bands, bass, colorHex)
-        canvas.drawBitmap(bitmap, 0f, 0f, null)
-        bitmap.recycle()
+        val bitmap = try {
+            render(width, height, visualizerOrdinal, timeMs, bands, bass, colorHex)
+        } catch (_: Throwable) {
+            synchronized(lock) {
+                if (display != EGL14.EGL_NO_DISPLAY) {
+                    runCatching { EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT) }
+                }
+            }
+            drawFallback(canvas, width, height, visualizerOrdinal, bands, colorHex)
+            null
+        }
+        if (bitmap != null) {
+            canvas.drawBitmap(bitmap, 0f, 0f, null)
+            bitmap.recycle()
+        }
 
         // Metadata remains legible and is deliberately drawn after the transparent GPU layer.
         if (visualizerOrdinal == 0) {
@@ -251,7 +265,7 @@ object OpenGlVisualizerRenderer {
         bass: Float,
         colorHex: String
     ): Bitmap = synchronized(lock) {
-        ensureContext()
+        ensureContext(width, height)
         check(EGL14.eglMakeCurrent(display, surface, surface, context)) { "Unable to activate OpenGL ES context" }
         if (program == 0) createProgram()
         GLES20.glViewport(0, 0, width, height)
@@ -292,11 +306,35 @@ object OpenGlVisualizerRenderer {
                 argb[targetY * width + x] = (a shl 24) or (r shl 16) or (g shl 8) or b
             }
         }
+        runCatching { EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT) }
         Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { it.setPixels(argb,0,width,0,0,width,height) }
     }
 
-    private fun ensureContext() {
-        if (display != EGL14.EGL_NO_DISPLAY && context != EGL14.EGL_NO_CONTEXT) return
+
+    private fun drawFallback(canvas: Canvas, width: Int, height: Int, type: Int, bands: FloatArray, colorHex: String) {
+        val accent = runCatching { Color.parseColor(colorHex) }.getOrDefault(Color.CYAN)
+        val count = if (type == 0 || type == 4) 16 else 32
+        val gap = width * 0.012f
+        val barWidth = (width * 0.86f - gap * (count - 1)) / count
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accent; style = Paint.Style.FILL }
+        val baseY = height * 0.68f
+        for (i in 0 until count) {
+            val level = bands.getOrElse(i % bands.size.coerceAtLeast(1)) { 0.08f }.coerceIn(0.02f, 1f)
+            val barHeight = height * (0.035f + level * 0.24f)
+            val left = width * 0.07f + i * (barWidth + gap)
+            paint.alpha = 130 + (level * 100).toInt()
+            canvas.drawRoundRect(left, baseY - barHeight, left + barWidth, baseY, barWidth * 0.25f, barWidth * 0.25f, paint)
+        }
+    }
+
+    private fun ensureContext(width: Int, height: Int) {
+        if (display != EGL14.EGL_NO_DISPLAY && context != EGL14.EGL_NO_CONTEXT) {
+            if (surfaceWidth != width || surfaceHeight != height) {
+                runCatching { EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT) }
+                if (surface != EGL14.EGL_NO_SURFACE) EGL14.eglDestroySurface(display, surface)
+                surface = EGL14.EGL_NO_SURFACE
+            } else return
+        }
         display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
         check(display != EGL14.EGL_NO_DISPLAY) { "OpenGL ES display unavailable" }
         val versions = IntArray(2)
@@ -313,9 +351,11 @@ object OpenGlVisualizerRenderer {
         val contextAttrs = intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION,2,EGL14.EGL_NONE)
         context = EGL14.eglCreateContext(display,configs[0],EGL14.EGL_NO_CONTEXT,contextAttrs,0)
         check(context != EGL14.EGL_NO_CONTEXT) { "OpenGL ES context creation failed" }
-        val surfaceAttrs = intArrayOf(EGL14.EGL_WIDTH,1,EGL14.EGL_HEIGHT,1,EGL14.EGL_NONE)
+        val surfaceAttrs = intArrayOf(EGL14.EGL_WIDTH,width,EGL14.EGL_HEIGHT,height,EGL14.EGL_NONE)
         surface = EGL14.eglCreatePbufferSurface(display,configs[0],surfaceAttrs,0)
         check(surface != EGL14.EGL_NO_SURFACE) { "OpenGL ES surface creation failed" }
+        surfaceWidth = width
+        surfaceHeight = height
     }
 
     private fun createProgram() {
