@@ -646,45 +646,6 @@ class VideoExportEngine(private val context: Context) {
             }
             VisualizerType.VINYL_SPINNER -> {
                 AudioGlowVisualizerRenderer.drawCoolBars(canvas, width, height, timeMs, envelopeBands)
-                /*
-                val centerX = width / 2f
-                val centerY = height * 0.32f
-                val radius = min(width, height) * 0.22f
-                val angle = (timeMs * 0.08f) % 360f
-
-                canvas.save()
-                canvas.rotate(angle, centerX, centerY)
-
-                val vinylPaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.FILL
-                    color = Color.parseColor("#15161C")
-                }
-                canvas.drawCircle(centerX, centerY, radius, vinylPaint)
-
-                // Groove rings
-                val groovePaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.STROKE
-                    strokeWidth = 1.5f
-                    color = Color.parseColor("#2E3142")
-                }
-                for (r in 1..4) {
-                    canvas.drawCircle(centerX, centerY, radius * (0.35f + r * 0.12f), groovePaint)
-                }
-
-                // Center label
-                val labelPaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.FILL
-                    color = primaryColor
-                }
-                canvas.drawCircle(centerX, centerY, radius * 0.32f, labelPaint)
-
-                // Spindle hole
-                canvas.drawCircle(centerX, centerY, radius * 0.08f, Paint().apply { color = Color.BLACK })
-
-                canvas.restore()
             }
             VisualizerType.BASS_PULSE -> {
                 val centerX = width / 2f
