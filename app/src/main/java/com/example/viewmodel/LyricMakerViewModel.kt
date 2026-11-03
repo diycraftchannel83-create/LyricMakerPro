@@ -134,7 +134,16 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         audioEngine.stop()
         val restoredLyrics = newProject.lyrics
             .sortedWith(compareBy<LyricLine> { it.startMs }.thenBy { it.endMs })
-        val restoredProject = newProject.copy(lyrics = restoredLyrics)
+        // Apply the requested editor defaults whenever a project is opened.
+        // Lyric timestamps and word-level synchronization remain untouched.
+        val restoredProject = newProject.copy(
+            lyrics = restoredLyrics,
+            typography = newProject.typography.copy(
+                fontSizeSp = 7f,
+                positionXPercent = 50f,
+                positionYPercent = 80f
+            )
+        )
         _project.value = restoredProject
         _selectedLineId.value = restoredLyrics.firstOrNull()?.id
         _currentTab.value = StudioTab.TIMELINE
@@ -665,7 +674,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // --- Export Video Workflow ---
-    fun startExport(quality: ExportQuality, durationSec: Int = 15, removeWatermark: Boolean = false) {
+    fun startExport(quality: ExportQuality, durationSec: Int = 0, removeWatermark: Boolean = false) {
         if (_isExporting.value) return
         audioEngine.pause()
         _lastExportedFile.value = null
