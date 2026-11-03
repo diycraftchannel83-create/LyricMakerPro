@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.winsmediatama.lyricmakerpro.model.*
 import com.winsmediatama.lyricmakerpro.visualizer.AudioGlowVisualizerRenderer
+import com.winsmediatama.lyricmakerpro.visualizer.OpenGlVisualizerRenderer
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.winsmediatama.lyricmakerpro.audio.AudioEngine
 import com.winsmediatama.lyricmakerpro.audio.AudioSpectrumAnalyzer
