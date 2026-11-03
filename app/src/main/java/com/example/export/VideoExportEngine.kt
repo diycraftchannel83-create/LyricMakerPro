@@ -232,7 +232,7 @@ class VideoExportEngine(private val context: Context) {
             owner.drawVisualizer(
                 Canvas(bitmap), width, height, project.visualizer, project.visualizerColorHex,
                 frameTimeMs, project.audioTrack.bpm, project.audioTrack.waveformPeaks, project.durationMs,
-                project.artist.ifBlank { project.audioTrack.artist }, project.title
+                project.audioTrack.artist.ifBlank { project.artist }, project.audioTrack.title
             )
             owner.drawLyrics(Canvas(bitmap), width, height, project, frameTimeMs)
             if (project.showWatermark) {
