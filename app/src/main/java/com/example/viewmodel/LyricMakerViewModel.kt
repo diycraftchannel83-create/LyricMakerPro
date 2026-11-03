@@ -499,7 +499,6 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
                     // A verified rewarded-ad callback or permanent Play purchase is the only bypass.
                     project = _project.value.copy(
                         showWatermark = !removeWatermark,
-                        watermarkText = "Created with LyricMakerPro"
                     ),
                     quality = quality,
                     durationSeconds = durationSec
