@@ -574,13 +574,6 @@ class VideoExportEngine(private val context: Context) {
                 .toInt().coerceIn(0, waveformPeaks.lastIndex)
         } else -1
         val audioLevel = if (peakIndex >= 0) waveformPeaks[peakIndex].coerceIn(0f, 1f) else fallbackBeat
-        fun bandLevel(index: Int): Float {
-            if (waveformPeaks.isEmpty()) return (fallbackBeat * (0.55f + (index % 5) * 0.09f)).coerceIn(0.04f, 1f)
-            val offset = (index * 7) % 31 - 15
-            val sampleIndex = (peakIndex + offset).coerceIn(0, waveformPeaks.lastIndex)
-            val neighbour = waveformPeaks[sampleIndex].coerceIn(0f, 1f)
-            return (audioLevel * 0.62f + neighbour * 0.38f).coerceIn(0.025f, 1f)
-        }
         val envelopeBands = if (spectrumFrames.isNotEmpty()) AudioSpectrumAnalyzer.bandsAt(spectrumFrames, timeMs, analysisFrameDurationMs) else AudioGlowVisualizerRenderer.bandsFromEnvelope(waveformPeaks, timeMs, durationMs)
         val detectedBeat = AudioSpectrumAnalyzer.beatPulseAt(beatTimesMs, timeMs)
         val kickEnergy = max(if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) envelopeBands.take(6).average().toFloat() else fallbackBeat, detectedBeat)
