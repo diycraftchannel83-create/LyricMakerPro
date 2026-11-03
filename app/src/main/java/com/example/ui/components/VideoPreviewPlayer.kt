@@ -1,5 +1,7 @@
 package com.winsmediatama.lyricmakerpro.ui.components
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.VideoView
 import android.media.MediaPlayer
@@ -38,6 +40,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,6 +63,14 @@ fun VideoPreviewPlayer(
     videoAudioMuted: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val watermarkBitmap = remember(context) {
+        runCatching {
+            val encoded = context.assets.open("lyricmakerpro_watermark.png.b64").bufferedReader().use { it.readText() }
+            val bytes = android.util.Base64.decode(encoded, android.util.Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        }.getOrNull()
+    }
     var isFullscreen by remember { mutableStateOf(false) }
     var isTextDragging by remember { mutableStateOf(false) }
     val latestPositionX by rememberUpdatedState(project.typography.positionXPercent)
@@ -217,7 +228,8 @@ fun VideoPreviewPlayer(
                         height = canvasHeight,
                         spectrumBands = spectrumBands,
                         bassEnergy = bassEnergy,
-                        drawBackground = activeMedia == null
+                        drawBackground = activeMedia == null,
+                        watermarkBitmap = watermarkBitmap
                     )
                 }
 
@@ -383,7 +395,7 @@ private fun FullscreenPreviewCanvas(
                 }
             }
             Canvas(Modifier.fillMaxSize()) {
-                drawInto(this, project, playheadMs, size.width.toInt(), size.height.toInt(), spectrumBands, bassEnergy, activeMedia == null)
+                drawInto(this, project, playheadMs, size.width.toInt(), size.height.toInt(), spectrumBands, bassEnergy, activeMedia == null, watermarkBitmap)
             }
         }
     }
@@ -397,7 +409,8 @@ private fun drawInto(
     height: Int,
     spectrumBands: FloatArray,
     bassEnergy: Float,
-    drawBackground: Boolean = true
+    drawBackground: Boolean = true,
+    watermarkBitmap: Bitmap? = null
 ) {
     val native = drawScope.drawContext.canvas.nativeCanvas
 
@@ -710,15 +723,17 @@ private fun drawInto(
         }
     }
 
-    // 4. Watermark
-    if (project.showWatermark && project.watermarkText.isNotBlank()) {
-        val wmPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-            textSize = (width * 0.035f).coerceAtLeast(16f)
-            color = AndroidColor.WHITE
-            alpha = 100
-            textAlign = AndroidPaint.Align.RIGHT
+    // 4. Image watermark (same artwork and sizing as the exported video).
+    if (project.showWatermark && watermarkBitmap != null && !watermarkBitmap.isRecycled) {
+        val targetWidth = width * 0.10f
+        val targetHeight = targetWidth * watermarkBitmap.height / watermarkBitmap.width
+        val right = width * 0.97f
+        val bottom = height * 0.965f
+        val destination = android.graphics.RectF(right - targetWidth, bottom - targetHeight, right, bottom)
+        val wmPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG or AndroidPaint.FILTER_BITMAP_FLAG).apply {
+            alpha = 179
         }
-        native.drawText(project.watermarkText, width * 0.94f, height * 0.95f, wmPaint)
+        native.drawBitmap(watermarkBitmap, null, destination, wmPaint)
     }
 }
 
