@@ -246,7 +246,7 @@ class VideoExportEngine(private val context: Context) {
                 Canvas(bitmap), width, height, project.visualizer, project.visualizerColorHex,
                 frameTimeMs, project.audioTrack.bpm, project.audioTrack.waveformPeaks, project.durationMs,
                 project.audioTrack.artist.ifBlank { project.artist }, project.audioTrack.title,
-                project.audioTrack.spectrumFrames, project.audioTrack.analysisFrameDurationMs
+                project.audioTrack.spectrumFrames, project.audioTrack.analysisFrameDurationMs, project.audioTrack.beatTimesMs
             )
             owner.drawLyrics(Canvas(bitmap), width, height, project, frameTimeMs)
             if (project.showWatermark) {
@@ -555,7 +555,8 @@ class VideoExportEngine(private val context: Context) {
         metadataArtist: String = "",
         metadataTitle: String = "",
         spectrumFrames: List<List<Float>> = emptyList(),
-        analysisFrameDurationMs: Long = 23L
+        analysisFrameDurationMs: Long = 23L,
+        beatTimesMs: List<Long> = emptyList()
     ) {
         if (type == VisualizerType.NONE) return
 
@@ -564,7 +565,8 @@ class VideoExportEngine(private val context: Context) {
         val beatPhase = (timeMs % beatIntervalMs) / beatIntervalMs
         val fallbackBeat = (1f - (beatPhase * 2.8f).toFloat()).coerceIn(0f, 1f)
         val envelopeBands = if (spectrumFrames.isNotEmpty()) AudioSpectrumAnalyzer.bandsAt(spectrumFrames, timeMs, analysisFrameDurationMs) else AudioGlowVisualizerRenderer.bandsFromEnvelope(waveformPeaks, timeMs, durationMs)
-        val kickEnergy = if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) envelopeBands[0] else fallbackBeat
+        val detectedBeat = AudioSpectrumAnalyzer.beatPulseAt(beatTimesMs, timeMs)
+        val kickEnergy = max(if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) envelopeBands.take(6).average().toFloat() else fallbackBeat, detectedBeat)
         fun bandLevel(index: Int): Float = if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) {
             envelopeBands[index.mod(envelopeBands.size)]
         } else {
