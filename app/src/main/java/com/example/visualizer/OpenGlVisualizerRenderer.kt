@@ -54,7 +54,41 @@ object OpenGlVisualizerRenderer {
         uniform float uBands[32];
 
         const float PI = 3.14159265359;
-        float bandAt(int i) { return clamp(uBands[i], 0.015, 1.0); }
+        float bandAt(int i) {
+            if (i == 0) return clamp(uBands[0], 0.015, 1.0);
+            if (i == 1) return clamp(uBands[1], 0.015, 1.0);
+            if (i == 2) return clamp(uBands[2], 0.015, 1.0);
+            if (i == 3) return clamp(uBands[3], 0.015, 1.0);
+            if (i == 4) return clamp(uBands[4], 0.015, 1.0);
+            if (i == 5) return clamp(uBands[5], 0.015, 1.0);
+            if (i == 6) return clamp(uBands[6], 0.015, 1.0);
+            if (i == 7) return clamp(uBands[7], 0.015, 1.0);
+            if (i == 8) return clamp(uBands[8], 0.015, 1.0);
+            if (i == 9) return clamp(uBands[9], 0.015, 1.0);
+            if (i == 10) return clamp(uBands[10], 0.015, 1.0);
+            if (i == 11) return clamp(uBands[11], 0.015, 1.0);
+            if (i == 12) return clamp(uBands[12], 0.015, 1.0);
+            if (i == 13) return clamp(uBands[13], 0.015, 1.0);
+            if (i == 14) return clamp(uBands[14], 0.015, 1.0);
+            if (i == 15) return clamp(uBands[15], 0.015, 1.0);
+            if (i == 16) return clamp(uBands[16], 0.015, 1.0);
+            if (i == 17) return clamp(uBands[17], 0.015, 1.0);
+            if (i == 18) return clamp(uBands[18], 0.015, 1.0);
+            if (i == 19) return clamp(uBands[19], 0.015, 1.0);
+            if (i == 20) return clamp(uBands[20], 0.015, 1.0);
+            if (i == 21) return clamp(uBands[21], 0.015, 1.0);
+            if (i == 22) return clamp(uBands[22], 0.015, 1.0);
+            if (i == 23) return clamp(uBands[23], 0.015, 1.0);
+            if (i == 24) return clamp(uBands[24], 0.015, 1.0);
+            if (i == 25) return clamp(uBands[25], 0.015, 1.0);
+            if (i == 26) return clamp(uBands[26], 0.015, 1.0);
+            if (i == 27) return clamp(uBands[27], 0.015, 1.0);
+            if (i == 28) return clamp(uBands[28], 0.015, 1.0);
+            if (i == 29) return clamp(uBands[29], 0.015, 1.0);
+            if (i == 30) return clamp(uBands[30], 0.015, 1.0);
+            if (i == 31) return clamp(uBands[31], 0.015, 1.0);
+            return 0.08;
+        }
         float hash(float n) { return fract(sin(n) * 43758.5453123); }
         float lineGlow(float d, float width) { return exp(-pow(d / max(width, 0.0005), 2.0)); }
         vec3 rainbow(float t) {
