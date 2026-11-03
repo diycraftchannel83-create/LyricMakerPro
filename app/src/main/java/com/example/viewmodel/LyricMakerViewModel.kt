@@ -11,6 +11,7 @@ import com.winsmediatama.lyricmakerpro.audio.AudioWaveformExtractor
 import com.winsmediatama.lyricmakerpro.data.PresetLibrary
 import com.winsmediatama.lyricmakerpro.export.VideoExportEngine
 import com.winsmediatama.lyricmakerpro.model.*
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.io.File
