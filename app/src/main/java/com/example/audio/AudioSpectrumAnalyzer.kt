@@ -152,6 +152,20 @@ object AudioSpectrumAnalyzer {
         return if (elapsed in 0..decayMs) (1f - elapsed.toFloat() / decayMs.coerceAtLeast(1L)).coerceIn(0f, 1f) else 0f
     }
 
+    fun beatPulseAt(events: List<Long>, timeMs: Long): Float {
+        if (events.isEmpty()) return 0f
+        var low = 0
+        var high = events.lastIndex
+        var match = -1
+        while (low <= high) {
+            val mid = (low + high) ushr 1
+            if (events[mid] <= timeMs) { match = mid; low = mid + 1 } else high = mid - 1
+        }
+        if (match < 0) return 0f
+        val elapsed = timeMs - events[match]
+        return if (elapsed in 0L..150L) (1f - elapsed / 150f).coerceIn(0f, 1f) else 0f
+    }
+
     private fun fft(source: FloatArray): FloatArray {
         val re = source.copyOf(); val im = FloatArray(N)
         for (i in 0 until N) re[i] *= (0.5 - 0.5 * cos(2.0 * PI * i / (N - 1))).toFloat()
