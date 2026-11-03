@@ -28,7 +28,7 @@ class AudioEngine(private val context: Context) {
     val playheadMs = _playheadMs.asStateFlow()
 
     // 16-band normalized spectrum levels (0.0f .. 1.0f) for visualizer
-    private val _spectrumBands = MutableStateFlow(FloatArray(16) { 0.1f })
+    private val _spectrumBands = MutableStateFlow(FloatArray(32) { 0.1f })
     val spectrumBands = _spectrumBands.asStateFlow()
 
     private val _bassEnergy = MutableStateFlow(0.1f)
