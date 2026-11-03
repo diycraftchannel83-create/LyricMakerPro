@@ -317,6 +317,82 @@ object AudioGlowVisualizerRenderer {
         canvas.drawLine(width * 0.015f, baseY, width * 0.985f, baseY, baseline)
     }
 
+
+    /** Transparent multicolor sine-wave mesh inspired by the supplied reference. */
+    fun drawSinBars(canvas: Canvas, width: Int, height: Int, timeMs: Long, bands: FloatArray) {
+        if (width <= 0 || height <= 0) return
+        val minSide = min(width, height).toFloat()
+        val centerY = height * 0.53f
+        val count = 112
+        val stepX = width.toFloat() / (count - 1)
+        val colors = intArrayOf(Color.CYAN, Color.rgb(0,145,255), Color.rgb(45,245,220), Color.rgb(110,100,255), Color.rgb(0,255,190), Color.rgb(30,190,255))
+        fun energy(i: Int): Float = bands.getOrElse((i * 32 / count).coerceIn(0,31)) { 0.2f }.coerceIn(0.025f,1f)
+        fun wave(i: Int, lane: Int): Float {
+            val x = i.toDouble() / (count - 1)
+            val env = (0.12 + 0.88 * (0.5 + 0.5 * sin(x * PI * 2.0 + 0.35))).toFloat()
+            val phase = x * 7.0 * PI + timeMs * 0.0017 + lane * 0.22
+            val amp = height * (0.012f + energy(i) * 0.31f) * env
+            return centerY + sin(phase).toFloat() * amp + sin(phase * 2.15 + lane * 0.17).toFloat() * amp * 0.16f
+        }
+        // Seven translucent waveform strands.
+        for (lane in -3..3) {
+            val path = Path()
+            for (i in 0 until count) {
+                val x = i * stepX
+                if (i == 0) path.moveTo(x, wave(i,lane)) else path.lineTo(x, wave(i,lane))
+            }
+            val tint = colors[lane + 3]
+            val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeWidth = minSide * 0.010f
+                color = withAlpha(tint, 28); setShadowLayer(minSide * 0.018f,0f,0f,tint)
+            }
+            canvas.drawPath(path, halo)
+            val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeWidth = minSide * (if (lane == 0) 0.0034f else 0.0015f)
+                color = withAlpha(tint, if (lane == 0) 205 else 92)
+            }
+            canvas.drawPath(path, line)
+        }
+        // Fine triangular mesh and glowing nodes.
+        val mesh = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = max(1f,minSide*0.00085f) }
+        val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+        for (i in 0 until count-1) {
+            val x1=i*stepX; val x2=(i+1)*stepX
+            val top1=wave(i,-2); val mid1=wave(i,0); val bot1=wave(i,2)
+            val top2=wave(i+1,-2); val mid2=wave(i+1,0); val bot2=wave(i+1,2)
+            val tint=colors[(i/18)%colors.size]
+            mesh.color=withAlpha(tint,48+(energy(i)*65).toInt())
+            canvas.drawLine(x1,top1,x2,mid2,mesh); canvas.drawLine(x1,mid1,x2,top2,mesh)
+            canvas.drawLine(x1,mid1,x2,bot2,mesh); canvas.drawLine(x1,bot1,x2,mid2,mesh)
+            if (i%3==0) {
+                val r=minSide*(0.0014f+energy(i)*0.0032f)
+                dot.color=withAlpha(tint,115+(energy(i)*130).toInt())
+                dot.setShadowLayer(r*5f,0f,0f,tint); canvas.drawCircle(x1,mid1,r,dot); dot.clearShadowLayer()
+            }
+        }
+        // Bright central beam remains an overlay; no opaque background is drawn.
+        val beam=Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style=Paint.Style.STROKE; strokeWidth=minSide*0.006f
+            shader=LinearGradient(0f,centerY,width.toFloat(),centerY,intArrayOf(Color.TRANSPARENT,Color.CYAN,Color.rgb(0,145,255),Color.CYAN,Color.TRANSPARENT),null,Shader.TileMode.CLAMP)
+            setShadowLayer(minSide*0.025f,0f,0f,Color.CYAN)
+        }
+        canvas.drawLine(0f,centerY,width.toFloat(),centerY,beam)
+        beam.shader=null; beam.clearShadowLayer(); beam.strokeWidth=max(1f,minSide*0.0012f); beam.color=withAlpha(Color.WHITE,190)
+        canvas.drawLine(0f,centerY,width.toFloat(),centerY,beam)
+        for (i in 0 until 48) {
+            val seed=i*91.7
+            val x=((sin(seed*0.73)*0.5+0.5)*width).toFloat()
+            val n=(x/width*(count-1)).toInt().coerceIn(0,count-1)
+            val y=wave(n,(i%7)-3)+cos(seed*1.31+timeMs*0.001).toFloat()*height*0.035f
+            val r=minSide*(0.0014f+(i%4)*0.0008f); val tint=colors[i%colors.size]
+            val p=Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color=withAlpha(tint,120+((sin(timeMs*0.003+seed)*0.5+0.5)*135).toInt())
+                setShadowLayer(r*7f,0f,0f,tint)
+            }
+            canvas.drawCircle(x,y,r,p)
+        }
+    }
+
     private fun withAlpha(color: Int, alpha: Int): Int =
         (color and 0x00FFFFFF) or (alpha.coerceIn(0, 255) shl 24)
 }
