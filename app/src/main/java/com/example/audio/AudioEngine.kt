@@ -4,7 +4,10 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
-import android.media.MediaPlayer
+import android.os.Looper
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import android.net.Uri
 import com.winsmediatama.lyricmakerpro.model.AudioBeatType
 import com.winsmediatama.lyricmakerpro.model.AudioTrackConfig
@@ -15,9 +18,9 @@ import kotlin.math.*
 
 class AudioEngine(private val context: Context) {
 
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
 
-    private var mediaPlayer: MediaPlayer? = null
+    private val exoPlayer: ExoPlayer = ExoPlayer.Builder(context.applicationContext).setLooper(Looper.getMainLooper()).build()
     private var synthAudioTrack: AudioTrack? = null
     private var synthPlayJob: Job? = null
 
@@ -54,37 +57,22 @@ class AudioEngine(private val context: Context) {
 
         if (track.beatType == AudioBeatType.CUSTOM_FILE && track.customUri != null) {
             isCustomFile = true
-            initCustomMediaPlayer(track.customUri)
+            initCustomExoPlayer(track.customUri)
         } else {
             isCustomFile = false
-            mediaPlayer?.release()
-            mediaPlayer = null
+            exoPlayer.stop()
+            exoPlayer.clearMediaItems()
         }
     }
 
-    private fun initCustomMediaPlayer(uriString: String) {
-        try {
-            mediaPlayer?.release()
-            mediaPlayer = MediaPlayer().apply {
-                setDataSource(context, Uri.parse(uriString))
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .build()
-                )
-                prepare()
-                isLooping = false
-                setOnCompletionListener {
-                    // Loop at the actual decoded media duration rather than stale project metadata.
-                    if (_isPlaying.value) {
-                        seekTo(0)
-                        start()
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
+    private fun initCustomExoPlayer(uriString: String) {
+        runCatching {
+            exoPlayer.pause()
+            exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(uriString)))
+            exoPlayer.repeatMode = Player.REPEAT_MODE_ONE
+            exoPlayer.prepare()
+        }.onFailure { error ->
+            error.printStackTrace()
             isCustomFile = false
         }
     }
@@ -95,7 +83,7 @@ class AudioEngine(private val context: Context) {
 
         // Built-in beat types are visual/demo presets only. Real playback is
         // available only when the user imports an audio file.
-        if (track.beatType != AudioBeatType.CUSTOM_FILE || mediaPlayer == null) {
+        if (track.beatType != AudioBeatType.CUSTOM_FILE || exoPlayer.mediaItemCount == 0) {
             _isPlaying.value = false
             return
         }
@@ -104,8 +92,8 @@ class AudioEngine(private val context: Context) {
         playbackStartSystemTime = System.currentTimeMillis()
         playheadOffsetOnStart = _playheadMs.value
 
-        mediaPlayer?.seekTo(_playheadMs.value.toInt())
-        mediaPlayer?.start()
+        exoPlayer.seekTo(_playheadMs.value)
+        exoPlayer.play()
 
         startTicker(track)
     }
@@ -115,7 +103,7 @@ class AudioEngine(private val context: Context) {
         _isPlaying.value = false
 
         if (isCustomFile) {
-            mediaPlayer?.pause()
+            exoPlayer.pause()
         } else {
             stopSynthTrack()
         }
@@ -144,7 +132,7 @@ class AudioEngine(private val context: Context) {
         playbackStartSystemTime = System.currentTimeMillis()
 
         if (isCustomFile) {
-            mediaPlayer?.seekTo(clamped.toInt())
+            exoPlayer.seekTo(clamped)
         } else if (_isPlaying.value) {
             stopSynthTrack()
             startSynthesizedPlayback(track, clamped)
@@ -163,18 +151,20 @@ class AudioEngine(private val context: Context) {
         tickerJob?.cancel()
         tickerJob = scope.launch {
             while (isActive && _isPlaying.value) {
-                // MediaPlayer is the playback clock. A wall-clock ticker drifts during
-                // buffering, audio focus changes, and device load.
-                val player = mediaPlayer
-                val position = if (isCustomFile && player != null) {
-                    runCatching { player.currentPosition.toLong() }.getOrDefault(_playheadMs.value)
+                // ExoPlayer is the playback clock; do not estimate media time from wall clock.
+                val position = if (isCustomFile) {
+                    runCatching { exoPlayer.currentPosition }.getOrDefault(_playheadMs.value)
                 } else {
                     val elapsed = System.currentTimeMillis() - playbackStartSystemTime
                     (playheadOffsetOnStart + elapsed).coerceAtMost(track.durationMs)
                 }
-                _playheadMs.value = position.coerceAtLeast(0L)
-                updateSpectrumForPosition(_playheadMs.value, track)
-                delay(16) // Keep the audio feature clock close to a 60Hz visualizer frame cadence.
+                val safePosition = position.coerceAtLeast(0L)
+                // Publish playhead at 20 Hz; keep visualizer analysis at approximately 60 Hz.
+                if (safePosition != _playheadMs.value &&
+                    (safePosition - _playheadMs.value >= 50L || safePosition < _playheadMs.value)
+                ) _playheadMs.value = safePosition
+                updateSpectrumForPosition(safePosition, track)
+                delay(16) // Visualizer feature clock: approximately 60 Hz.
             }
         }
     }
@@ -395,8 +385,7 @@ class AudioEngine(private val context: Context) {
 
     fun release() {
         stop()
-        mediaPlayer?.release()
-        mediaPlayer = null
+        exoPlayer.release()
         scope.cancel()
     }
 }
