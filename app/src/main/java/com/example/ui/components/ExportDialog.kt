@@ -42,7 +42,7 @@ fun ExportDialog(
     onDismiss: () -> Unit
 ) {
     var selectedQuality by remember { mutableStateOf(ExportQuality.FULL_HD_1080P) }
-    var selectedDurationSec by remember { mutableIntStateOf(15) }
+    var selectedDurationSec by remember { mutableIntStateOf(0) }
 
     AlertDialog(
         onDismissRequest = { if (!isExporting) onDismiss() },
