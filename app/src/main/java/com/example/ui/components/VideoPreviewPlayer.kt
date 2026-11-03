@@ -493,25 +493,7 @@ private fun drawInto(
         )
     }
     when (project.visualizer) {
-        VisualizerType.BARS_SPECTRUM -> {
-            val barCount = 16
-            val spacing = width * 0.012f
-            val totalW = width * 0.88f
-            val barW = (totalW - (spacing * (barCount - 1))) / barCount
-            val startX = (width - totalW) / 2f
-            val baseY = height * 0.82f
-            val maxH = height * 0.16f
-
-            val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply { style = AndroidPaint.Style.FILL }
-
-            for (i in 0 until barCount) {
-                val bandLevel = spectrumBands.getOrElse(i) { 0.2f }
-                val barH = (bandLevel * maxH).coerceAtLeast(6f)
-                val x = startX + i * (barW + spacing)
-                paint.shader = LinearGradient(x, baseY - barH, x, baseY, intArrayOf(visColor, AndroidColor.MAGENTA), null, Shader.TileMode.CLAMP)
-                native.drawRoundRect(x, baseY - barH, x + barW, baseY, barW / 2f, barW / 2f, paint)
-            }
-        }
+        VisualizerType.BARS_SPECTRUM -> {} // Drawn by AudioGlowVisualizerRenderer above.
         VisualizerType.CIRCULAR_WAVE -> {
             val cx = width / 2f
             val cy = height * 0.35f
