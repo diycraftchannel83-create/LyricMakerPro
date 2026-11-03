@@ -220,7 +220,8 @@ object AudioGlowVisualizerRenderer {
     fun drawClassicSpectrum(canvas: Canvas, width: Int, height: Int, timeMs: Long,
         bands: FloatArray, artist: String, trackTitle: String) {
         if (width <= 0 || height <= 0) return
-        canvas.drawColor(Color.BLACK)
+        // This renderer is an overlay above imported photos/videos. Never paint an
+        // opaque full-frame background here; preserve the underlying media pixels.
         val minSide = min(width, height).toFloat()
         val baseY = height * 0.665f
         val count = 16
