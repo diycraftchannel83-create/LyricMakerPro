@@ -285,7 +285,7 @@ object AudioGlowVisualizerRenderer {
                     moveTo(x + skew, top); lineTo(x + barWidth, top)
                     lineTo(x + barWidth - skew, top + segmentHeight); lineTo(x, top + segmentHeight); close()
                 }
-                paint.alpha = 242
+                paint.alpha = 185
                 paint.setShadowLayer(height * 0.008f, 0f, 0f, tint)
                 canvas.drawPath(bar, paint)
                 paint.clearShadowLayer()
@@ -294,12 +294,12 @@ object AudioGlowVisualizerRenderer {
                     moveTo(x, reflectionTop); lineTo(x + barWidth - skew, reflectionTop)
                     lineTo(x + barWidth, reflectionTop + segmentHeight); lineTo(x + skew, reflectionTop + segmentHeight); close()
                 }
-                paint.alpha = (82 * (1f - segment / (stack + 1f))).toInt()
+                paint.alpha = (58 * (1f - segment / (stack + 1f))).toInt()
                 canvas.drawPath(reflection, paint)
             }
             val peakY = baseY - stack * (segmentHeight + segmentGap) - height * 0.018f
             val cap = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.WHITE; strokeWidth = max(1f, height * 0.0024f)
+                color = withAlpha(Color.WHITE, 190); strokeWidth = max(1f, height * 0.0024f)
                 setShadowLayer(height * 0.008f, 0f, 0f, Color.WHITE)
             }
             canvas.drawLine(x - barWidth * 0.05f, peakY, x + barWidth * 1.05f, peakY, cap)
@@ -357,7 +357,7 @@ object AudioGlowVisualizerRenderer {
             canvas.drawPath(path, halo)
             val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 style = Paint.Style.STROKE; strokeWidth = minSide * (if (lane == 0) 0.0034f else 0.0015f)
-                color = withAlpha(tint, if (lane == 0) 205 else 92)
+                color = withAlpha(tint, if (lane == 0) 175 else 68)
             }
             canvas.drawPath(path, line)
         }
@@ -385,7 +385,7 @@ object AudioGlowVisualizerRenderer {
             setShadowLayer(minSide*0.025f,0f,0f,Color.CYAN)
         }
         canvas.drawLine(0f,centerY,width.toFloat(),centerY,beam)
-        beam.shader=null; beam.clearShadowLayer(); beam.strokeWidth=max(1f,minSide*0.0012f); beam.color=withAlpha(Color.WHITE,190)
+        beam.shader=null; beam.clearShadowLayer(); beam.strokeWidth=max(1f,minSide*0.0012f); beam.color=withAlpha(Color.WHITE,165)
         canvas.drawLine(0f,centerY,width.toFloat(),centerY,beam)
         for (i in 0 until 48) {
             val seed=i*91.7
@@ -398,6 +398,104 @@ object AudioGlowVisualizerRenderer {
                 setShadowLayer(r*7f,0f,0f,tint)
             }
             canvas.drawCircle(x,y,r,p)
+        }
+    }
+
+    /**
+     * Transparent 3D terrain spectrum. The layered ridges and perspective mesh react
+     * to the audio envelope while leaving the imported photo/video visible underneath.
+     */
+    fun drawTerrainBars(canvas: Canvas, width: Int, height: Int, timeMs: Long, bands: FloatArray) {
+        if (width <= 0 || height <= 0) return
+        val minSide = min(width, height).toFloat()
+        val columns = 84
+        val rows = 9
+        val horizon = height * 0.43f
+        val stepX = width.toFloat() / (columns - 1)
+        val colors = intArrayOf(
+            Color.rgb(0, 235, 255),
+            Color.rgb(35, 155, 255),
+            Color.rgb(95, 95, 255),
+            Color.rgb(190, 65, 255),
+            Color.rgb(255, 55, 190),
+            Color.rgb(65, 220, 255),
+            Color.rgb(0, 245, 205)
+        )
+        fun energy(column: Int): Float {
+            val index = (column * 32 / columns).coerceIn(0, 31)
+            return bands.getOrElse(index) { 0.12f }.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0.12f
+        }
+        fun point(column: Int, row: Int): Pair<Float, Float> {
+            val xNorm = column.toFloat() / (columns - 1)
+            val depth = row.toFloat() / (rows - 1)
+            val x = column * stepX
+            val band = energy(column)
+            val travel = timeMs * 0.00048 + row * 0.31
+            val ridgeA = kotlin.math.abs(sin(xNorm * PI * 2.25 + travel * 0.28))
+            val ridgeB = kotlin.math.abs(sin(xNorm * PI * 4.1 - travel * 0.19 + 0.7))
+            val envelope = (0.24 + ridgeA * 0.48 + ridgeB * 0.28).toFloat()
+            val amplitude = height * (0.018f + band * 0.17f) * (0.42f + depth * 0.9f)
+            val wave = (envelope * amplitude) +
+                sin(xNorm * PI * 7.0 + travel).toFloat() * height * (0.008f + band * 0.025f)
+            val y = horizon + depth * height * 0.105f - wave
+            return x to y
+        }
+
+        // Back-to-front terrain ridges. Strokes only: never paint a solid backdrop.
+        for (row in 0 until rows) {
+            val path = Path()
+            for (column in 0 until columns) {
+                val (x, y) = point(column, row)
+                if (column == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            val tint = colors[(row * 3) % colors.size]
+            val alpha = (48 + row * 7).coerceIn(48, 104)
+            val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeCap = Paint.Cap.ROUND
+                strokeJoin = Paint.Join.ROUND
+                strokeWidth = minSide * (0.009f - row * 0.00045f).coerceAtLeast(0.003f)
+                color = withAlpha(tint, (alpha * 0.52f).toInt())
+                setShadowLayer(minSide * 0.018f, 0f, 0f, tint)
+            }
+            canvas.drawPath(path, glow)
+            val ridge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeCap = Paint.Cap.ROUND
+                strokeJoin = Paint.Join.ROUND
+                strokeWidth = max(1f, minSide * (0.0027f - row * 0.00012f))
+                color = withAlpha(tint, alpha)
+            }
+            canvas.drawPath(path, ridge)
+        }
+
+        // Perspective cross-mesh connects the ridges into a 3D wireframe landscape.
+        val mesh = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = max(1f, minSide * 0.00105f)
+        }
+        for (column in 0 until columns step 4) {
+            val path = Path()
+            for (row in 0 until rows) {
+                val (x, y) = point(column, row)
+                if (row == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            val tint = colors[(column / 12) % colors.size]
+            mesh.color = withAlpha(tint, (34 + energy(column) * 66).toInt())
+            canvas.drawPath(path, mesh)
+        }
+
+        // A few luminous audio peaks emphasize the terrain silhouette without filling it.
+        for (column in 2 until columns step 7) {
+            val (x, y) = point(column, rows - 1)
+            val band = energy(column)
+            val radius = minSide * (0.002f + band * 0.004f)
+            val tint = colors[(column / 7) % colors.size]
+            val node = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = withAlpha(tint, (80 + band * 115).toInt())
+                setShadowLayer(radius * 6f, 0f, 0f, tint)
+            }
+            canvas.drawCircle(x, y, radius, node)
         }
     }
 
