@@ -474,16 +474,6 @@ private fun drawInto(
         }
     }
 
-    // Render every visualizer on a translucent overlay so imported media remains visible.
-    val visualizerLayer = native.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), 210)
-    // Reference-style rainbow bars share the same metadata-aware renderer as MP4 export.
-    if (project.visualizer == VisualizerType.BARS_SPECTRUM) {
-        val bars = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty())
-            AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
-        else activeBands
-        AudioGlowVisualizerRenderer.drawClassicSpectrum(native, width, height, timeMs, bars,
-            project.audioTrack.artist, project.audioTrack.title)
-    }
     // 2. Visualizer Overlay — restore the exact legacy preview rendering from pre-PR #39.
     // Keep these six established styles on their original drawing paths. The newer
     // Audio Glow collection remains available separately and does not alter legacy looks.
