@@ -188,6 +188,18 @@ class AudioEngine(private val context: Context) {
 
         // The cached waveform is an amplitude envelope, not a frequency spectrum.
         // Use it only for transient energy and keep BPM as a graceful fallback.
+        if (track.spectrumFrames.isNotEmpty()) {
+            val cached = AudioSpectrumAnalyzer.bandsAt(track.spectrumFrames, positionMs, track.analysisFrameDurationMs)
+            for (i in smoothedBands.indices) {
+                val target = cached[i]
+                smoothedBands[i] += (target - smoothedBands[i]) * if (target > smoothedBands[i]) 0.72f else 0.18f
+            }
+            val bassTarget = cached.take(6).average().toFloat()
+            smoothedBass += (bassTarget - smoothedBass) * if (bassTarget > smoothedBass) 0.75f else 0.16f
+            _spectrumBands.value = smoothedBands.copyOf()
+            _bassEnergy.value = smoothedBass
+            return
+        }
         val peaks = track.waveformPeaks
         val envelope = if (peaks.isNotEmpty() && track.durationMs > 0L) {
             val index = ((positionMs.toDouble() / track.durationMs) * peaks.size)
