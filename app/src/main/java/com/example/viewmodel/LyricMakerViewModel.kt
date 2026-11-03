@@ -222,7 +222,9 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         val old = current[index]
         val previous = current.getOrNull(index - 1)
         val minimumStart = (previous?.endMs ?: 0L) + if (previous == null) 0L else 1L
-        val newStart = (old.startMs + deltaMs).coerceIn(minimumStart, old.endMs - 300L)
+        val maximumStart = old.endMs - 300L
+        if (maximumStart < minimumStart) return
+        val newStart = (old.startMs + deltaMs).coerceIn(minimumStart, maximumStart)
         _project.value = _project.value.copy(
             lyrics = current.toMutableList().apply { this[index] = resizeLyricLine(old, newStart, old.endMs) }
         )
@@ -236,7 +238,9 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         val old = current[index]
         val next = current.getOrNull(index + 1)
         val maximumEnd = (next?.startMs ?: Long.MAX_VALUE) - if (next == null) 0L else 1L
-        val newEnd = (old.endMs + deltaMs).coerceIn(old.startMs + 300L, maximumEnd.coerceAtLeast(old.startMs + 300L))
+        val minimumEnd = old.startMs + 300L
+        if (maximumEnd < minimumEnd) return
+        val newEnd = (old.endMs + deltaMs).coerceIn(minimumEnd, maximumEnd)
         _project.value = _project.value.copy(
             lyrics = current.toMutableList().apply { this[index] = resizeLyricLine(old, old.startMs, newEnd) }
         )
