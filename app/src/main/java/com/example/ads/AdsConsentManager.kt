@@ -34,11 +34,11 @@ class AdsConsentManager {
             {
                 if (activity.isFinishing || activity.isDestroyed) {
                     requestInProgress = false
-                    return@requestConsentInfoUpdate
-                }
-                UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) {
-                    requestInProgress = false
-                    refreshState(information)
+                } else {
+                    UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) {
+                        requestInProgress = false
+                        refreshState(information)
+                    }
                 }
             },
             {
