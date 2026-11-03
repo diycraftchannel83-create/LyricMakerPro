@@ -130,6 +130,7 @@ class MainActivity : ComponentActivity() {
 
                 val showTemplatesSheet by viewModel.showTemplatesSheet.collectAsStateWithLifecycle()
                 var showSaveProjectDialog by rememberSaveable { mutableStateOf(false) }
+                var showNewProjectDialog by rememberSaveable { mutableStateOf(false) }
                 var saveProjectName by rememberSaveable { mutableStateOf(project.title) }
 
                 val lyricsPicker = rememberLauncherForActivityResult(
@@ -286,6 +287,7 @@ class MainActivity : ComponentActivity() {
                                     .onSuccess { Toast.makeText(this@MainActivity, "LRC saved successfully", Toast.LENGTH_LONG).show() }
                                     .onFailure { Toast.makeText(this@MainActivity, "LRC save failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show() }
                             },
+                            onNewProject = { showNewProjectDialog = true },
                             onExit = {
                                 viewModel.audioEngine.stop()
                                 finishAffinity()
@@ -476,6 +478,33 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
+                    if (showNewProjectDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showNewProjectDialog = false },
+                            containerColor = StudioSurface,
+                            title = { Text("Create New Project", color = TextPrimary, fontWeight = FontWeight.Bold) },
+                            text = {
+                                Text(
+                                    "This will clear the current audio, lyrics, and all timeline clips. Previously saved projects will remain available.",
+                                    color = TextSecondary
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    viewModel.createNewProject()
+                                    showNewProjectDialog = false
+                                    saveProjectName = "Untitled Project"
+                                    Toast.makeText(this@MainActivity, "New project created", Toast.LENGTH_SHORT).show()
+                                }) { Text("New Project", color = NeonCyan) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showNewProjectDialog = false }) {
+                                    Text("Cancel", color = TextSecondary)
+                                }
+                            }
+                        )
+                    }
+
                     if (isTapToSyncActive) {
                         TapToSyncModal(
                             project = project,
@@ -545,6 +574,7 @@ private fun StudioTopAppBar(
     onOpenProject: () -> Unit,
     onSaveProject: () -> Unit,
     onSaveLrc: () -> Unit,
+    onNewProject: () -> Unit,
     onExit: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -617,6 +647,11 @@ private fun StudioTopAppBar(
                             onClick = { menuExpanded = false; onPickLyrics() }
                         )
                         HorizontalDivider(color = StudioCardBorder)
+                        DropdownMenuItem(
+                            text = { Text(tr("New Project")) },
+                            leadingIcon = { Icon(Icons.Default.NoteAdd, null, tint = NeonCyan) },
+                            onClick = { menuExpanded = false; onNewProject() }
+                        )
                         DropdownMenuItem(
                             text = { Text(tr("Open Project")) },
                             leadingIcon = { Icon(Icons.Default.FolderOpen, null) },
