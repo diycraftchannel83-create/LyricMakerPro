@@ -99,6 +99,7 @@ dependencies {
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
+  implementation(libs.androidx.media3.exoplayer)
   implementation(libs.androidx.media3.transformer)
   implementation(libs.androidx.media3.effect)
   // implementation(libs.androidx.datastore.preferences)
