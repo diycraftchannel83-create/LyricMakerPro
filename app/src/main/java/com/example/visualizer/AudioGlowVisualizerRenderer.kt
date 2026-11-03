@@ -301,8 +301,11 @@ object AudioGlowVisualizerRenderer {
     }
 
     /** Reference-style rainbow spectrum bars with metadata header and mirrored neon reflection. */
-    fun drawClassicSpectrum(canvas: Canvas, width: Int, height: Int, timeMs: Long,
-        bands: FloatArray, artist: String, trackTitle: String) {
+    fun drawClassicSpectrum(
+        canvas: Canvas, width: Int, height: Int, timeMs: Long,
+        bands: FloatArray, artist: String, trackTitle: String,
+        exportPerformanceMode: Boolean = false
+    ) {
         if (width <= 0 || height <= 0) return
         // This renderer is an overlay above imported photos/videos. Never paint an
         // opaque full-frame background here; preserve the underlying media pixels.
@@ -337,7 +340,7 @@ object AudioGlowVisualizerRenderer {
 
         // Fine, colorful floating particles over a pure black canvas.
         val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        for (i in 0 until 115) {
+        for (i in 0 until if (exportPerformanceMode) 42 else 115) {
             val seed = i * 127.1
             val x = ((sin(seed * 0.73) * 0.5 + 0.5) * width).toFloat()
             val y = ((cos(seed * 1.17) * 0.5 + 0.5) * height * 0.76f).toFloat()
@@ -353,17 +356,20 @@ object AudioGlowVisualizerRenderer {
         val startX = (width - totalWidth) / 2f
         for (i in 0 until count) {
             val energy = bands.getOrElse(i) { 0.25f }.coerceIn(0.04f, 1f)
-            val stack = (2 + (energy * 7.2f * (0.88f + 0.12f * sin(timeMs * 0.004 + i * 0.7).toFloat())).toInt()).coerceIn(2, 9)
+            val maxStack = if (exportPerformanceMode) 7 else 9
+            val stack = (2 + (energy * 7.2f * (0.88f + 0.12f * sin(timeMs * 0.004 + i * 0.7).toFloat())).toInt()).coerceIn(2, maxStack)
             val x = startX + i * (barWidth + gap)
             val skew = barWidth * 0.10f
             val tint = rainbow[i]
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = tint }
             // Colored haze behind each column.
-            val haze = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                shader = RadialGradient(x + barWidth/2f, baseY, height * 0.15f,
-                    intArrayOf(withAlpha(tint, 48), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
+            if (!exportPerformanceMode) {
+                val haze = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    shader = RadialGradient(x + barWidth/2f, baseY, height * 0.15f,
+                        intArrayOf(withAlpha(tint, 48), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
+                }
+                canvas.drawCircle(x + barWidth/2f, baseY, height * 0.15f, haze)
             }
-            canvas.drawCircle(x + barWidth/2f, baseY, height * 0.15f, haze)
             for (segment in 0 until stack) {
                 val top = baseY - (segment + 1) * (segmentHeight + segmentGap)
                 val bar = Path().apply {
@@ -402,11 +408,14 @@ object AudioGlowVisualizerRenderer {
     }
 
     /** Transparent multicolor sine-wave mesh inspired by the supplied reference. */
-    fun drawSinBars(canvas: Canvas, width: Int, height: Int, timeMs: Long, bands: FloatArray) {
+    fun drawSinBars(
+        canvas: Canvas, width: Int, height: Int, timeMs: Long, bands: FloatArray,
+        exportPerformanceMode: Boolean = false
+    ) {
         if (width <= 0 || height <= 0) return
         val minSide = min(width, height).toFloat()
         val centerY = height * 0.53f
-        val count = 112
+        val count = if (exportPerformanceMode) 80 else 112
         val stepX = width.toFloat() / (count - 1)
         // Seven lanes are rendered below, so keep one dedicated tint per lane.
         // The former six-color array caused colors[6] to crash on the final lane.
@@ -472,7 +481,7 @@ object AudioGlowVisualizerRenderer {
         canvas.drawLine(0f,centerY,width.toFloat(),centerY,beam)
         beam.shader=null; beam.clearShadowLayer(); beam.strokeWidth=max(1f,minSide*0.0012f); beam.color=withAlpha(Color.WHITE,165)
         canvas.drawLine(0f,centerY,width.toFloat(),centerY,beam)
-        for (i in 0 until 48) {
+        for (i in 0 until if (exportPerformanceMode) 20 else 48) {
             val seed=i*91.7
             val x=((sin(seed*0.73)*0.5+0.5)*width).toFloat()
             val n=(x/width*(count-1)).toInt().coerceIn(0,count-1)
