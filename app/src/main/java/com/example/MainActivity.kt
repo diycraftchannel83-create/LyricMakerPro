@@ -122,10 +122,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             MyApplicationTheme {
                 val project by viewModel.project.collectAsStateWithLifecycle()
-                val isPlaying by viewModel.audioEngine.isPlaying.collectAsStateWithLifecycle()
-                val playheadMs by viewModel.audioEngine.playheadMs.collectAsStateWithLifecycle()
-                val spectrumBands by viewModel.audioEngine.spectrumBands.collectAsStateWithLifecycle()
-                val bassEnergy by viewModel.audioEngine.bassEnergy.collectAsStateWithLifecycle()
 
                 val selectedLineId by viewModel.selectedLineId.collectAsStateWithLifecycle()
                 val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
@@ -354,10 +350,7 @@ class MainActivity : ComponentActivity() {
                             Row(modifier = Modifier.fillMaxSize()) {
                                 VideoPreviewPlayer(
                                     project = project.copy(showWatermark = !hasConfirmedPermanentWatermarkRemoval),
-                                    playheadMs = playheadMs,
-                                    isPlaying = isPlaying,
-                                    spectrumBands = spectrumBands,
-                                    bassEnergy = bassEnergy,
+                                    audioEngine = viewModel.audioEngine,
                                     onTogglePlay = { viewModel.audioEngine.togglePlayPause() },
                                     onSeek = { viewModel.audioEngine.seekTo(it) },
                                     onTextPositionChange = { dx, dy -> viewModel.updateTypographyProperties(positionXPercent = project.typography.positionXPercent + dx, positionYPercent = project.typography.positionYPercent + dy) },
@@ -375,7 +368,7 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     MultiTrackTimeline(
                                         project = project,
-                                        playheadMs = playheadMs,
+                                    audioEngine = viewModel.audioEngine,
                                         selectedLineId = selectedLineId,
                                         onSelectLine = { viewModel.selectLyricLine(it) },
                                         onSeek = { viewModel.audioEngine.seekTo(it) },
@@ -414,10 +407,7 @@ class MainActivity : ComponentActivity() {
                                 Column(modifier = Modifier.fillMaxSize()) {
                                     VideoPreviewPlayer(
                                         project = project.copy(showWatermark = !hasConfirmedPermanentWatermarkRemoval),
-                                        playheadMs = playheadMs,
-                                        isPlaying = isPlaying,
-                                        spectrumBands = spectrumBands,
-                                        bassEnergy = bassEnergy,
+                                    audioEngine = viewModel.audioEngine,
                                         onTogglePlay = { viewModel.audioEngine.togglePlayPause() },
                                         onSeek = { viewModel.audioEngine.seekTo(it) },
                                         onTextPositionChange = { dx, dy -> viewModel.updateTypographyProperties(positionXPercent = project.typography.positionXPercent + dx, positionYPercent = project.typography.positionYPercent + dy) },
@@ -427,7 +417,7 @@ class MainActivity : ComponentActivity() {
 
                                     MultiTrackTimeline(
                                         project = project,
-                                        playheadMs = playheadMs,
+                                    audioEngine = viewModel.audioEngine,
                                         selectedLineId = selectedLineId,
                                         onSelectLine = { viewModel.selectLyricLine(it) },
                                         onSeek = { viewModel.audioEngine.seekTo(it) },
@@ -546,8 +536,7 @@ class MainActivity : ComponentActivity() {
                         TapToSyncModal(
                             project = project,
                             currentLineIndex = syncLineIndex,
-                            playheadMs = playheadMs,
-                            isPlaying = isPlaying,
+                                    audioEngine = viewModel.audioEngine,
                             onTapNext = { viewModel.tapSyncNext() },
                             onResetSync = { viewModel.resetTapToSync() },
                             onTogglePlayback = { viewModel.audioEngine.togglePlayPause() },
