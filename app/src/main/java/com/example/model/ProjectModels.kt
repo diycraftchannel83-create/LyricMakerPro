@@ -151,7 +151,8 @@ data class VideoProject(
     val canvasRatio: CanvasRatio = CanvasRatio.TIKTOK_REELS_9_16,
     val audioTrack: AudioTrackConfig,
     val lyrics: List<LyricLine>,
-    val typography: TypographyPreset,
+    // Missing typography in older JSON project files receives safe editor defaults.
+    val typography: TypographyPreset = TypographyPreset(name = "Default"),
     val transitionEffect: TextTransitionEffect = TextTransitionEffect.KARAOKE_SWEEP,
     val visualizer: VisualizerType = VisualizerType.BARS_SPECTRUM,
     val visualizerColorHex: String = "#00F5D4",
