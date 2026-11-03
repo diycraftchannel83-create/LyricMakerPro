@@ -98,6 +98,36 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         _showTemplatesSheet.value = show
     }
 
+    fun createNewProject() {
+        // A new project starts with no audio source, lyric cues, or media timeline.
+        audioEngine.stop()
+        val emptyProject = PresetLibrary.createDefaultProject().copy(
+            title = "Untitled Project",
+            artist = "",
+            audioTrack = AudioTrackConfig(
+                title = "No audio",
+                artist = "",
+                durationMs = 0L,
+                beatType = AudioBeatType.NONE,
+                customUri = null,
+                waveformPeaks = emptyList()
+            ),
+            lyrics = emptyList(),
+            mediaClips = emptyList(),
+            videoAudioMuted = false
+        )
+        _project.value = emptyProject
+        _selectedLineId.value = null
+        _currentTab.value = StudioTab.TIMELINE
+        _isTapToSyncActive.value = false
+        _syncLineIndex.value = 0
+        tapSyncTrackingJob?.cancel()
+        tapSyncTrackingJob = null
+        tapSyncLastCommittedIndex = -1
+        isFreshTapSyncSession = false
+        audioEngine.loadTrack(emptyProject.audioTrack)
+    }
+
     fun loadProject(newProject: VideoProject) {
         // Restore the complete saved editor state before touching playback so Compose
         // receives one consistent project snapshot (including the original word timings).
@@ -148,53 +178,68 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
 
     fun nudgeSelectedLyric(deltaMs: Long) {
         val id = _selectedLineId.value ?: return
-        val currentLyrics = _project.value.lyrics.toMutableList()
-        val index = currentLyrics.indexOfFirst { it.id == id }
-        if (index != -1) {
-            val old = currentLyrics[index]
-            val newStart = (old.startMs + deltaMs).coerceAtLeast(0L)
-            val newEnd = (old.endMs + deltaMs).coerceAtLeast(newStart + 200L)
-            currentLyrics[index] = shiftLyricLine(old, newStart - old.startMs, newStart, newEnd)
-            _project.value = _project.value.copy(lyrics = currentLyrics.sortedBy { it.startMs })
-            audioEngine.seekTo(newStart)
-        }
+        val current = _project.value.lyrics
+        val old = current.firstOrNull { it.id == id } ?: return
+        val updated = moveLyricWithinNeighbours(current, id, old.startMs + deltaMs)
+        _project.value = _project.value.copy(lyrics = updated)
+        updated.firstOrNull { it.id == id }?.let { audioEngine.seekTo(it.startMs) }
     }
 
     fun moveSelectedLyric(deltaMs: Long) {
         val id = _selectedLineId.value ?: return
-        val currentLyrics = _project.value.lyrics.toMutableList()
-        val index = currentLyrics.indexOfFirst { it.id == id }
-        if (index != -1) {
-            val old = currentLyrics[index]
-            val newStart = (old.startMs + deltaMs).coerceAtLeast(0L)
-            val newEnd = (old.endMs + deltaMs).coerceAtLeast(newStart + 200L)
-            currentLyrics[index] = shiftLyricLine(old, newStart - old.startMs, newStart, newEnd)
-            _project.value = _project.value.copy(lyrics = currentLyrics.sortedBy { it.startMs })
-        }
+        val current = _project.value.lyrics
+        val old = current.firstOrNull { it.id == id } ?: return
+        _project.value = _project.value.copy(
+            lyrics = moveLyricWithinNeighbours(current, id, old.startMs + deltaMs)
+        )
+    }
+
+    private fun moveLyricWithinNeighbours(
+        lyrics: List<LyricLine>,
+        id: String,
+        requestedStartMs: Long
+    ): List<LyricLine> {
+        val ordered = lyrics.sortedBy { it.startMs }
+        val index = ordered.indexOfFirst { it.id == id }
+        if (index < 0) return lyrics
+        val line = ordered[index]
+        val previous = ordered.getOrNull(index - 1)
+        val next = ordered.getOrNull(index + 1)
+        val minimumStart = (previous?.endMs ?: 0L) + if (previous == null) 0L else 1L
+        val maximumStart = (next?.startMs ?: Long.MAX_VALUE) - line.durationMs - if (next == null) 0L else 1L
+        if (maximumStart < minimumStart) return lyrics
+        val safeStart = requestedStartMs.coerceIn(minimumStart, maximumStart)
+        val safeEnd = safeStart + line.durationMs
+        val shifted = shiftLyricLine(line, safeStart - line.startMs, safeStart, safeEnd)
+        return ordered.toMutableList().apply { this[index] = shifted }
     }
 
     fun updateSelectedLyricStart(deltaMs: Long) {
         val id = _selectedLineId.value ?: return
-        val currentLyrics = _project.value.lyrics.toMutableList()
-        val index = currentLyrics.indexOfFirst { it.id == id }
-        if (index != -1) {
-            val old = currentLyrics[index]
-            val newStart = (old.startMs + deltaMs).coerceIn(0L, old.endMs - 300L)
-            currentLyrics[index] = resizeLyricLine(old, newStart, old.endMs)
-            _project.value = _project.value.copy(lyrics = currentLyrics)
-        }
+        val current = _project.value.lyrics.sortedBy { it.startMs }
+        val index = current.indexOfFirst { it.id == id }
+        if (index < 0) return
+        val old = current[index]
+        val previous = current.getOrNull(index - 1)
+        val minimumStart = (previous?.endMs ?: 0L) + if (previous == null) 0L else 1L
+        val newStart = (old.startMs + deltaMs).coerceIn(minimumStart, old.endMs - 300L)
+        _project.value = _project.value.copy(
+            lyrics = current.toMutableList().apply { this[index] = resizeLyricLine(old, newStart, old.endMs) }
+        )
     }
 
     fun updateSelectedLyricDuration(deltaMs: Long) {
         val id = _selectedLineId.value ?: return
-        val currentLyrics = _project.value.lyrics.toMutableList()
-        val index = currentLyrics.indexOfFirst { it.id == id }
-        if (index != -1) {
-            val old = currentLyrics[index]
-            val newEnd = (old.endMs + deltaMs).coerceAtLeast(old.startMs + 300L)
-            currentLyrics[index] = resizeLyricLine(old, old.startMs, newEnd)
-            _project.value = _project.value.copy(lyrics = currentLyrics)
-        }
+        val current = _project.value.lyrics.sortedBy { it.startMs }
+        val index = current.indexOfFirst { it.id == id }
+        if (index < 0) return
+        val old = current[index]
+        val next = current.getOrNull(index + 1)
+        val maximumEnd = (next?.startMs ?: Long.MAX_VALUE) - if (next == null) 0L else 1L
+        val newEnd = (old.endMs + deltaMs).coerceIn(old.startMs + 300L, maximumEnd.coerceAtLeast(old.startMs + 300L))
+        _project.value = _project.value.copy(
+            lyrics = current.toMutableList().apply { this[index] = resizeLyricLine(old, old.startMs, newEnd) }
+        )
     }
 
     fun updateLyricText(id: String, newText: String) {
