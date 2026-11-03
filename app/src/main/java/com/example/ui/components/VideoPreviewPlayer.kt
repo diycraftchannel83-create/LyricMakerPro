@@ -168,7 +168,7 @@ fun VideoPreviewPlayer(
                     )
                 }
 
-                // Imported media is rendered behind the lyric/effect canvas.
+                // 1. Base Layer: Imported media or synthesized background
                 if (activeMedia != null) {
                     when (activeMedia.type) {
                         MediaClipType.IMAGE -> {
@@ -214,15 +214,17 @@ fun VideoPreviewPlayer(
                             }
                         }
                     }
+                } else {
+                    PreviewBackground(project.background, playheadMs, Modifier.fillMaxSize())
                 }
 
-                // Real-time Canvas Rendering
-                Canvas(modifier = Modifier.fillMaxSize()) {
+                // 2. High-Performance Visualizer Canvas Overlay
+                Canvas(modifier = Modifier.fillMaxSize().testTag("visualizer_canvas_overlay")) {
                     val canvasWidth = size.width.toInt()
                     val canvasHeight = size.height.toInt()
                     if (canvasWidth <= 0 || canvasHeight <= 0) return@Canvas
 
-                    drawInto(
+                    drawVisualizerOverlay(
                         drawScope = this,
                         project = project,
                         timeMs = playheadMs,
@@ -230,7 +232,6 @@ fun VideoPreviewPlayer(
                         height = canvasHeight,
                         spectrumBands = spectrumBands,
                         bassEnergy = bassEnergy,
-                        drawBackground = activeMedia == null,
                         watermarkBitmap = watermarkBitmap
                     )
                 }
@@ -403,15 +404,109 @@ private fun FullscreenPreviewCanvas(
                         )
                     }
                 }
+            } else {
+                PreviewBackground(project.background, playheadMs, Modifier.fillMaxSize())
             }
-            Canvas(Modifier.fillMaxSize()) {
-                drawInto(this, project, playheadMs, size.width.toInt(), size.height.toInt(), spectrumBands, bassEnergy, activeMedia == null, watermarkBitmap)
+            Canvas(Modifier.fillMaxSize().testTag("fullscreen_visualizer_canvas_overlay")) {
+                drawVisualizerOverlay(this, project, playheadMs, size.width.toInt(), size.height.toInt(), spectrumBands, bassEnergy, watermarkBitmap)
             }
         }
     }
 }
 
-private fun drawInto(
+private object PreviewPaintHolder {
+    val gridPaint = AndroidPaint().apply {
+        alpha = 45
+        strokeWidth = 1.5f
+        style = AndroidPaint.Style.STROKE
+    }
+    val particlePaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+        style = AndroidPaint.Style.FILL
+    }
+    val pulsePaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+        style = AndroidPaint.Style.STROKE
+        strokeWidth = 3f
+    }
+    val textPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG)
+    val strokePaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG)
+    val outerStrokePaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG)
+    val wmPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG or AndroidPaint.FILTER_BITMAP_FLAG).apply {
+        alpha = 179
+    }
+    val rectF = android.graphics.RectF()
+}
+
+@Composable
+private fun PreviewBackground(
+    background: BackgroundConfig,
+    timeMs: Long,
+    modifier: Modifier = Modifier
+) {
+    when (background.type) {
+        BackgroundType.SOLID -> {
+            val color = remember(background.primaryColorHex) {
+                try { Color(AndroidColor.parseColor(background.primaryColorHex)) }
+                catch (_: Exception) { Color.Black }
+            }
+            Box(modifier.background(color))
+        }
+        BackgroundType.GRADIENT -> {
+            val c1 = remember(background.primaryColorHex) {
+                try { Color(AndroidColor.parseColor(background.primaryColorHex)) } catch (_: Exception) { Color(0xFF090A14) }
+            }
+            val c2 = remember(background.secondaryColorHex) {
+                try { Color(AndroidColor.parseColor(background.secondaryColorHex)) } catch (_: Exception) { Color(0xFF1B112C) }
+            }
+            val c3 = remember(background.accentColorHex) {
+                try { Color(AndroidColor.parseColor(background.accentColorHex)) } catch (_: Exception) { Color(0xFFFF007F) }
+            }
+            val brush = remember(c1, c2, c3) {
+                Brush.linearGradient(
+                    colors = listOf(c1, c2, c3),
+                    start = androidx.compose.ui.geometry.Offset.Zero,
+                    end = androidx.compose.ui.geometry.Offset.Infinite
+                )
+            }
+            Box(modifier.background(brush)) {
+                if (background.darkOverlayOpacity > 0f) {
+                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = background.darkOverlayOpacity)))
+                }
+            }
+        }
+        BackgroundType.CYBER_GRID -> {
+            Canvas(modifier) {
+                val primaryColor = try { AndroidColor.parseColor(background.primaryColorHex) } catch (_: Exception) { AndroidColor.BLACK }
+                val accentColor = try { AndroidColor.parseColor(background.accentColorHex) } catch (_: Exception) { AndroidColor.CYAN }
+                drawContext.canvas.nativeCanvas.drawColor(primaryColor)
+
+                val gridPaint = PreviewPaintHolder.gridPaint.apply {
+                    color = accentColor
+                    alpha = 45
+                }
+                val step = size.width / 10f
+                if (step > 0) {
+                    var x = 0f
+                    while (x <= size.width) {
+                        drawContext.canvas.nativeCanvas.drawLine(x, 0f, x, size.height, gridPaint)
+                        x += step
+                    }
+                    val scrollY = ((timeMs * 0.05f) % step)
+                    var y = scrollY
+                    while (y <= size.height) {
+                        drawContext.canvas.nativeCanvas.drawLine(0f, y, size.width, y, gridPaint)
+                        y += step
+                    }
+                }
+            }
+        }
+        BackgroundType.MESH,
+        BackgroundType.IMAGE -> {
+            Box(modifier.background(Color.Black))
+        }
+    }
+}
+
+private fun drawVisualizerOverlay(
     drawScope: androidx.compose.ui.graphics.drawscope.DrawScope,
     project: VideoProject,
     timeMs: Long,
@@ -419,64 +514,13 @@ private fun drawInto(
     height: Int,
     spectrumBands: FloatArray,
     bassEnergy: Float,
-    drawBackground: Boolean = true,
     watermarkBitmap: Bitmap? = null
 ) {
     val native = drawScope.drawContext.canvas.nativeCanvas
     val fftBands = AudioSpectrumAnalyzer.bandsAt(project.audioTrack.spectrumFrames, timeMs, project.audioTrack.analysisFrameDurationMs)
     val activeBands = if (project.audioTrack.spectrumFrames.isNotEmpty()) fftBands else spectrumBands
 
-    // 1. Background
-    val bg = project.background
-    val bgPaint = AndroidPaint()
-    if (drawBackground) when (bg.type) {
-        BackgroundType.SOLID -> {
-            native.drawColor(AndroidColor.parseColor(bg.primaryColorHex))
-        }
-        BackgroundType.CYBER_GRID -> {
-            native.drawColor(AndroidColor.parseColor(bg.primaryColorHex))
-            val gridPaint = AndroidPaint().apply {
-                color = AndroidColor.parseColor(bg.accentColorHex)
-                alpha = 45
-                strokeWidth = 1.5f
-                style = AndroidPaint.Style.STROKE
-            }
-            val step = width / 10f
-            var x = 0f
-            while (x <= width) {
-                native.drawLine(x, 0f, x, height.toFloat(), gridPaint)
-                x += step
-            }
-            val scrollY = ((timeMs * 0.05f) % step)
-            var y = scrollY
-            while (y <= height) {
-                native.drawLine(0f, y, width.toFloat(), y, gridPaint)
-                y += step
-            }
-        }
-        else -> {
-            val c1 = try { AndroidColor.parseColor(bg.primaryColorHex) } catch (_: Exception) { AndroidColor.BLACK }
-            val c2 = try { AndroidColor.parseColor(bg.secondaryColorHex) } catch (_: Exception) { AndroidColor.DKGRAY }
-            val c3 = try { AndroidColor.parseColor(bg.accentColorHex) } catch (_: Exception) { AndroidColor.MAGENTA }
-
-            bgPaint.shader = LinearGradient(
-                0f, 0f, width.toFloat(), height.toFloat(),
-                intArrayOf(c1, c2, c3),
-                floatArrayOf(0f, 0.65f, 1f),
-                Shader.TileMode.CLAMP
-            )
-            native.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
-
-            val darkOverlay = AndroidPaint().apply {
-                color = AndroidColor.argb((bg.darkOverlayOpacity * 255).toInt(), 0, 0, 0)
-            }
-            native.drawRect(0f, 0f, width.toFloat(), height.toFloat(), darkOverlay)
-        }
-    }
-
-    // Render every visualizer on a translucent overlay so imported media remains visible.
-    val visualizerLayer = native.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), 210)
-    // Reference-style rainbow bars share the same metadata-aware renderer as MP4 export.
+    // 1. Spectrum Visualizer Overlay
     if (project.visualizer == VisualizerType.BARS_SPECTRUM) {
         val bars = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty())
             AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
@@ -484,7 +528,6 @@ private fun drawInto(
         AudioGlowVisualizerRenderer.drawClassicSpectrum(native, width, height, timeMs, bars,
             project.audioTrack.artist, project.audioTrack.title)
     }
-    // 2. Visualizer Overlay. Audio Glow styles share the same native renderer as MP4 export.
     val visColor = try { AndroidColor.parseColor(project.visualizerColorHex) } catch (_: Exception) { AndroidColor.CYAN }
     if (AudioGlowVisualizerRenderer.isGlowStyle(project.visualizer)) {
         val glowBands = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty()) {
@@ -499,7 +542,7 @@ private fun drawInto(
         )
     }
     when (project.visualizer) {
-        VisualizerType.BARS_SPECTRUM -> {} // Drawn by AudioGlowVisualizerRenderer above.
+        VisualizerType.BARS_SPECTRUM -> {} // Handled above
         VisualizerType.CIRCULAR_WAVE -> {
             val sinBars = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty())
                 AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
@@ -507,10 +550,7 @@ private fun drawInto(
             AudioGlowVisualizerRenderer.drawSinBars(native, width, height, timeMs, sinBars)
         }
         VisualizerType.FLOATING_PARTICLES -> {
-            val pPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.FILL
-                color = visColor
-            }
+            val pPaint = PreviewPaintHolder.particlePaint.apply { color = visColor }
             for (i in 0 until 18) {
                 val speed = (i % 4 + 2) * 0.04f
                 val y = (height - ((timeMs * speed + i * 140) % height)).toFloat()
@@ -530,11 +570,7 @@ private fun drawInto(
             val cx = width / 2f
             val cy = height * 0.40f
             val maxR = width * 0.4f
-            val pulsePaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.STROKE
-                strokeWidth = 3f
-                color = visColor
-            }
+            val pulsePaint = PreviewPaintHolder.pulsePaint.apply { color = visColor }
             val detectedBeat = AudioSpectrumAnalyzer.beatPulseAt(project.audioTrack.beatTimesMs, timeMs)
             val beatPhase = if (project.audioTrack.beatTimesMs.isNotEmpty()) 1f - detectedBeat else (timeMs % 500) / 500f
             val r = (beatPhase * maxR).coerceIn(0f, maxR)
@@ -544,34 +580,6 @@ private fun drawInto(
         }
         VisualizerType.VINYL_SPINNER -> {
             AudioGlowVisualizerRenderer.drawCoolBars(native, width, height, timeMs, activeBands)
-            /*
-            val cx = width / 2f
-            val cy = height * 0.32f
-            val r = min(width, height) * 0.22f
-            val angle = (timeMs * 0.08f) % 360f
-
-            native.save()
-            native.rotate(angle, cx, cy)
-            val vPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.FILL
-                color = AndroidColor.parseColor("#15161C")
-            }
-            native.drawCircle(cx, cy, r, vPaint)
-            val gPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.STROKE
-                strokeWidth = 1f
-                color = AndroidColor.parseColor("#2E3142")
-            }
-            native.drawCircle(cx, cy, r * 0.6f, gPaint)
-            native.drawCircle(cx, cy, r * 0.8f, gPaint)
-
-            val lPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.FILL
-                color = visColor
-            }
-            native.drawCircle(cx, cy, r * 0.32f, lPaint)
-            native.restore()
-            */
         }
         VisualizerType.AURORA_BLOOM,
         VisualizerType.GLOW_ORBS,
@@ -581,9 +589,7 @@ private fun drawInto(
         VisualizerType.NONE -> {}
     }
 
-    native.restoreToCount(visualizerLayer)
-
-    // 3. Lyrics
+    // 2. Lyrics
     val lyrics = project.lyrics
     if (lyrics.isNotEmpty()) {
         val typography = project.typography
@@ -616,9 +622,12 @@ private fun drawInto(
                 typography.isItalic -> Typeface.ITALIC
                 else -> Typeface.NORMAL
             }
+            val fontTypeface = Typeface.create(tf, style)
 
-            val textPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                typeface = Typeface.create(tf, style)
+            val textPaint = PreviewPaintHolder.textPaint.apply {
+                reset()
+                isAntiAlias = true
+                typeface = fontTypeface
                 textSize = fontSize
                 textAlign = AndroidPaint.Align.CENTER
                 when (typography.visualEffect) {
@@ -627,8 +636,10 @@ private fun drawInto(
                     else -> {}
                 }
             }
-            val strokePaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                typeface = Typeface.create(tf, style)
+            val strokePaint = PreviewPaintHolder.strokePaint.apply {
+                reset()
+                isAntiAlias = true
+                typeface = fontTypeface
                 textSize = fontSize
                 textAlign = AndroidPaint.Align.CENTER
                 this.style = AndroidPaint.Style.STROKE
@@ -672,7 +683,13 @@ private fun drawInto(
             val primaryC = try { AndroidColor.parseColor(typography.primaryColorHex) } catch (_: Exception) { AndroidColor.WHITE }
             val highlightC = try { AndroidColor.parseColor(typography.highlightColorHex) } catch (_: Exception) { AndroidColor.CYAN }
             if (typography.visualEffect == FontVisualEffect.DOUBLE_OUTLINE) {
-                val outer = AndroidPaint(strokePaint).apply {
+                val outer = PreviewPaintHolder.outerStrokePaint.apply {
+                    reset()
+                    isAntiAlias = true
+                    typeface = fontTypeface
+                    textSize = fontSize
+                    textAlign = AndroidPaint.Align.CENTER
+                    this.style = AndroidPaint.Style.STROKE
                     strokeWidth = typography.strokeWidthDp * (width / 360f) * 2.4f
                     color = AndroidColor.parseColor("#FF00C8")
                 }
@@ -722,17 +739,14 @@ private fun drawInto(
         }
     }
 
-    // 4. Image watermark (same artwork and sizing as the exported video).
+    // 3. Image watermark (same artwork and sizing as the exported video).
     if (project.showWatermark && watermarkBitmap != null && !watermarkBitmap.isRecycled) {
         val targetWidth = width * 0.10f
         val targetHeight = targetWidth * watermarkBitmap.height / watermarkBitmap.width
         val right = width * 0.97f
         val bottom = height * 0.965f
-        val destination = android.graphics.RectF(right - targetWidth, bottom - targetHeight, right, bottom)
-        val wmPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG or AndroidPaint.FILTER_BITMAP_FLAG).apply {
-            alpha = 179
-        }
-        native.drawBitmap(watermarkBitmap, null, destination, wmPaint)
+        PreviewPaintHolder.rectF.set(right - targetWidth, bottom - targetHeight, right, bottom)
+        native.drawBitmap(watermarkBitmap, null, PreviewPaintHolder.rectF, PreviewPaintHolder.wmPaint)
     }
 }
 

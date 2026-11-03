@@ -33,8 +33,31 @@ class VideoExportEngine(private val context: Context) {
         val sourceHeight: Int = 0
     )
 
-    // Reuse the paint for every frame instead of allocating one 30 times per second.
+    // Reusable paints and buffers to guarantee zero-allocation rendering per exported frame.
     private val mediaFramePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val exportBgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val exportDarkOverlayPaint = Paint()
+    private val exportGridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        strokeWidth = 2f
+        style = Paint.Style.STROKE
+    }
+    private val exportParticlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+    private val exportPulsePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 4f
+    }
+    private val exportBarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+    private val exportLyricTextPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val exportLyricStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val exportLyricSubPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val exportWmPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+        alpha = 179
+    }
+    private val exportRectF = RectF()
 
     private fun prepareMediaAssets(clips: List<MediaClip>): List<ExportMediaAsset> = clips.mapNotNull { clip ->
         runCatching {
@@ -90,14 +113,21 @@ class VideoExportEngine(private val context: Context) {
         durationSeconds: Int = 15,
         onProgress: (ExportProgress) -> Unit
     ): File = withContext(Dispatchers.Main.immediate) {
-        val audioUri = project.audioTrack.customUri
-            ?: error("Import a song before exporting an MP4 with audio")
         val totalDurationMs = if (durationSeconds <= 0) {
             project.durationMs.coerceAtLeast(1L)
         } else {
             min(project.durationMs, durationSeconds * 1000L).coerceAtLeast(1L)
         }
         val exportDir = File(context.cacheDir, "clips").apply { mkdirs() }
+        var synthAudioFile: File? = null
+        val audioUri = if (project.audioTrack.customUri != null) {
+            project.audioTrack.customUri
+        } else {
+            val file = File(exportDir, "SynthAudio_${System.currentTimeMillis()}.m4a")
+            synthAudioFile = file
+            AudioTrackTranscoder.synthesizeBeatToAac(project.audioTrack, file, totalDurationMs)
+            Uri.fromFile(file).toString()
+        }
         val outputFile = File(exportDir, "LyricVideo_${System.currentTimeMillis()}.mp4")
         val backgroundFile = File(exportDir, "LyricBackground_${System.currentTimeMillis()}.png")
         val width = (project.canvasRatio.exportWidth * quality.scaleFactor).toInt().let { if (it % 2 != 0) it + 1 else it }
@@ -124,7 +154,7 @@ class VideoExportEngine(private val context: Context) {
             // select the clip active at that presentation timestamp.
             mediaAssets = prepareMediaAssets(project.mediaClips)
             val watermarkBitmap = loadWatermarkBitmap()
-            val overlay = ProjectLyricOverlay(
+            val overlay = ProjectCanvasOverlay(
                 this@VideoExportEngine, width, height, project, watermarkBitmap, mediaAssets
             )
             val effects = listOf<androidx.media3.common.Effect>(
@@ -236,36 +266,37 @@ class VideoExportEngine(private val context: Context) {
         } finally {
             releaseMediaAssets(mediaAssets)
             backgroundFile.delete()
+            synthAudioFile?.delete()
         }
     }
 
     @androidx.media3.common.util.UnstableApi
-    private class ProjectLyricOverlay(
+    private class ProjectCanvasOverlay(
         private val owner: VideoExportEngine,
-        private val width: Int,
-        private val height: Int,
+        private val canvasWidth: Int,
+        private val canvasHeight: Int,
         private val project: VideoProject,
-        private val watermarkBitmap: Bitmap,
+        private val watermarkBitmap: Bitmap?,
         private val mediaAssets: List<ExportMediaAsset>
-    ) : androidx.media3.effect.BitmapOverlay() {
-        private var cached: Bitmap? = null
+    ) : androidx.media3.effect.CanvasOverlay(/* useHighPerformance = */ true) {
 
-        override fun getBitmap(presentationTimeUs: Long): Bitmap {
-            val bitmap = cached?.takeIf { it.width == width && it.height == height }
-                ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { cached = it }
-            bitmap.eraseColor(Color.TRANSPARENT)
+        init {
+            setCanvasSize(canvasWidth, canvasHeight)
+        }
+
+        override fun onDraw(canvas: Canvas, presentationTimeUs: Long) {
+            val timeMs = (presentationTimeUs / 1000L).coerceAtLeast(0L)
+            canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
             owner.renderFrameInternal(
-                Canvas(bitmap), width, height, project,
-                (presentationTimeUs / 1000L).coerceAtLeast(0L),
-                mediaAssets, watermarkBitmap
+                canvas, canvasWidth, canvasHeight, project,
+                timeMs, mediaAssets, watermarkBitmap
             )
-            return bitmap
         }
 
         override fun release() {
-            cached?.recycle()
-            cached = null
-            if (!watermarkBitmap.isRecycled) watermarkBitmap.recycle()
+            if (watermarkBitmap != null && !watermarkBitmap.isRecycled) {
+                watermarkBitmap.recycle()
+            }
             super.release()
         }
     }
@@ -463,12 +494,9 @@ class VideoExportEngine(private val context: Context) {
         }
 
         // 2. Visualizer Overlay
-        // Keep all visualizer styles translucent over imported photo/video frames.
-        val visualizerLayer = canvas.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), 210)
         drawVisualizer(canvas, width, height, project.visualizer, project.visualizerColorHex, timeMs, project.audioTrack.bpm,
             project.audioTrack.waveformPeaks, project.durationMs, project.audioTrack.artist.ifBlank { project.artist }, project.audioTrack.title,
             project.audioTrack.spectrumFrames, project.audioTrack.analysisFrameDurationMs, project.audioTrack.beatTimesMs)
-        canvas.restoreToCount(visualizerLayer)
 
         // 3. Lyrics with Typography & Transitions
         drawLyrics(canvas, width, height, project, timeMs)
@@ -518,23 +546,19 @@ class VideoExportEngine(private val context: Context) {
                     floatArrayOf(0f, 0.65f, 1f),
                     Shader.TileMode.CLAMP
                 )
-                val paint = Paint().apply { this.shader = shader }
-                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+                exportBgPaint.shader = shader
+                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), exportBgPaint)
 
                 // Dark vignette overlay
-                val darkOverlay = Paint().apply {
-                    color = Color.argb((bg.darkOverlayOpacity * 255).toInt(), 0, 0, 0)
-                }
-                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), darkOverlay)
+                exportDarkOverlayPaint.color = Color.argb((bg.darkOverlayOpacity * 255).toInt(), 0, 0, 0)
+                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), exportDarkOverlayPaint)
             }
             BackgroundType.CYBER_GRID -> {
                 canvas.drawColor(parseColor(bg.primaryColorHex, Color.parseColor("#08090F")))
 
-                val gridPaint = Paint().apply {
+                val gridPaint = exportGridPaint.apply {
                     color = parseColor(bg.accentColorHex, Color.parseColor("#00F5D4"))
                     alpha = 40
-                    strokeWidth = 2f
-                    style = Paint.Style.STROKE
                 }
 
                 val gridSize = (width / 12f).coerceAtLeast(30f)
@@ -636,17 +660,12 @@ class VideoExportEngine(private val context: Context) {
                 val baseY = height * 0.82f
                 val maxBarHeight = height * 0.16f
 
-                val barPaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.FILL
-                }
-
                 for (i in 0 until barCount) {
                     val peak = bandLevel(i)
                     val barH = (peak * maxBarHeight).coerceAtLeast(10f)
 
                     val x = startX + i * (barWidth + spacing)
-                    val rect = RectF(x, baseY - barH, x + barWidth, baseY)
+                    exportRectF.set(x, baseY - barH, x + barWidth, baseY)
 
                     val shader = LinearGradient(
                         x, baseY - barH, x, baseY,
@@ -654,8 +673,8 @@ class VideoExportEngine(private val context: Context) {
                         null,
                         Shader.TileMode.CLAMP
                     )
-                    barPaint.shader = shader
-                    canvas.drawRoundRect(rect, barWidth / 2f, barWidth / 2f, barPaint)
+                    exportBarPaint.shader = shader
+                    canvas.drawRoundRect(exportRectF, barWidth / 2f, barWidth / 2f, exportBarPaint)
                 }
             }
             VisualizerType.CIRCULAR_WAVE -> {
@@ -667,19 +686,15 @@ class VideoExportEngine(private val context: Context) {
                 AudioGlowVisualizerRenderer.drawTerrainBars(canvas, width, height, timeMs, envelopeBands)
             }
             VisualizerType.FLOATING_PARTICLES -> {
-                val particlePaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.FILL
-                    color = primaryColor
-                }
+                exportParticlePaint.color = primaryColor
                 val count = 24
                 for (i in 0 until count) {
                     val speed = (i % 5 + 2) * 0.04f
                     val y = (height - ((timeMs * speed + i * 150) % height)).toFloat()
                     val x = ((sin(timeMs * 0.001 + i) * 0.35 + 0.5) * width).toFloat()
                     val radius = (i % 4 + 3) * 2f
-                    particlePaint.alpha = (70 + bandLevel(i) * 150).toInt().coerceIn(40, 220)
-                    canvas.drawCircle(x, y, radius, particlePaint)
+                    exportParticlePaint.alpha = (70 + bandLevel(i) * 150).toInt().coerceIn(40, 220)
+                    canvas.drawCircle(x, y, radius, exportParticlePaint)
                 }
             }
             VisualizerType.VINYL_SPINNER -> {
@@ -690,19 +705,13 @@ class VideoExportEngine(private val context: Context) {
                 val centerY = height * 0.40f
                 val maxRadius = width * 0.45f
 
-                val pulsePaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.STROKE
-                    strokeWidth = 4f
-                }
-
                 for (ring in 0..2) {
                     val ringProgress = ((beatPhase + ring * 0.33) % 1.0).toFloat()
                     val r = ringProgress * maxRadius
                     val alpha = ((1f - ringProgress) * 200).toInt().coerceIn(0, 255)
-                    pulsePaint.color = primaryColor
-                    pulsePaint.alpha = alpha
-                    canvas.drawCircle(centerX, centerY, r, pulsePaint)
+                    exportPulsePaint.color = primaryColor
+                    exportPulsePaint.alpha = alpha
+                    canvas.drawCircle(centerX, centerY, r, exportPulsePaint)
                 }
             }
             VisualizerType.AURORA_BLOOM,
@@ -754,14 +763,18 @@ class VideoExportEngine(private val context: Context) {
         val finalTypeface = Typeface.create(baseTypeface, style)
 
         // Paint setup
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val textPaint = exportLyricTextPaint.apply {
+            reset()
+            isAntiAlias = true
             typeface = finalTypeface
             textSize = baseFontSize
             letterSpacing = typography.letterSpacingSp * 0.05f
             textAlign = Paint.Align.CENTER
         }
 
-        val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val strokePaint = exportLyricStrokePaint.apply {
+            reset()
+            isAntiAlias = true
             typeface = finalTypeface
             textSize = baseFontSize
             letterSpacing = typography.letterSpacingSp * 0.05f
@@ -826,7 +839,9 @@ class VideoExportEngine(private val context: Context) {
         // Upcoming lyric preview: compact single-line mode or full two-line karaoke mode.
         if (activeLineIndex != -1 && activeLineIndex + 1 < lyrics.size) {
             val nextLine = lyrics[activeLineIndex + 1]
-            val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            val subPaint = exportLyricSubPaint.apply {
+                reset()
+                isAntiAlias = true
                 typeface = finalTypeface
                 textSize = if (typography.lyricLayout == LyricLayoutMode.KARAOKE_TWO_LINE) baseFontSize else baseFontSize * 0.65f
                 color = if (typography.lyricLayout == LyricLayoutMode.KARAOKE_TWO_LINE) parseColor(typography.primaryColorHex, Color.WHITE) else Color.parseColor("#7A809E")
@@ -940,9 +955,8 @@ class VideoExportEngine(private val context: Context) {
         val targetHeight = targetWidth * bitmap.height / bitmap.width
         val right = width * 0.97f
         val bottom = height * 0.965f
-        val destination = RectF(right - targetWidth, bottom - targetHeight, right, bottom)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { alpha = 179 }
-        canvas.drawBitmap(bitmap, null, destination, paint)
+        exportRectF.set(right - targetWidth, bottom - targetHeight, right, bottom)
+        canvas.drawBitmap(bitmap, null, exportRectF, exportWmPaint)
     }
 
     private fun parseColor(hex: String, default: Int): Int {

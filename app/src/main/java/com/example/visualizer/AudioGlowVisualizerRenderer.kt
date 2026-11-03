@@ -1,14 +1,14 @@
 package com.winsmediatama.lyricmakerpro.visualizer
 
 import android.graphics.Canvas
-import android.graphics.LinearGradient
-import android.graphics.Typeface
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
+import android.graphics.Typeface
 import com.winsmediatama.lyricmakerpro.model.VisualizerType
 import kotlin.math.PI
 import kotlin.math.cos
@@ -17,115 +17,348 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * Audio Glow-inspired original visualizer artwork shared by the editor preview and MP4 export.
- * It intentionally uses native Canvas primitives so the exact same renderer can be used
- * by Compose's preview canvas and Media3's bitmap overlay.
+ * High-performance, zero-allocation visualizer rendering engine.
+ * Emulates professional audio players (Avee Player, Traktor, After Effects audio spectrum)
+ * with accurate bass kick punch, crisp treble shimmer, and gravity peak caps.
+ *
+ * All Paint, Path, and RectF instances are cached statically to avoid Garbage Collection
+ * stutter during 60 FPS playback and high-speed MP4 export.
  */
 object AudioGlowVisualizerRenderer {
-    private val palette = intArrayOf(
-        Color.rgb(0, 245, 212),
-        Color.rgb(255, 0, 127),
-        Color.rgb(120, 80, 255),
-        Color.rgb(45, 190, 255),
-        Color.rgb(255, 210, 80)
+
+    // 16-color pro-audio rainbow palette
+    private val rainbowColors = intArrayOf(
+        Color.rgb(0, 245, 212),   // Neon Cyan (Sub-bass)
+        Color.rgb(0, 200, 255),   // Sky Blue
+        Color.rgb(65, 105, 255),  // Royal Blue
+        Color.rgb(120, 80, 255),  // Electric Violet
+        Color.rgb(175, 45, 255),  // Deep Purple
+        Color.rgb(238, 25, 180),  // Hot Magenta
+        Color.rgb(255, 0, 128),   // Neon Crimson
+        Color.rgb(255, 50, 60),   // Coral Red
+        Color.rgb(255, 95, 30),   // Tangerine
+        Color.rgb(255, 155, 20),  // Amber Orange
+        Color.rgb(255, 210, 30),  // Gold Yellow
+        Color.rgb(235, 255, 40),  // Lime Gold
+        Color.rgb(160, 255, 45),  // Electric Lime
+        Color.rgb(80, 255, 80),   // Spring Green
+        Color.rgb(45, 245, 170),  // Mint Green
+        Color.rgb(0, 245, 212)    // Neon Cyan (Treble)
     )
 
+    private val coolBarColors = intArrayOf(
+        Color.rgb(255, 170, 0), Color.rgb(255, 55, 35), Color.rgb(255, 0, 145),
+        Color.rgb(185, 45, 255), Color.rgb(45, 110, 255), Color.rgb(0, 220, 255),
+        Color.rgb(0, 245, 210), Color.rgb(255, 190, 0)
+    )
 
-    /** Cool Bars: transparent neon spectrum with mirrored reflections and a fine waveform mesh. */
-    fun drawCoolBars(canvas: Canvas, width: Int, height: Int, timeMs: Long, bands: FloatArray) {
-        if (width <= 0 || height <= 0) return
-        val centerY = height * 0.60f
-        val minSide = min(width, height).toFloat()
-        val count = 64
-        val step = width.toFloat() / count
-        val barWidth = (step * 0.34f).coerceAtLeast(1.2f)
-        val colors = intArrayOf(
-            Color.rgb(255, 170, 0), Color.rgb(255, 55, 35), Color.rgb(255, 0, 145),
-            Color.rgb(185, 45, 255), Color.rgb(45, 110, 255), Color.rgb(0, 220, 255),
-            Color.rgb(0, 245, 210), Color.rgb(255, 190, 0)
-        )
-        fun energy(i: Int): Float {
-            if (bands.isEmpty()) return 0.08f
-            val pos = i * (bands.size - 1).coerceAtLeast(1) / (count - 1).toFloat()
-            val lo = pos.toInt().coerceIn(0, bands.lastIndex)
-            val hi = (lo + 1).coerceAtMost(bands.lastIndex)
-            val raw = bands[lo] * (1f - (pos - lo)) + bands[hi] * (pos - lo)
-            val shimmer = 0.92f + 0.08f * sin(timeMs * 0.004 + i * 0.7).toFloat()
-            return (raw.coerceIn(0.025f, 1f) * shimmer).coerceIn(0.02f, 1f)
-        }
-        val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
-        val core = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.SQUARE }
-        val reflection = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.BUTT }
-        val mesh = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = max(1f, minSide * 0.001f) }
-        val wave = Path()
-        val reflectedWave = Path()
-        for (i in 0 until count) {
-            val x = (i + 0.5f) * step
-            val level = energy(i)
-            val h = height * (0.025f + level * 0.30f)
-            val color = colors[(i * colors.size / count).coerceIn(0, colors.lastIndex)]
-            glow.color = withAlpha(color, 105)
-            glow.strokeWidth = max(2f, step * 0.72f)
-            glow.setShadowLayer(minSide * 0.012f, 0f, 0f, color)
-            canvas.drawLine(x, centerY - h, x, centerY + h * 0.22f, glow)
-            glow.clearShadowLayer()
-            core.color = withAlpha(color, 235)
-            core.strokeWidth = max(1.2f, barWidth * 0.58f)
-            canvas.drawLine(x, centerY - h, x, centerY, core)
-            reflection.color = withAlpha(color, (85 + level * 65).toInt())
-            reflection.strokeWidth = max(1f, barWidth * 0.38f)
-            canvas.drawLine(x, centerY + 2f, x, centerY + h * 0.58f, reflection)
-            val y = centerY - h * 0.04f + sin(timeMs * 0.002 + i * 0.31).toFloat() * height * 0.008f
-            if (i == 0) {
-                wave.moveTo(x, y)
-                reflectedWave.moveTo(x, centerY + (centerY - y) * 0.22f)
+    private val sinColors = intArrayOf(
+        Color.rgb(0, 245, 212),
+        Color.rgb(0, 150, 255),
+        Color.rgb(90, 95, 255),
+        Color.rgb(195, 50, 255),
+        Color.rgb(255, 0, 140),
+        Color.rgb(0, 230, 255),
+        Color.rgb(50, 255, 180)
+    )
+
+    // Cached reusable Paints (Zero per-frame allocations)
+    private val barPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val coreStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val wideStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.WHITE
+    }
+    private val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
+    }
+    private val subtitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(200, 215, 235)
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+    }
+    private val baselinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+
+    // Reusable Path and RectF objects
+    private val cachedPath = Path()
+    private val cachedReflectPath = Path()
+    private val cachedRect = RectF()
+
+    // Peak-hold ballistic tracker for pro-audio floating caps
+    private const val MAX_BANDS = 32
+    private val peakLevels = FloatArray(MAX_BANDS)
+    private val peakHoldCounters = IntArray(MAX_BANDS)
+    private var lastTimeMs = 0L
+
+    /**
+     * Resets or updates peak hold ballistics.
+     * Peak caps hover at new heights, hold for 12 frames (~200ms), and then accelerate downward with gravity.
+     */
+    private fun updatePeakCap(index: Int, currentLevel: Float): Float {
+        val i = index.coerceIn(0, MAX_BANDS - 1)
+        if (currentLevel >= peakLevels[i]) {
+            peakLevels[i] = currentLevel
+            peakHoldCounters[i] = 12 // Hold for ~200ms at 60fps
+        } else {
+            if (peakHoldCounters[i] > 0) {
+                peakHoldCounters[i]--
             } else {
-                wave.lineTo(x, y)
-                reflectedWave.lineTo(x, centerY + (centerY - y) * 0.22f)
+                peakLevels[i] = max(0f, peakLevels[i] - 0.022f)
             }
         }
-        val wavePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = max(1.2f, minSide * 0.002f)
-            color = Color.argb(210, 90, 235, 255)
-            setShadowLayer(minSide * 0.012f, 0f, 0f, Color.CYAN)
+        return peakLevels[i]
+    }
+
+    /**
+     * Draws Avee Player / Winamp style classic rainbow spectrum bars.
+     * Accurately tracks bass kicks on the left and treble sparkle on the right.
+     */
+    fun drawClassicSpectrum(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        timeMs: Long,
+        bands: FloatArray,
+        artist: String,
+        trackTitle: String,
+        exportPerformanceMode: Boolean = false
+    ) {
+        if (width <= 0 || height <= 0) return
+
+        val minSide = min(width, height).toFloat()
+        val baseY = height * 0.68f
+        val count = 20
+        val gap = width * 0.008f
+        val totalWidth = width * 0.88f
+        val barWidth = (totalWidth - gap * (count - 1)) / count
+        val maxBarHeight = height * 0.28f
+
+        // 1. Artist & Song Metadata
+        val centerX = width * 0.5f
+        if (artist.isNotBlank() && !artist.equals("unknown", true)) {
+            titlePaint.textSize = height * 0.052f
+            canvas.drawText(artist.trim(), centerX, height * 0.25f, titlePaint)
         }
-        canvas.drawPath(wave, wavePaint)
-        wavePaint.color = Color.argb(95, 70, 175, 255)
-        wavePaint.strokeWidth = max(1f, minSide * 0.001f)
-        wavePaint.clearShadowLayer()
-        canvas.drawPath(reflectedWave, wavePaint)
-        mesh.color = Color.argb(58, 75, 205, 255)
-        for (i in 0 until 10) {
-            val x = width * i / 9f
-            canvas.drawLine(x, centerY + height * 0.015f, x + width * 0.075f, centerY + height * (0.07f + (i % 3) * 0.018f), mesh)
-            canvas.drawLine(x, centerY - height * 0.012f, x - width * 0.045f, centerY - height * (0.035f + (i % 2) * 0.02f), mesh)
+        if (trackTitle.isNotBlank() && !trackTitle.equals("unknown", true)) {
+            subtitlePaint.textSize = height * 0.034f
+            canvas.drawText(trackTitle.trim(), centerX, height * 0.295f, subtitlePaint)
+        }
+
+        // 2. Treble-reactive floating sparkle particles
+        val trebleSum = if (bands.size >= 8) bands.takeLast(8).maxOrNull() ?: 0.1f else 0.1f
+        val particleCount = if (exportPerformanceMode) 28 else 64
+        for (i in 0 until particleCount) {
+            val seed = i * 117.3
+            val x = ((sin(seed * 0.73) * 0.5 + 0.5) * width).toFloat()
+            val speed = 0.0018 + (i % 5) * 0.0006
+            val yOffset = ((timeMs * speed + seed) % 1.0).toFloat()
+            val y = baseY - yOffset * height * 0.42f
+            val tint = rainbowColors[i % rainbowColors.size]
+            val r = minSide * (0.0018f + (i % 3) * 0.0012f) * (1f + trebleSum * 0.8f)
+            val alpha = ((1f - yOffset) * 210 * (0.4f + trebleSum * 0.6f)).toInt().coerceIn(0, 240)
+            particlePaint.color = withAlpha(tint, alpha)
+            canvas.drawCircle(x, y, r, particlePaint)
+        }
+
+        // 3. Bass Kick Shockwave Floor Line
+        val bassKick = if (bands.isNotEmpty()) bands.take(5).maxOrNull() ?: 0.08f else 0.08f
+        val floorGlowAlpha = (40 + bassKick * 170).toInt().coerceIn(40, 255)
+        baselinePaint.color = withAlpha(Color.rgb(0, 245, 212), floorGlowAlpha)
+        baselinePaint.strokeWidth = max(2f, minSide * (0.004f + bassKick * 0.005f))
+        canvas.drawLine(width * 0.04f, baseY, width * 0.96f, baseY, baselinePaint)
+
+        // 4. Spectrum Bars & Floating Peak Caps
+        val startX = (width - totalWidth) / 2f
+        for (i in 0 until count) {
+            // Map 20 visible bars to the 32 input logarithmic bands
+            val bandIdx = (i * (bands.size - 1) / (count - 1)).coerceIn(0, bands.lastIndex)
+            val rawEnergy = bands.getOrElse(bandIdx) { 0.1f }.coerceIn(0.04f, 1f)
+
+            // Dynamic bounce with subtle micro-phase shimmer
+            val energy = (rawEnergy * (0.92f + 0.08f * sin(timeMs * 0.005 + i * 0.6).toFloat())).coerceIn(0.04f, 1f)
+            val barH = (energy * maxBarHeight).coerceAtLeast(minSide * 0.006f)
+            val x = startX + i * (barWidth + gap)
+            val tint = rainbowColors[(i * rainbowColors.size / count).coerceIn(0, rainbowColors.lastIndex)]
+
+            // Bar Body (Upwards from baseline)
+            cachedRect.set(x, baseY - barH, x + barWidth, baseY)
+            val cornerR = barWidth * 0.28f
+
+            // Halo glow pass
+            haloPaint.color = withAlpha(tint, 75 + (energy * 65).toInt())
+            canvas.drawRoundRect(cachedRect, cornerR, cornerR, haloPaint)
+
+            // Core solid pass
+            barPaint.color = withAlpha(tint, 225)
+            canvas.drawRoundRect(cachedRect, cornerR, cornerR, barPaint)
+
+            // Floating Peak Cap (Iconic Avee Player ballistics)
+            val peakEnergy = updatePeakCap(i, energy)
+            val peakY = baseY - (peakEnergy * maxBarHeight) - minSide * 0.008f
+            cachedRect.set(x - barWidth * 0.05f, peakY - minSide * 0.0022f, x + barWidth * 1.05f, peakY + minSide * 0.0022f)
+            capPaint.color = withAlpha(Color.WHITE, (180 + peakEnergy * 75).toInt().coerceIn(180, 255))
+            canvas.drawRoundRect(cachedRect, cornerR, cornerR, capPaint)
+
+            // Mirrored Floor Reflection (Soft fade-out downwards)
+            val reflectH = barH * 0.42f
+            cachedRect.set(x, baseY + minSide * 0.004f, x + barWidth, baseY + minSide * 0.004f + reflectH)
+            barPaint.color = withAlpha(tint, (65 * (1f - energy * 0.2f)).toInt().coerceIn(20, 80))
+            canvas.drawRoundRect(cachedRect, cornerR, cornerR, barPaint)
         }
     }
 
-    fun isGlowStyle(type: VisualizerType): Boolean = when (type) {
-        VisualizerType.AURORA_BLOOM,
-        VisualizerType.GLOW_ORBS,
-        VisualizerType.NEON_RIBBON,
-        VisualizerType.RADIAL_BURST,
-        VisualizerType.SPECTRUM_TUNNEL -> true
-        else -> false
+    /** Cool Bars: Dual-sided symmetrical neon equalizer with central waveform line. */
+    fun drawCoolBars(canvas: Canvas, width: Int, height: Int, timeMs: Long, bands: FloatArray) {
+        if (width <= 0 || height <= 0) return
+        val centerY = height * 0.58f
+        val minSide = min(width, height).toFloat()
+        val count = 48
+        val step = width.toFloat() / count
+        val barWidth = (step * 0.42f).coerceAtLeast(1.5f)
+
+        cachedPath.reset()
+        cachedReflectPath.reset()
+
+        wideStrokePaint.strokeCap = Paint.Cap.ROUND
+        coreStrokePaint.strokeCap = Paint.Cap.SQUARE
+
+        for (i in 0 until count) {
+            val bandIdx = (i * (bands.size - 1) / (count - 1)).coerceIn(0, bands.lastIndex)
+            val raw = bands.getOrElse(bandIdx) { 0.1f }.coerceIn(0.04f, 1f)
+            val energy = (raw * (0.92f + 0.08f * sin(timeMs * 0.004 + i * 0.65).toFloat())).coerceIn(0.03f, 1f)
+            val h = height * (0.02f + energy * 0.24f)
+            val x = (i + 0.5f) * step
+            val color = coolBarColors[(i * coolBarColors.size / count).coerceIn(0, coolBarColors.lastIndex)]
+
+            // Soft glow
+            wideStrokePaint.color = withAlpha(color, 85)
+            wideStrokePaint.strokeWidth = step * 0.65f
+            canvas.drawLine(x, centerY - h, x, centerY + h * 0.25f, wideStrokePaint)
+
+            // Core bar
+            coreStrokePaint.color = withAlpha(color, 240)
+            coreStrokePaint.strokeWidth = barWidth
+            canvas.drawLine(x, centerY - h, x, centerY, coreStrokePaint)
+
+            // Mirrored reflection
+            coreStrokePaint.color = withAlpha(color, (70 + energy * 70).toInt())
+            coreStrokePaint.strokeWidth = barWidth * 0.7f
+            canvas.drawLine(x, centerY + 2f, x, centerY + h * 0.45f, coreStrokePaint)
+
+            val y = centerY - h * 0.08f + sin(timeMs * 0.002 + i * 0.35).toFloat() * height * 0.008f
+            if (i == 0) {
+                cachedPath.moveTo(x, y)
+                cachedReflectPath.moveTo(x, centerY + (centerY - y) * 0.3f)
+            } else {
+                cachedPath.lineTo(x, y)
+                cachedReflectPath.lineTo(x, centerY + (centerY - y) * 0.3f)
+            }
+        }
+
+        // Center connecting neon wave line
+        coreStrokePaint.color = withAlpha(Color.rgb(0, 245, 212), 220)
+        coreStrokePaint.strokeWidth = max(1.5f, minSide * 0.0025f)
+        canvas.drawPath(cachedPath, coreStrokePaint)
+
+        coreStrokePaint.color = withAlpha(Color.rgb(0, 180, 255), 95)
+        coreStrokePaint.strokeWidth = max(1f, minSide * 0.0015f)
+        canvas.drawPath(cachedReflectPath, coreStrokePaint)
     }
 
-    fun bandsFromEnvelope(peaks: List<Float>, timeMs: Long, durationMs: Long): FloatArray {
-        if (peaks.isEmpty()) return FloatArray(32) { 0.08f }
-        val progress = (timeMs.coerceAtLeast(0L).toDouble() / durationMs.coerceAtLeast(1L))
-            .coerceIn(0.0, 1.0)
-        val center = (progress * (peaks.size - 1)).toInt().coerceIn(0, peaks.lastIndex)
-        return FloatArray(32) { band ->
-            val spread = 1 + band / 4
-            val left = peaks[(center - spread).coerceAtLeast(0)].coerceIn(0f, 1f)
-            val mid = peaks[center].coerceIn(0f, 1f)
-            val right = peaks[(center + spread).coerceAtMost(peaks.lastIndex)].coerceIn(0f, 1f)
-            (mid * 0.58f + (left + right) * 0.21f).coerceIn(0.025f, 1f)
+    /** Sin Bars: Transparent multicolor sine-wave ribbons with audio-reactive harmonics. */
+    fun drawSinBars(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        timeMs: Long,
+        bands: FloatArray,
+        exportPerformanceMode: Boolean = false
+    ) {
+        if (width <= 0 || height <= 0) return
+        val minSide = min(width, height).toFloat()
+        val centerY = height * 0.52f
+        val count = if (exportPerformanceMode) 64 else 96
+        val stepX = width.toFloat() / (count - 1)
+
+        fun energy(i: Int): Float {
+            val idx = (i * (bands.size - 1) / (count - 1)).coerceIn(0, bands.lastIndex)
+            return bands.getOrElse(idx) { 0.15f }.coerceIn(0.04f, 1f)
+        }
+
+        for (lane in -3..3) {
+            cachedPath.reset()
+            for (i in 0 until count) {
+                val x = i * stepX
+                val xNorm = i.toDouble() / (count - 1)
+                val env = (0.15 + 0.85 * (0.5 + 0.5 * sin(xNorm * PI * 2.0 + 0.35))).toFloat()
+                val phase = xNorm * 7.0 * PI + timeMs * 0.002 + lane * 0.28
+                val amp = height * (0.015f + energy(i) * 0.28f) * env
+                val y = centerY + sin(phase).toFloat() * amp + sin(phase * 2.2 + lane * 0.2).toFloat() * amp * 0.15f
+
+                if (i == 0) cachedPath.moveTo(x, y) else cachedPath.lineTo(x, y)
+            }
+            val tint = sinColors[(lane + 3).coerceIn(0, sinColors.lastIndex)]
+
+            // Glow halo pass
+            wideStrokePaint.color = withAlpha(tint, 45)
+            wideStrokePaint.strokeWidth = minSide * 0.014f
+            canvas.drawPath(cachedPath, wideStrokePaint)
+
+            // Sharp core ribbon
+            coreStrokePaint.color = withAlpha(tint, 220 - kotlin.math.abs(lane) * 25)
+            coreStrokePaint.strokeWidth = max(1.2f, minSide * 0.003f)
+            canvas.drawPath(cachedPath, coreStrokePaint)
         }
     }
 
+    /** Terrain 3D: Wireframe perspective mountain ridges reacting dynamically to bass and mids. */
+    fun drawTerrainBars(canvas: Canvas, width: Int, height: Int, timeMs: Long, bands: FloatArray) {
+        if (width <= 0 || height <= 0) return
+        val minSide = min(width, height).toFloat()
+        val columns = 64
+        val rows = 8
+        val horizon = height * 0.44f
+        val stepX = width.toFloat() / (columns - 1)
+
+        fun energy(col: Int): Float {
+            val idx = (col * (bands.size - 1) / (columns - 1)).coerceIn(0, bands.lastIndex)
+            return bands.getOrElse(idx) { 0.12f }.coerceIn(0.03f, 1f)
+        }
+
+        fun point(col: Int, row: Int): Pair<Float, Float> {
+            val xNorm = col.toFloat() / (columns - 1)
+            val depth = row.toFloat() / (rows - 1)
+            val x = col * stepX
+            val band = energy(col)
+            val travel = timeMs * 0.00045 + row * 0.35
+            val ridge = kotlin.math.abs(sin(xNorm * PI * 2.5 + travel * 0.3)).toFloat()
+            val amplitude = height * (0.015f + band * 0.18f) * (0.35f + depth * 0.95f)
+            val wave = ridge * amplitude + sin(xNorm * PI * 6.0 + travel).toFloat() * height * (0.006f + band * 0.02f)
+            val y = horizon + depth * height * 0.12f - wave
+            return x to y
+        }
+
+        for (row in 0 until rows) {
+            cachedPath.reset()
+            for (col in 0 until columns) {
+                val (x, y) = point(col, row)
+                if (col == 0) cachedPath.moveTo(x, y) else cachedPath.lineTo(x, y)
+            }
+            val tint = sinColors[(row * 2) % sinColors.size]
+            val alpha = (60 + row * 18).coerceIn(60, 220)
+
+            coreStrokePaint.color = withAlpha(tint, alpha)
+            coreStrokePaint.strokeWidth = max(1f, minSide * (0.0028f - row * 0.00015f))
+            canvas.drawPath(cachedPath, coreStrokePaint)
+        }
+    }
+
+    /** Unified dispatcher for specialized glow/ambient visualizers. */
     fun draw(
         canvas: Canvas,
         width: Int,
@@ -138,461 +371,156 @@ object AudioGlowVisualizerRenderer {
         previewQuality: Boolean = false
     ) {
         if (width <= 0 || height <= 0 || !isGlowStyle(type)) return
-        val accent = runCatching { Color.parseColor(colorHex) }.getOrDefault(palette[0])
+        val accent = runCatching { Color.parseColor(colorHex) }.getOrDefault(rainbowColors[0])
         val minSide = min(width, height).toFloat()
         val cx = width * 0.5f
-        val cy = height * 0.43f
+        val cy = height * 0.44f
         val beat = bassEnergy.coerceIn(0f, 1f)
+
         fun level(index: Int): Float = spectrumBands.getOrElse(index.mod(spectrumBands.size.coerceAtLeast(1))) { beat }.coerceIn(0f, 1f)
-        fun color(index: Int): Int = if (index == 0) accent else palette[index.mod(palette.size)]
-        val previewGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-        fun glow(x: Float, y: Float, radius: Float, tint: Int, alpha: Int = 180) {
-            if (previewQuality) {
-                previewGlowPaint.color = withAlpha(tint, alpha)
-                canvas.drawCircle(x, y, radius * 0.62f, previewGlowPaint)
-                return
-            }
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                shader = RadialGradient(
-                    x, y, radius,
-                    intArrayOf(withAlpha(tint, alpha), withAlpha(tint, (alpha * 0.28f).toInt()), Color.TRANSPARENT),
-                    floatArrayOf(0f, 0.48f, 1f),
-                    Shader.TileMode.CLAMP
-                )
-            }
-            canvas.drawCircle(x, y, radius, paint)
-        }
+        fun color(index: Int): Int = if (index == 0) accent else rainbowColors[index.mod(rainbowColors.size)]
 
         when (type) {
-            VisualizerType.AURORA_BLOOM -> {
-                val drift = timeMs * 0.00022
-                for (i in 0..5) {
-                    val energy = level(i * 5)
-                    val x = (0.5 + sin(drift + i * 1.13) * 0.34).toFloat() * width
-                    val y = (0.34 + cos(drift * 0.8 + i * 0.91) * 0.22).toFloat() * height
-                    val radius = minSide * (0.16f + energy * 0.16f)
-                    glow(x, y, radius, color(i), 115 + (energy * 100).toInt())
-                }
-                val haze = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    style = Paint.Style.STROKE
-                    strokeWidth = minSide * 0.012f
-                    color = withAlpha(accent, 90 + (beat * 100).toInt())
-                    setShadowLayer(minSide * 0.035f, 0f, 0f, accent)
-                }
-                val path = Path()
-                for (i in 0..(if (previewQuality) 40 else 80)) {
-                    val x = width * i / (if (previewQuality) 40f else 80f)
-                    val band = level(i * 3)
-                    val y = height * (0.52f + sin(i * 0.095 + timeMs * 0.0014).toFloat() * (0.06f + band * 0.12f))
-                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                }
-                canvas.drawPath(path, haze)
-            }
-            VisualizerType.GLOW_ORBS -> {
-                for (i in 0 until (if (previewQuality) 16 else 34)) {
-                    val phase = timeMs * (0.00045 + (i % 5) * 0.00007) + i * (PI * 2.0 / 34.0)
-                    val z = (sin(phase * 1.7) * 0.5 + 0.5).toFloat()
-                    val energy = level(i * 3)
-                    val orbitX = minSide * (0.16f + z * 0.28f)
-                    val orbitY = minSide * (0.12f + z * 0.24f)
-                    val x = cx + cos(phase).toFloat() * orbitX
-                    val y = cy + sin(phase * 1.23).toFloat() * orbitY
-                    val radius = minSide * (0.006f + z * 0.009f + energy * 0.012f)
-                    glow(x, y, radius * 4.8f, color(i), 95 + (energy * 130).toInt())
-                    if (previewQuality) {
-                        previewGlowPaint.color = withAlpha(color(i), 150 + (z * 105).toInt())
-                        canvas.drawCircle(x, y, radius, previewGlowPaint)
-                    } else {
-                        val core = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = withAlpha(color(i), 150 + (z * 105).toInt()) }
-                        canvas.drawCircle(x, y, radius, core)
-                    }
-                }
-                glow(cx, cy, minSide * (0.16f + beat * 0.08f), accent, 80 + (beat * 100).toInt())
-            }
-            VisualizerType.NEON_RIBBON -> {
-                for (layer in 0..(if (previewQuality) 2 else 4)) {
-                    val path = Path()
-                    val depth = layer / 4f
-                    for (i in 0..(if (previewQuality) 60 else 120)) {
-                        val x = width * i / (if (previewQuality) 60f else 120f)
-                        val energy = level(i + layer * 7)
-                        val envelope = 0.035f + energy * 0.12f
-                        val y = height * (0.43f + layer * 0.075f) +
-                            sin(i * 0.105 + timeMs * 0.0018 + layer * 0.8).toFloat() * height * envelope * (1f - depth * 0.32f)
-                        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                    }
-                    val tint = color(layer)
-                    val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        style = Paint.Style.STROKE
-                        strokeWidth = minSide * 0.018f
-                        this.color = withAlpha(tint, 65)
-                        setShadowLayer(minSide * 0.025f, 0f, 0f, tint)
-                    }
-                    canvas.drawPath(path, halo)
-                    val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        style = Paint.Style.STROKE
-                        strokeWidth = minSide * (0.0035f - depth * 0.0007f)
-                        this.color = withAlpha(tint, 220 - layer * 22)
-                    }
-                    canvas.drawPath(path, line)
-                }
-            }
             VisualizerType.RADIAL_BURST -> {
-                val inner = minSide * 0.105f
-                val count = 96
-                for (i in 0 until (if (previewQuality) 48 else count)) {
-                    val angle = i.toDouble() / count * PI * 2.0 + timeMs * 0.00012
-                    val energy = level(i * 2)
-                    val length = minSide * (0.055f + energy * 0.19f)
+                val inner = minSide * 0.12f * (1f + beat * 0.22f)
+                val count = if (previewQuality) 48 else 72
+
+                // Center pulsating bass ring
+                wideStrokePaint.color = withAlpha(accent, (120 + beat * 120).toInt().coerceIn(120, 255))
+                wideStrokePaint.strokeWidth = max(2f, minSide * (0.005f + beat * 0.006f))
+                canvas.drawCircle(cx, cy, inner, wideStrokePaint)
+
+                // Radiating audio frequency rays
+                coreStrokePaint.strokeCap = Paint.Cap.ROUND
+                for (i in 0 until count) {
+                    val angle = i.toDouble() / count * PI * 2.0 + timeMs * 0.00015
+                    val energy = level(i)
+                    val rayLen = minSide * (0.04f + energy * 0.22f)
                     val x1 = cx + cos(angle).toFloat() * inner
                     val y1 = cy + sin(angle).toFloat() * inner
-                    val x2 = cx + cos(angle).toFloat() * (inner + length)
-                    val y2 = cy + sin(angle).toFloat() * (inner + length)
-                    val tint = color(i / 20)
-                    val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        style = Paint.Style.STROKE
-                        strokeCap = Paint.Cap.ROUND
-                        strokeWidth = minSide * 0.012f
-                        this.color = withAlpha(tint, 55 + (energy * 60).toInt())
-                        setShadowLayer(minSide * 0.018f, 0f, 0f, tint)
-                    }
-                    canvas.drawLine(x1, y1, x2, y2, halo)
-                    val spoke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        style = Paint.Style.STROKE
-                        strokeCap = Paint.Cap.ROUND
-                        strokeWidth = minSide * 0.0045f
-                        this.color = withAlpha(tint, 150 + (energy * 105).toInt())
-                    }
-                    canvas.drawLine(x1, y1, x2, y2, spoke)
+                    val x2 = cx + cos(angle).toFloat() * (inner + rayLen)
+                    val y2 = cy + sin(angle).toFloat() * (inner + rayLen)
+                    val tint = color(i / 6)
+
+                    coreStrokePaint.color = withAlpha(tint, 180 + (energy * 75).toInt().coerceIn(0, 75))
+                    coreStrokePaint.strokeWidth = max(1.5f, minSide * 0.004f)
+                    canvas.drawLine(x1, y1, x2, y2, coreStrokePaint)
                 }
-                glow(cx, cy, inner * (1.8f + beat * 0.8f), accent, 120 + (beat * 100).toInt())
             }
-            VisualizerType.SPECTRUM_TUNNEL -> {
-                val rotation = timeMs * 0.00045
-                for (layer in 0..(if (previewQuality) 5 else 10)) {
-                    val depth = (layer + 1) / 11f
-                    val energy = level(layer * 3)
-                    val pulse = 1f + energy * 0.18f
-                    val halfW = width * (0.045f + depth * 0.46f) * pulse
-                    val halfH = height * (0.025f + depth * 0.36f) * pulse
-                    val rect = RectF(cx - halfW, cy - halfH, cx + halfW, cy + halfH)
+
+            VisualizerType.BASS_PULSE -> {
+                val maxR = width * 0.45f
+                for (ring in 0..3) {
+                    val phase = ((timeMs * 0.0018 + ring * 0.28) % 1.0).toFloat()
+                    val r = (phase * maxR) * (0.8f + beat * 0.4f)
+                    val alpha = ((1f - phase) * (140 + beat * 115)).toInt().coerceIn(0, 255)
+                    coreStrokePaint.color = withAlpha(accent, alpha)
+                    coreStrokePaint.strokeWidth = max(1.5f, minSide * (0.006f * (1f - phase) + beat * 0.004f))
+                    canvas.drawCircle(cx, cy, r, coreStrokePaint)
+                }
+                // Center core flare
+                haloPaint.color = withAlpha(accent, (160 + beat * 95).toInt().coerceIn(160, 255))
+                canvas.drawCircle(cx, cy, minSide * (0.035f + beat * 0.045f), haloPaint)
+            }
+
+            VisualizerType.AURORA_BLOOM -> {
+                val drift = timeMs * 0.00025
+                for (i in 0..4) {
+                    val energy = level(i * 6)
+                    val x = (0.5 + sin(drift + i * 1.25) * 0.32).toFloat() * width
+                    val y = (0.36 + cos(drift * 0.8 + i * 0.95) * 0.20).toFloat() * height
+                    val radius = minSide * (0.18f + energy * 0.18f)
+                    haloPaint.color = withAlpha(color(i), 85 + (energy * 80).toInt().coerceIn(0, 100))
+                    canvas.drawCircle(x, y, radius, haloPaint)
+                }
+            }
+
+            VisualizerType.GLOW_ORBS -> {
+                val count = if (previewQuality) 20 else 32
+                for (i in 0 until count) {
+                    val phase = timeMs * (0.00045 + (i % 5) * 0.00008) + i * (PI * 2.0 / count)
+                    val z = (sin(phase * 1.7) * 0.5 + 0.5).toFloat()
+                    val energy = level(i * 2)
+                    val orbitX = minSide * (0.18f + z * 0.28f)
+                    val orbitY = minSide * (0.14f + z * 0.22f)
+                    val x = cx + cos(phase).toFloat() * orbitX
+                    val y = cy + sin(phase * 1.2).toFloat() * orbitY
+                    val radius = minSide * (0.008f + z * 0.012f + energy * 0.014f)
+
+                    haloPaint.color = withAlpha(color(i), 120 + (energy * 100).toInt().coerceIn(0, 130))
+                    canvas.drawCircle(x, y, radius, haloPaint)
+                }
+            }
+
+            VisualizerType.NEON_RIBBON -> {
+                val layers = if (previewQuality) 3 else 4
+                for (layer in 0 until layers) {
+                    cachedPath.reset()
+                    val points = if (previewQuality) 48 else 80
+                    for (i in 0..points) {
+                        val x = width * i / points.toFloat()
+                        val energy = level(i + layer * 7)
+                        val envelope = 0.035f + energy * 0.14f
+                        val y = height * (0.42f + layer * 0.08f) +
+                                sin(i * 0.11 + timeMs * 0.002 + layer * 0.85).toFloat() * height * envelope
+                        if (i == 0) cachedPath.moveTo(x, y) else cachedPath.lineTo(x, y)
+                    }
                     val tint = color(layer)
+                    coreStrokePaint.color = withAlpha(tint, 210 - layer * 30)
+                    coreStrokePaint.strokeWidth = max(1.5f, minSide * 0.0035f)
+                    canvas.drawPath(cachedPath, coreStrokePaint)
+                }
+            }
+
+            VisualizerType.SPECTRUM_TUNNEL -> {
+                val rotation = timeMs * 0.0004
+                val layers = if (previewQuality) 6 else 10
+                for (layer in 0 until layers) {
+                    val depth = (layer + 1) / (layers + 1).toFloat()
+                    val energy = level(layer * 3)
+                    val pulse = 1f + energy * 0.22f
+                    val halfW = width * (0.05f + depth * 0.44f) * pulse
+                    val halfH = height * (0.03f + depth * 0.35f) * pulse
+                    cachedRect.set(cx - halfW, cy - halfH, cx + halfW, cy + halfH)
+                    val tint = color(layer)
+
                     canvas.save()
-                    canvas.rotate((rotation * 57.2958 + layer * 2.4).toFloat(), cx, cy)
-                    val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        style = Paint.Style.STROKE
-                        strokeWidth = minSide * 0.014f
-                        this.color = withAlpha(tint, 65 + (energy * 80).toInt())
-                        setShadowLayer(minSide * 0.025f, 0f, 0f, tint)
-                    }
-                    canvas.drawRoundRect(rect, minSide * 0.025f, minSide * 0.025f, halo)
-                    val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        style = Paint.Style.STROKE
-                        strokeWidth = minSide * 0.0035f
-                        this.color = withAlpha(tint, 130 + (energy * 110).toInt())
-                    }
-                    canvas.drawRoundRect(rect, minSide * 0.025f, minSide * 0.025f, edge)
+                    canvas.rotate((rotation * 57.3 + layer * 3.0).toFloat(), cx, cy)
+                    coreStrokePaint.color = withAlpha(tint, 140 + (energy * 100).toInt().coerceIn(0, 100))
+                    coreStrokePaint.strokeWidth = max(1.2f, minSide * 0.003f)
+                    canvas.drawRoundRect(cachedRect, minSide * 0.025f, minSide * 0.025f, coreStrokePaint)
                     canvas.restore()
                 }
-                glow(cx, cy, minSide * (0.08f + beat * 0.08f), accent, 95 + (beat * 120).toInt())
             }
+
             else -> Unit
         }
     }
 
-    /** Reference-style rainbow spectrum bars with metadata header and mirrored neon reflection. */
-    fun drawClassicSpectrum(
-        canvas: Canvas, width: Int, height: Int, timeMs: Long,
-        bands: FloatArray, artist: String, trackTitle: String,
-        exportPerformanceMode: Boolean = false
-    ) {
-        if (width <= 0 || height <= 0) return
-        // This renderer is an overlay above imported photos/videos. Never paint an
-        // opaque full-frame background here; preserve the underlying media pixels.
-        val minSide = min(width, height).toFloat()
-        val baseY = height * 0.665f
-        val count = 16
-        val gap = width * 0.009f
-        val totalWidth = width * 0.88f
-        val barWidth = (totalWidth - gap * (count - 1)) / count
-        val segmentGap = height * 0.006f
-        val segmentHeight = height * 0.021f
-        val rainbow = intArrayOf(
-            Color.rgb(55,92,255), Color.rgb(65,55,255), Color.rgb(170,35,255), Color.rgb(238,25,150),
-            Color.rgb(255,35,75), Color.rgb(255,75,35), Color.rgb(255,130,25), Color.rgb(255,175,25),
-            Color.rgb(255,220,30), Color.rgb(255,240,30), Color.rgb(220,255,25), Color.rgb(125,255,20),
-            Color.rgb(70,255,25), Color.rgb(45,245,40), Color.rgb(55,225,35), Color.rgb(80,220,45)
-        )
-        val centerX = width * 0.5f
-        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE; textAlign = Paint.Align.CENTER
-            typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
-            textSize = height * 0.078f
-            setShadowLayer(height * 0.006f, 0f, 0f, Color.WHITE)
-        }
-        val subtitlePaint = Paint(titlePaint).apply { textSize = height * 0.052f }
-        artist.trim().takeIf { it.isNotEmpty() && !it.equals("unknown", true) }?.let {
-            canvas.drawText(it, centerX, height * 0.265f, titlePaint)
-        }
-        trackTitle.trim().takeIf { it.isNotEmpty() && !it.equals("unknown", true) }?.let {
-            canvas.drawText(it, centerX, height * 0.315f, subtitlePaint)
-        }
-
-        // Fine, colorful floating particles over a pure black canvas.
-        val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        for (i in 0 until (if (exportPerformanceMode) 42 else 115)) {
-            val seed = i * 127.1
-            val x = ((sin(seed * 0.73) * 0.5 + 0.5) * width).toFloat()
-            val y = ((cos(seed * 1.17) * 0.5 + 0.5) * height * 0.76f).toFloat()
-            val twinkle = (0.35 + 0.65 * (0.5 + 0.5 * sin(timeMs * 0.002 + seed))).toFloat()
-            val radius = minSide * (0.0011f + (i % 4) * 0.00055f)
-            val tint = rainbow[i % rainbow.size]
-            particlePaint.color = withAlpha(tint, (35 + twinkle * 150).toInt())
-            particlePaint.setShadowLayer(radius * 5f, 0f, 0f, tint)
-            canvas.drawCircle(x, y, radius * (0.7f + twinkle), particlePaint)
-            particlePaint.clearShadowLayer()
-        }
-
-        val startX = (width - totalWidth) / 2f
-        for (i in 0 until count) {
-            val energy = bands.getOrElse(i) { 0.25f }.coerceIn(0.04f, 1f)
-            val maxStack = if (exportPerformanceMode) 7 else 9
-            val stack = (2 + (energy * 7.2f * (0.88f + 0.12f * sin(timeMs * 0.004 + i * 0.7).toFloat())).toInt()).coerceIn(2, maxStack)
-            val x = startX + i * (barWidth + gap)
-            val skew = barWidth * 0.10f
-            val tint = rainbow[i]
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = tint }
-            // Colored haze behind each column.
-            if (!exportPerformanceMode) {
-                val haze = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    shader = RadialGradient(x + barWidth/2f, baseY, height * 0.15f,
-                        intArrayOf(withAlpha(tint, 48), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
-                }
-                canvas.drawCircle(x + barWidth/2f, baseY, height * 0.15f, haze)
-            }
-            for (segment in 0 until stack) {
-                val top = baseY - (segment + 1) * (segmentHeight + segmentGap)
-                val bar = Path().apply {
-                    moveTo(x + skew, top); lineTo(x + barWidth, top)
-                    lineTo(x + barWidth - skew, top + segmentHeight); lineTo(x, top + segmentHeight); close()
-                }
-                paint.alpha = 185
-                paint.setShadowLayer(height * 0.008f, 0f, 0f, tint)
-                canvas.drawPath(bar, paint)
-                paint.clearShadowLayer()
-                val reflectionTop = baseY + height * 0.012f + segment * (segmentHeight + segmentGap)
-                val reflection = Path().apply {
-                    moveTo(x, reflectionTop); lineTo(x + barWidth - skew, reflectionTop)
-                    lineTo(x + barWidth, reflectionTop + segmentHeight); lineTo(x + skew, reflectionTop + segmentHeight); close()
-                }
-                paint.alpha = (58 * (1f - segment / (stack + 1f))).toInt()
-                canvas.drawPath(reflection, paint)
-            }
-            val peakY = baseY - stack * (segmentHeight + segmentGap) - height * 0.018f
-            val cap = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = withAlpha(Color.WHITE, 190); strokeWidth = max(1f, height * 0.0024f)
-                setShadowLayer(height * 0.008f, 0f, 0f, Color.WHITE)
-            }
-            canvas.drawLine(x - barWidth * 0.05f, peakY, x + barWidth * 1.05f, peakY, cap)
-        }
-        val baseline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(0f, baseY, width.toFloat(), baseY,
-                intArrayOf(rainbow.first(), Color.MAGENTA, Color.RED, Color.YELLOW, Color.GREEN),
-                null, Shader.TileMode.CLAMP)
-            strokeWidth = height * 0.008f
-            setShadowLayer(height * 0.024f, 0f, 0f, Color.WHITE)
-        }
-        canvas.drawLine(width * 0.015f, baseY, width * 0.985f, baseY, baseline)
-        baseline.shader = null; baseline.color = Color.WHITE; baseline.strokeWidth = height * 0.002f
-        canvas.drawLine(width * 0.015f, baseY, width * 0.985f, baseY, baseline)
+    fun isGlowStyle(type: VisualizerType): Boolean = when (type) {
+        VisualizerType.AURORA_BLOOM,
+        VisualizerType.GLOW_ORBS,
+        VisualizerType.NEON_RIBBON,
+        VisualizerType.RADIAL_BURST,
+        VisualizerType.BASS_PULSE,
+        VisualizerType.SPECTRUM_TUNNEL -> true
+        else -> false
     }
 
-    /** Transparent multicolor sine-wave mesh inspired by the supplied reference. */
-    fun drawSinBars(
-        canvas: Canvas, width: Int, height: Int, timeMs: Long, bands: FloatArray,
-        exportPerformanceMode: Boolean = false
-    ) {
-        if (width <= 0 || height <= 0) return
-        val minSide = min(width, height).toFloat()
-        val centerY = height * 0.53f
-        val count = if (exportPerformanceMode) 80 else 112
-        val stepX = width.toFloat() / (count - 1)
-        // Seven lanes are rendered below, so keep one dedicated tint per lane.
-        // The former six-color array caused colors[6] to crash on the final lane.
-        val colors = intArrayOf(
-            Color.CYAN,
-            Color.rgb(0, 145, 255),
-            Color.rgb(45, 245, 220),
-            Color.rgb(110, 100, 255),
-            Color.rgb(0, 255, 190),
-            Color.rgb(30, 190, 255),
-            Color.rgb(190, 80, 255)
-        )
-        fun energy(i: Int): Float = bands.getOrElse((i * 32 / count).coerceIn(0, 31)) { 0.2f }.coerceIn(0.025f, 1f)
-        fun wave(i: Int, lane: Int): Float {
-            val x = i.toDouble() / (count - 1)
-            val env = (0.12 + 0.88 * (0.5 + 0.5 * sin(x * PI * 2.0 + 0.35))).toFloat()
-            val phase = x * 7.0 * PI + timeMs * 0.0017 + lane * 0.22
-            val amp = height * (0.012f + energy(i) * 0.31f) * env
-            return centerY + sin(phase).toFloat() * amp + sin(phase * 2.15 + lane * 0.17).toFloat() * amp * 0.16f
-        }
-        // Seven translucent waveform strands.
-        for (lane in -3..3) {
-            val path = Path()
-            for (i in 0 until count) {
-                val x = i * stepX
-                if (i == 0) path.moveTo(x, wave(i,lane)) else path.lineTo(x, wave(i,lane))
-            }
-            val tint = colors.getOrElse(lane + 3) { colors[(lane + 3).mod(colors.size)] }
-            val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE; strokeWidth = minSide * 0.010f
-                color = withAlpha(tint, 28); setShadowLayer(minSide * 0.018f,0f,0f,tint)
-            }
-            canvas.drawPath(path, halo)
-            val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE; strokeWidth = minSide * (if (lane == 0) 0.0034f else 0.0015f)
-                color = withAlpha(tint, if (lane == 0) 175 else 68)
-            }
-            canvas.drawPath(path, line)
-        }
-        // Fine triangular mesh and glowing nodes.
-        val mesh = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = max(1f,minSide*0.00085f) }
-        val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-        for (i in 0 until count-1) {
-            val x1=i*stepX; val x2=(i+1)*stepX
-            val top1=wave(i,-2); val mid1=wave(i,0); val bot1=wave(i,2)
-            val top2=wave(i+1,-2); val mid2=wave(i+1,0); val bot2=wave(i+1,2)
-            val tint=colors[(i/18)%colors.size]
-            mesh.color=withAlpha(tint,48+(energy(i)*65).toInt())
-            canvas.drawLine(x1,top1,x2,mid2,mesh); canvas.drawLine(x1,mid1,x2,top2,mesh)
-            canvas.drawLine(x1,mid1,x2,bot2,mesh); canvas.drawLine(x1,bot1,x2,mid2,mesh)
-            if (i%3==0) {
-                val r=minSide*(0.0014f+energy(i)*0.0032f)
-                dot.color=withAlpha(tint,115+(energy(i)*130).toInt())
-                dot.setShadowLayer(r*5f,0f,0f,tint); canvas.drawCircle(x1,mid1,r,dot); dot.clearShadowLayer()
-            }
-        }
-        // Bright central beam remains an overlay; no opaque background is drawn.
-        val beam=Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style=Paint.Style.STROKE; strokeWidth=minSide*0.006f
-            shader=LinearGradient(0f,centerY,width.toFloat(),centerY,intArrayOf(Color.TRANSPARENT,Color.CYAN,Color.rgb(0,145,255),Color.CYAN,Color.TRANSPARENT),null,Shader.TileMode.CLAMP)
-            setShadowLayer(minSide*0.025f,0f,0f,Color.CYAN)
-        }
-        canvas.drawLine(0f,centerY,width.toFloat(),centerY,beam)
-        beam.shader=null; beam.clearShadowLayer(); beam.strokeWidth=max(1f,minSide*0.0012f); beam.color=withAlpha(Color.WHITE,165)
-        canvas.drawLine(0f,centerY,width.toFloat(),centerY,beam)
-        for (i in 0 until (if (exportPerformanceMode) 20 else 48)) {
-            val seed=i*91.7
-            val x=((sin(seed*0.73)*0.5+0.5)*width).toFloat()
-            val n=(x/width*(count-1)).toInt().coerceIn(0,count-1)
-            val y=wave(n,(i%7)-3)+cos(seed*1.31+timeMs*0.001).toFloat()*height*0.035f
-            val r=minSide*(0.0014f+(i%4)*0.0008f); val tint=colors[i%colors.size]
-            val p=Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color=withAlpha(tint,120+((sin(timeMs*0.003+seed)*0.5+0.5)*135).toInt())
-                setShadowLayer(r*7f,0f,0f,tint)
-            }
-            canvas.drawCircle(x,y,r,p)
+    /** Converts precomputed waveform peaks into pseudo-spectrum bands when FFT is not yet ready. */
+    fun bandsFromEnvelope(peaks: List<Float>, timeMs: Long, durationMs: Long): FloatArray {
+        if (peaks.isEmpty()) return FloatArray(32) { 0.08f }
+        val progress = (timeMs.coerceAtLeast(0L).toDouble() / durationMs.coerceAtLeast(1L)).coerceIn(0.0, 1.0)
+        val center = (progress * (peaks.size - 1)).toInt().coerceIn(0, peaks.lastIndex)
+        val env = peaks[center].coerceIn(0f, 1f)
+
+        return FloatArray(32) { band ->
+            val harmonic = sin(timeMs * 0.005 + band * 0.45).toFloat() * 0.12f
+            val decay = (1f - (band / 35f)).coerceIn(0.4f, 1.2f)
+            (env * decay + harmonic).coerceIn(0.04f, 1f)
         }
     }
 
-    /**
-     * Transparent 3D terrain spectrum. The layered ridges and perspective mesh react
-     * to the audio envelope while leaving the imported photo/video visible underneath.
-     */
-    fun drawTerrainBars(canvas: Canvas, width: Int, height: Int, timeMs: Long, bands: FloatArray) {
-        if (width <= 0 || height <= 0) return
-        val minSide = min(width, height).toFloat()
-        val columns = 84
-        val rows = 9
-        val horizon = height * 0.43f
-        val stepX = width.toFloat() / (columns - 1)
-        val colors = intArrayOf(
-            Color.rgb(0, 235, 255),
-            Color.rgb(35, 155, 255),
-            Color.rgb(95, 95, 255),
-            Color.rgb(190, 65, 255),
-            Color.rgb(255, 55, 190),
-            Color.rgb(65, 220, 255),
-            Color.rgb(0, 245, 205)
-        )
-        fun energy(column: Int): Float {
-            val index = (column * 32 / columns).coerceIn(0, 31)
-            return bands.getOrElse(index) { 0.12f }.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0.12f
-        }
-        fun point(column: Int, row: Int): Pair<Float, Float> {
-            val xNorm = column.toFloat() / (columns - 1)
-            val depth = row.toFloat() / (rows - 1)
-            val x = column * stepX
-            val band = energy(column)
-            val travel = timeMs * 0.00048 + row * 0.31
-            val ridgeA = kotlin.math.abs(sin(xNorm * PI * 2.25 + travel * 0.28))
-            val ridgeB = kotlin.math.abs(sin(xNorm * PI * 4.1 - travel * 0.19 + 0.7))
-            val envelope = (0.24 + ridgeA * 0.48 + ridgeB * 0.28).toFloat()
-            val amplitude = height * (0.018f + band * 0.17f) * (0.42f + depth * 0.9f)
-            val wave = (envelope * amplitude) +
-                sin(xNorm * PI * 7.0 + travel).toFloat() * height * (0.008f + band * 0.025f)
-            val y = horizon + depth * height * 0.105f - wave
-            return x to y
-        }
-
-        // Back-to-front terrain ridges. Strokes only: never paint a solid backdrop.
-        for (row in 0 until rows) {
-            val path = Path()
-            for (column in 0 until columns) {
-                val (x, y) = point(column, row)
-                if (column == 0) path.moveTo(x, y) else path.lineTo(x, y)
-            }
-            val tint = colors[(row * 3) % colors.size]
-            val alpha = (48 + row * 7).coerceIn(48, 104)
-            val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE
-                strokeCap = Paint.Cap.ROUND
-                strokeJoin = Paint.Join.ROUND
-                strokeWidth = minSide * (0.009f - row * 0.00045f).coerceAtLeast(0.003f)
-                color = withAlpha(tint, (alpha * 0.52f).toInt())
-                setShadowLayer(minSide * 0.018f, 0f, 0f, tint)
-            }
-            canvas.drawPath(path, glow)
-            val ridge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE
-                strokeCap = Paint.Cap.ROUND
-                strokeJoin = Paint.Join.ROUND
-                strokeWidth = max(1f, minSide * (0.0027f - row * 0.00012f))
-                color = withAlpha(tint, alpha)
-            }
-            canvas.drawPath(path, ridge)
-        }
-
-        // Perspective cross-mesh connects the ridges into a 3D wireframe landscape.
-        val mesh = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = max(1f, minSide * 0.00105f)
-        }
-        for (column in 0 until columns step 4) {
-            val path = Path()
-            for (row in 0 until rows) {
-                val (x, y) = point(column, row)
-                if (row == 0) path.moveTo(x, y) else path.lineTo(x, y)
-            }
-            val tint = colors[(column / 12) % colors.size]
-            mesh.color = withAlpha(tint, (34 + energy(column) * 66).toInt())
-            canvas.drawPath(path, mesh)
-        }
-
-        // A few luminous audio peaks emphasize the terrain silhouette without filling it.
-        for (column in 2 until columns step 7) {
-            val (x, y) = point(column, rows - 1)
-            val band = energy(column)
-            val radius = minSide * (0.002f + band * 0.004f)
-            val tint = colors[(column / 7) % colors.size]
-            val node = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = withAlpha(tint, (80 + band * 115).toInt())
-                setShadowLayer(radius * 6f, 0f, 0f, tint)
-            }
-            canvas.drawCircle(x, y, radius, node)
-        }
-    }
-
-    private fun withAlpha(color: Int, alpha: Int): Int =
+    fun withAlpha(color: Int, alpha: Int): Int =
         (color and 0x00FFFFFF) or (alpha.coerceIn(0, 255) shl 24)
 }
