@@ -136,6 +136,9 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         audioEngine.stop()
         val restoredLyrics = newProject.lyrics
             .sortedWith(compareBy<LyricLine> { it.startMs }.thenBy { it.endMs })
+        // Keep the saved typography exactly as authored by the user.
+        // New projects and legacy JSON files without typography receive defaults
+        // from VideoProject/TypographyPreset constructor defaults.
         val restoredProject = newProject.copy(lyrics = restoredLyrics)
         _project.value = restoredProject
         _selectedLineId.value = restoredLyrics.firstOrNull()?.id
@@ -689,7 +692,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // --- Export Video Workflow ---
-    fun startExport(quality: ExportQuality, durationSec: Int = 15, removeWatermark: Boolean = false) {
+    fun startExport(quality: ExportQuality, durationSec: Int = 0, removeWatermark: Boolean = false) {
         if (_isExporting.value) return
         audioEngine.pause()
         _lastExportedFile.value = null
