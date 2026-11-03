@@ -17,6 +17,7 @@ import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
+import kotlin.math.tanh
 
 data class AudioAnalysisResult(val spectrumFrames: List<List<Float>>, val pitchFramesHz: List<Float>, val beatTimesMs: List<Long>, val frameDurationMs: Long)
 
@@ -25,6 +26,13 @@ object AudioSpectrumAnalyzer {
     private const val N = 1024
     private const val HOP = 512
     private const val BANDS = 32
+
+    // Analysis-only gain; playback and exported audio are never modified.
+    private const val PCM_ANALYSIS_GAIN = 3.0f
+    private const val BASS_ANALYSIS_GAIN = 1.8f
+    private const val MID_ANALYSIS_GAIN = 1.3f
+    private const val TREBLE_ANALYSIS_GAIN = 2.0f
+    private val PCM_SOFT_CLIP_NORMALIZER = tanh(PCM_ANALYSIS_GAIN.toDouble()).toFloat()
 
     suspend fun analyze(context: Context, uriString: String, durationMs: Long): AudioAnalysisResult = withContext(Dispatchers.IO) {
         val extractor = MediaExtractor()
@@ -56,10 +64,12 @@ object AudioSpectrumAnalyzer {
             var inputDone = false
             var outputDone = false
             val info = MediaCodec.BufferInfo()
-            val frameMs = max(1L, HOP * 1000L / rate)
+            var frameMs = max(1L, HOP * 1000L / rate)
 
             fun push(sample: Float) {
-                window[filled++] = sample.coerceIn(-1f, 1f)
+                // Boost only this private analyzer PCM copy; soft clipping avoids hard distortion.
+                val boosted = tanh(sample.coerceIn(-1f, 1f) * PCM_ANALYSIS_GAIN).toFloat() / PCM_SOFT_CLIP_NORMALIZER.coerceAtLeast(0.001f)
+                window[filled++] = boosted.coerceIn(-1f, 1f)
                 if (filled == N) {
                     val levels = logBands(fft(window), rate)
                     spectra.add(levels.toList())
@@ -99,6 +109,7 @@ object AudioSpectrumAnalyzer {
                         rate = out.getInteger(MediaFormat.KEY_SAMPLE_RATE).coerceAtLeast(8000)
                         channels = out.getInteger(MediaFormat.KEY_CHANNEL_COUNT).coerceAtLeast(1)
                         encoding = runCatching { out.getInteger(MediaFormat.KEY_PCM_ENCODING) }.getOrDefault(AudioFormat.ENCODING_PCM_16BIT)
+                        frameMs = max(1L, HOP * 1000L / rate)
                     }
                     MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
                     else -> if (outIndex >= 0) {
@@ -214,7 +225,13 @@ object AudioSpectrumAnalyzer {
             val last = (high * N / rate).toInt().coerceIn(first, mag.lastIndex)
             var sum = 0f
             for (i in first..last) sum += mag[i]
-            (ln(1f + sum / N * 10f) / ln(11f)).coerceIn(0f, 1f)
+            val normalized = (ln(1f + sum / N * 10f) / ln(11f)).coerceIn(0f, 1f)
+            val gain = when {
+                b < 7 -> BASS_ANALYSIS_GAIN
+                b < 22 -> MID_ANALYSIS_GAIN
+                else -> TREBLE_ANALYSIS_GAIN
+            }
+            (normalized * gain).coerceIn(0f, 1f)
         }
     }
 
