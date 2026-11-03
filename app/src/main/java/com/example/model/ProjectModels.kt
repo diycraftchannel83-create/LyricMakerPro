@@ -28,6 +28,10 @@ enum class TextTransitionEffect(val label: String, val description: String) {
 }
 
 enum class VisualizerType(val label: String, val description: String) {
+    THREE_D_TUNNEL("3D Neon Tunnel", "Layered perspective tunnel pulsing with the music"),
+    THREE_D_RADIAL("3D Radial Spectrum", "Dimensional circular spectrum with depth and glow"),
+    THREE_D_WAVE("3D Wave Ribbon", "Layered flowing wave ribbons reacting to the track"),
+    THREE_D_ORBIT("3D Particle Orbit", "Depth-layered particles orbiting to the audio rhythm"),
     BARS_SPECTRUM("Spectrum Bars", "16-band gradient frequency spectrum equalizer"),
     CIRCULAR_WAVE("Sin Bars", "Colorful animated sine-wave spectrum with luminous particles and mesh lines"),
     OSCILLOSCOPE("Terrain Bars", "Transparent 3D neon terrain spectrum mesh with audio-reactive peaks"),
@@ -68,7 +72,7 @@ data class TypographyPreset(
     val id: String = UUID.randomUUID().toString(),
     val name: String,
     val fontFamilyName: String = "SansSerif",
-    val fontSizeSp: Float = 18f,
+    val fontSizeSp: Float = 7f,
     val primaryColorHex: String = "#FFFFFF",
     val highlightColorHex: String = "#00F5D4",
     val strokeColorHex: String = "#000000",
@@ -80,7 +84,7 @@ data class TypographyPreset(
     val isItalic: Boolean = false,
     val textAlign: TextAlign = TextAlign.Center,
     val positionXPercent: Float = 50f,
-    val positionYPercent: Float = 56f,
+    val positionYPercent: Float = 80f,
     val visualEffect: FontVisualEffect = FontVisualEffect.NEON_GLOW,
     val lyricLayout: LyricLayoutMode = LyricLayoutMode.SINGLE_LINE
 )
@@ -156,7 +160,8 @@ data class VideoProject(
     val canvasRatio: CanvasRatio = CanvasRatio.TIKTOK_REELS_9_16,
     val audioTrack: AudioTrackConfig,
     val lyrics: List<LyricLine>,
-    val typography: TypographyPreset,
+    // Missing typography in older JSON project files receives safe editor defaults.
+    val typography: TypographyPreset = TypographyPreset(name = "Default"),
     val transitionEffect: TextTransitionEffect = TextTransitionEffect.KARAOKE_SWEEP,
     val visualizer: VisualizerType = VisualizerType.BARS_SPECTRUM,
     val visualizerColorHex: String = "#00F5D4",
