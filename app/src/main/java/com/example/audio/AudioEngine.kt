@@ -215,7 +215,7 @@ class AudioEngine(private val context: Context) {
         envelopeFloor += (localBaseline - envelopeFloor) * 0.035f
         val transient = if (envelope > max(0.08f, envelopeFloor * 1.42f) &&
             envelope - previousEnvelope > 0.025f &&
-            positionMs - lastBeatTimeMs > 180L
+            (lastBeatTimeMs == Long.MIN_VALUE || positionMs - lastBeatTimeMs > 180L)
         ) {
             lastBeatTimeMs = positionMs
             ((envelope - envelopeFloor) / (1f - envelopeFloor).coerceAtLeast(0.08f)).coerceIn(0f, 1f)
