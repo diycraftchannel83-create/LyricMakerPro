@@ -119,6 +119,25 @@ object AudioGlowVisualizerRenderer {
      * Transparent overlay: never paints an opaque background, so imported media remains visible.
      * Uses cached Paint/RectF instances and a reduced particle count in export mode.
      */
+    /** Draws only the metadata header when the spectrum itself is rendered by OpenGL. */
+    fun drawClassicSpectrumMetadata(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        artist: String,
+        trackTitle: String
+    ) {
+        val centerX = width * 0.5f
+        if (artist.isNotBlank() && !artist.equals("unknown", true)) {
+            titlePaint.textSize = height * 0.052f
+            canvas.drawText(artist.trim(), centerX, height * 0.25f, titlePaint)
+        }
+        if (trackTitle.isNotBlank() && !trackTitle.equals("unknown", true)) {
+            subtitlePaint.textSize = height * 0.034f
+            canvas.drawText(trackTitle.trim(), centerX, height * 0.295f, subtitlePaint)
+        }
+    }
+
     fun drawClassicSpectrum(
         canvas: Canvas,
         width: Int,

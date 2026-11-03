@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.winsmediatama.lyricmakerpro.model.*
 import com.winsmediatama.lyricmakerpro.visualizer.AudioGlowVisualizerRenderer
+import com.winsmediatama.lyricmakerpro.visualizer.opengl.GLSpectrumVisualizerView
 import com.winsmediatama.lyricmakerpro.audio.AudioSpectrumAnalyzer
 import com.winsmediatama.lyricmakerpro.ui.theme.*
 import kotlin.math.*
@@ -218,7 +219,30 @@ fun VideoPreviewPlayer(
                     PreviewBackground(project.background, playheadMs, Modifier.fillMaxSize())
                 }
 
-                // 2. High-Performance Visualizer Canvas Overlay
+                // Spectrum Bars preview uses the OpenGL ES 3.0 renderer.
+                // Canvas remains responsible for lyrics, watermark, and all other visualizer modes.
+                if (project.visualizer == VisualizerType.BARS_SPECTRUM) {
+                    val glBands = if (project.audioTrack.spectrumFrames.isNotEmpty()) {
+                        AudioSpectrumAnalyzer.bandsAt(
+                            project.audioTrack.spectrumFrames,
+                            playheadMs,
+                            project.audioTrack.analysisFrameDurationMs
+                        )
+                    } else if (project.audioTrack.waveformPeaks.isNotEmpty()) {
+                        AudioGlowVisualizerRenderer.bandsFromEnvelope(
+                            project.audioTrack.waveformPeaks, playheadMs, project.durationMs
+                        )
+                    } else {
+                        spectrumBands
+                    }
+                    AndroidView(
+                        factory = { viewContext -> GLSpectrumVisualizerView(viewContext) },
+                        update = { view -> view.updateFrame(playheadMs, glBands) },
+                        modifier = Modifier.fillMaxSize().testTag("visualizer_opengl_overlay")
+                    )
+                }
+
+                // 2. Canvas overlay keeps lyrics and editor overlays independent of the GPU spectrum.
                 Canvas(modifier = Modifier.fillMaxSize().testTag("visualizer_canvas_overlay")) {
                     val canvasWidth = size.width.toInt()
                     val canvasHeight = size.height.toInt()
@@ -232,7 +256,8 @@ fun VideoPreviewPlayer(
                         height = canvasHeight,
                         spectrumBands = spectrumBands,
                         bassEnergy = bassEnergy,
-                        watermarkBitmap = watermarkBitmap
+                        watermarkBitmap = watermarkBitmap,
+                        renderSpectrumBars = project.visualizer != VisualizerType.BARS_SPECTRUM
                     )
                 }
 
@@ -514,7 +539,8 @@ private fun drawVisualizerOverlay(
     height: Int,
     spectrumBands: FloatArray,
     bassEnergy: Float,
-    watermarkBitmap: Bitmap? = null
+    watermarkBitmap: Bitmap? = null,
+    renderSpectrumBars: Boolean = true
 ) {
     val native = drawScope.drawContext.canvas.nativeCanvas
     val fftBands = AudioSpectrumAnalyzer.bandsAt(project.audioTrack.spectrumFrames, timeMs, project.audioTrack.analysisFrameDurationMs)
@@ -525,8 +551,14 @@ private fun drawVisualizerOverlay(
         val bars = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty())
             AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
         else activeBands
-        AudioGlowVisualizerRenderer.drawClassicSpectrum(native, width, height, timeMs, bars,
-            project.audioTrack.artist, project.audioTrack.title)
+        if (renderSpectrumBars) {
+            AudioGlowVisualizerRenderer.drawClassicSpectrum(native, width, height, timeMs, bars,
+                project.audioTrack.artist, project.audioTrack.title)
+        } else {
+            AudioGlowVisualizerRenderer.drawClassicSpectrumMetadata(
+                native, width, height, project.audioTrack.artist, project.audioTrack.title
+            )
+        }
     }
     val visColor = try { AndroidColor.parseColor(project.visualizerColorHex) } catch (_: Exception) { AndroidColor.CYAN }
     if (AudioGlowVisualizerRenderer.isGlowStyle(project.visualizer)) {

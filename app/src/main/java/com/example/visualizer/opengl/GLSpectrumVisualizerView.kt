@@ -8,9 +8,6 @@ import android.util.AttributeSet
 import com.winsmediatama.lyricmakerpro.R
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.nio.FloatBuffer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -47,11 +44,8 @@ class GLSpectrumVisualizerView @JvmOverloads constructor(
         private var resolutionLocation = -1
         private var timeLocation = -1
         private var bandsLocation = -1
-        private val vertices: FloatBuffer = ByteBuffer.allocateDirect(3 * 2 * 4)
-            .order(ByteOrder.nativeOrder()).asFloatBuffer().apply {
-                put(floatArrayOf(-1f, -1f, 3f, -1f, -1f, 3f))
-                position(0)
-            }
+        private var surfaceWidth = 1
+        private var surfaceHeight = 1
 
         fun update(timeMs: Long, bands: FloatArray) {
             frameTimeMs = timeMs
@@ -74,9 +68,11 @@ class GLSpectrumVisualizerView @JvmOverloads constructor(
         }
 
         override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-            GLES30.glViewport(0, 0, width, height)
+            surfaceWidth = width.coerceAtLeast(1)
+            surfaceHeight = height.coerceAtLeast(1)
+            GLES30.glViewport(0, 0, surfaceWidth, surfaceHeight)
             if (program != 0) GLES30.glUseProgram(program).also {
-                GLES30.glUniform2f(resolutionLocation, width.toFloat(), height.toFloat())
+                GLES30.glUniform2f(resolutionLocation, surfaceWidth.toFloat(), surfaceHeight.toFloat())
             }
         }
 
@@ -84,14 +80,10 @@ class GLSpectrumVisualizerView @JvmOverloads constructor(
             GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
             if (program == 0) return
             GLES30.glUseProgram(program)
-            GLES30.glUniform2f(resolutionLocation, width.toFloat(), height.toFloat())
+            GLES30.glUniform2f(resolutionLocation, surfaceWidth.toFloat(), surfaceHeight.toFloat())
             GLES30.glUniform1f(timeLocation, frameTimeMs / 1000f)
             GLES30.glUniform1fv(bandsLocation, 16, frameBands, 0)
-            vertices.position(0)
-            GLES30.glEnableVertexAttribArray(0)
-            GLES30.glVertexAttribPointer(0, 2, GLES30.GL_FLOAT, false, 0, vertices)
             GLES30.glDrawArrays(GLES30.GL_TRIANGLES, 0, 3)
-            GLES30.glDisableVertexAttribArray(0)
         }
 
         private fun readRaw(id: Int): String =
