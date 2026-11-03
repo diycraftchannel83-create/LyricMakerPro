@@ -495,113 +495,24 @@ private fun drawInto(
         }
     }
 
-    // Render every visualizer on a translucent overlay so imported media remains visible.
+    // Every visualizer mode is rendered by the shared OpenGL ES shader pipeline.
+    // Keep the GPU output translucent so imported photos/videos remain visible.
     val visualizerLayer = native.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), 210)
-    // Reference-style rainbow bars share the same metadata-aware renderer as MP4 export.
-    if (project.visualizer == VisualizerType.BARS_SPECTRUM) {
-        val bars = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty())
-            AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
-        else activeBands
-        AudioGlowVisualizerRenderer.drawClassicSpectrum(native, width, height, timeMs, bars,
-            project.audioTrack.artist, project.audioTrack.title)
-    }
-    // 2. Visualizer Overlay. Audio Glow styles share the same native renderer as MP4 export.
-    val visColor = try { AndroidColor.parseColor(project.visualizerColorHex) } catch (_: Exception) { AndroidColor.CYAN }
-    if (AudioGlowVisualizerRenderer.isGlowStyle(project.visualizer)) {
-        val glowBands = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty()) {
-            AudioGlowVisualizerRenderer.bandsFromEnvelope(
-                project.audioTrack.waveformPeaks, timeMs, project.durationMs
-            )
-        } else activeBands
-        AudioGlowVisualizerRenderer.draw(
-            native, width, height, project.visualizer, project.visualizerColorHex,
-            timeMs, glowBands, glowBands.firstOrNull() ?: bassEnergy,
-            previewQuality = true
-        )
-    }
-    when (project.visualizer) {
-        VisualizerType.BARS_SPECTRUM -> {} // Drawn by AudioGlowVisualizerRenderer above.
-        VisualizerType.CIRCULAR_WAVE -> {
-            val sinBars = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty())
-                AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
-            else activeBands
-            AudioGlowVisualizerRenderer.drawSinBars(native, width, height, timeMs, sinBars)
-        }
-        VisualizerType.FLOATING_PARTICLES -> {
-            val pPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.FILL
-                color = visColor
-            }
-            for (i in 0 until 18) {
-                val speed = (i % 4 + 2) * 0.04f
-                val y = (height - ((timeMs * speed + i * 140) % height)).toFloat()
-                val x = ((sin(timeMs * 0.001 + i) * 0.38 + 0.5) * width).toFloat()
-                val r = (i % 3 + 2) * 1.5f
-                pPaint.alpha = (sin(timeMs * 0.004 + i) * 60 + 130).toInt().coerceIn(40, 220)
-                native.drawCircle(x, y, r, pPaint)
-            }
-        }
-        VisualizerType.OSCILLOSCOPE -> {
-            val terrainBands = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty())
-                AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
-            else activeBands
-            AudioGlowVisualizerRenderer.drawTerrainBars(native, width, height, timeMs, terrainBands)
-        }
-        VisualizerType.BASS_PULSE -> {
-            val cx = width / 2f
-            val cy = height * 0.40f
-            val maxR = width * 0.4f
-            val pulsePaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.STROKE
-                strokeWidth = 3f
-                color = visColor
-            }
-            val detectedBeat = AudioSpectrumAnalyzer.beatPulseAt(project.audioTrack.beatTimesMs, timeMs)
-            val beatPhase = if (project.audioTrack.beatTimesMs.isNotEmpty()) 1f - detectedBeat else (timeMs % 500) / 500f
-            val r = (beatPhase * maxR).coerceIn(0f, maxR)
-            pulsePaint.alpha = if (project.audioTrack.beatTimesMs.isNotEmpty()) (detectedBeat * 220).toInt().coerceIn(0, 255)
-                else ((1f - beatPhase) * 220).toInt().coerceIn(0, 255)
-            native.drawCircle(cx, cy, r, pulsePaint)
-        }
-        VisualizerType.VINYL_SPINNER -> {
-            AudioGlowVisualizerRenderer.drawCoolBars(native, width, height, timeMs, activeBands)
-            /*
-            val cx = width / 2f
-            val cy = height * 0.32f
-            val r = min(width, height) * 0.22f
-            val angle = (timeMs * 0.08f) % 360f
-
-            native.save()
-            native.rotate(angle, cx, cy)
-            val vPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.FILL
-                color = AndroidColor.parseColor("#15161C")
-            }
-            native.drawCircle(cx, cy, r, vPaint)
-            val gPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.STROKE
-                strokeWidth = 1f
-                color = AndroidColor.parseColor("#2E3142")
-            }
-            native.drawCircle(cx, cy, r * 0.6f, gPaint)
-            native.drawCircle(cx, cy, r * 0.8f, gPaint)
-
-            val lPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.FILL
-                color = visColor
-            }
-            native.drawCircle(cx, cy, r * 0.32f, lPaint)
-            native.restore()
-            */
-        }
-        VisualizerType.AURORA_BLOOM,
-        VisualizerType.GLOW_ORBS,
-        VisualizerType.NEON_RIBBON,
-        VisualizerType.RADIAL_BURST,
-        VisualizerType.SPECTRUM_TUNNEL,
-        VisualizerType.NONE -> {}
-    }
-
+    val visualizerBands = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty()) {
+        AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
+    } else activeBands
+    OpenGlVisualizerRenderer.draw(
+        native,
+        width,
+        height,
+        project.visualizer.ordinal,
+        timeMs,
+        visualizerBands,
+        bassEnergy,
+        project.visualizerColorHex,
+        project.audioTrack.artist,
+        project.audioTrack.title
+    )
     native.restoreToCount(visualizerLayer)
 
     // 3. Lyrics
