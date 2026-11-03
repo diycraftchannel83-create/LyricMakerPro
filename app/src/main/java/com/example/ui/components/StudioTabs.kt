@@ -468,7 +468,7 @@ private fun EffectsTab(viewModel: LyricMakerViewModel, project: VideoProject) {
                                 TextTransitionEffect.NEON_PULSE -> Icons.Default.Flare
                                 TextTransitionEffect.TYPEWRITER_GLITCH -> Icons.Default.Terminal
                                 TextTransitionEffect.SLIDE_FADE_UP -> Icons.Default.ArrowUpward
-                                TextTransitionEffect.WAVE_RIPPLE -> Icons.Default.Waves
+                                TextTransitionEffect.WAVE_RIPPLE -> Icons.Default.ShowChart
                                 TextTransitionEffect.BURST_ZOOM -> Icons.Default.FitScreen
                             },
                             contentDescription = null,
@@ -544,11 +544,11 @@ private fun VisualizerTab(viewModel: LyricMakerViewModel, project: VideoProject)
                             VisualizerType.FLOATING_PARTICLES -> Icons.Default.Grain
                             VisualizerType.VINYL_SPINNER -> Icons.Default.Album
                             VisualizerType.BASS_PULSE -> Icons.Default.SurroundSound
-                            VisualizerType.AURORA_BLOOM -> Icons.Default.WbTwilight
-                            VisualizerType.GLOW_ORBS -> Icons.Default.BubbleChart
+                            VisualizerType.AURORA_BLOOM -> Icons.Default.AutoAwesome
+                            VisualizerType.GLOW_ORBS -> Icons.Default.Grain
                             VisualizerType.NEON_RIBBON -> Icons.Default.Waves
-                            VisualizerType.RADIAL_BURST -> Icons.Default.RadioButtonChecked
-                            VisualizerType.SPECTRUM_TUNNEL -> Icons.Default.ViewInAr
+                            VisualizerType.RADIAL_BURST -> Icons.Default.DonutLarge
+                            VisualizerType.SPECTRUM_TUNNEL -> Icons.Default.BarChart
                             VisualizerType.NONE -> Icons.Default.Block
                         },
                         contentDescription = null,
