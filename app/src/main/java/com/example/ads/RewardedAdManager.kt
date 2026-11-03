@@ -94,6 +94,7 @@ class FreeAppOpenAdManager(private val activity: Activity) {
     private var loading = false
     private var premiumUser = true
     private var hasShownThisForeground = false
+    private var isForeground = false
     private var initialized = false
 
     private val adUnitId: String
@@ -115,6 +116,7 @@ class FreeAppOpenAdManager(private val activity: Activity) {
     }
 
     fun onForeground() {
+        isForeground = true
         hasShownThisForeground = false
         if (!premiumUser) {
             if (appOpenAd == null) load() else showIfReady()
@@ -122,6 +124,7 @@ class FreeAppOpenAdManager(private val activity: Activity) {
     }
 
     fun onBackground() {
+        isForeground = false
         hasShownThisForeground = false
     }
 
@@ -149,7 +152,7 @@ class FreeAppOpenAdManager(private val activity: Activity) {
     private fun showIfReady() {
         val ad = appOpenAd ?: return
         if (premiumUser || hasShownThisForeground || activity.isFinishing ||
-            activity.isDestroyed || !activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+            activity.isDestroyed || !isForeground
         ) return
         hasShownThisForeground = true
         appOpenAd = null
