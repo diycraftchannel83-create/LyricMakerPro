@@ -35,6 +35,8 @@ object OpenGlVisualizerRenderer {
     private var bandsLocation = -1
     private var vertexBuffer: FloatBuffer? = null
     private var bitmapCache: Bitmap? = null
+    private var pixelBuffer: ByteBuffer? = null
+    private var argbBuffer: IntArray? = null
 
     private val vertexShader = """
         attribute vec2 aPosition;
@@ -288,11 +290,16 @@ object OpenGlVisualizerRenderer {
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
         GLES20.glDisableVertexAttribArray(positionLocation)
 
-        val pixels = ByteBuffer.allocateDirect(width * height * 4).order(ByteOrder.nativeOrder())
+        val pixelBytes = width * height * 4
+        val pixels = pixelBuffer?.takeIf { it.capacity() == pixelBytes }
+            ?: ByteBuffer.allocateDirect(pixelBytes).order(ByteOrder.nativeOrder()).also { pixelBuffer = it }
+        pixels.clear()
         GLES20.glPixelStorei(GLES20.GL_PACK_ALIGNMENT, 1)
         GLES20.glReadPixels(0, 0, width, height, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, pixels)
         pixels.rewind()
-        val argb = IntArray(width * height)
+        val pixelCount = width * height
+        val argb = argbBuffer?.takeIf { it.size == pixelCount }
+            ?: IntArray(pixelCount).also { argbBuffer = it }
         for (y in 0 until height) {
             val targetY = height - 1 - y
             for (x in 0 until width) {
