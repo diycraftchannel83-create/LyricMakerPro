@@ -30,6 +30,79 @@ object AudioGlowVisualizerRenderer {
         Color.rgb(255, 210, 80)
     )
 
+
+    /** Cool Bars: transparent neon spectrum with mirrored reflections and a fine waveform mesh. */
+    fun drawCoolBars(canvas: Canvas, width: Int, height: Int, timeMs: Long, bands: FloatArray) {
+        if (width <= 0 || height <= 0) return
+        val centerY = height * 0.60f
+        val minSide = min(width, height).toFloat()
+        val count = 64
+        val step = width.toFloat() / count
+        val barWidth = (step * 0.34f).coerceAtLeast(1.2f)
+        val colors = intArrayOf(
+            Color.rgb(255, 170, 0), Color.rgb(255, 55, 35), Color.rgb(255, 0, 145),
+            Color.rgb(185, 45, 255), Color.rgb(45, 110, 255), Color.rgb(0, 220, 255),
+            Color.rgb(0, 245, 210), Color.rgb(255, 190, 0)
+        )
+        fun energy(i: Int): Float {
+            if (bands.isEmpty()) return 0.08f
+            val pos = i * (bands.size - 1).coerceAtLeast(1) / (count - 1).toFloat()
+            val lo = pos.toInt().coerceIn(0, bands.lastIndex)
+            val hi = (lo + 1).coerceAtMost(bands.lastIndex)
+            val raw = bands[lo] * (1f - (pos - lo)) + bands[hi] * (pos - lo)
+            val shimmer = 0.92f + 0.08f * sin(timeMs * 0.004 + i * 0.7).toFloat()
+            return (raw.coerceIn(0.025f, 1f) * shimmer).coerceIn(0.02f, 1f)
+        }
+        val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
+        val core = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.SQUARE }
+        val reflection = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.BUTT }
+        val mesh = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = max(1f, minSide * 0.001f) }
+        val wave = Path()
+        val reflectedWave = Path()
+        for (i in 0 until count) {
+            val x = (i + 0.5f) * step
+            val level = energy(i)
+            val h = height * (0.025f + level * 0.30f)
+            val color = colors[(i * colors.size / count).coerceIn(0, colors.lastIndex)]
+            glow.color = withAlpha(color, 105)
+            glow.strokeWidth = max(2f, step * 0.72f)
+            glow.setShadowLayer(minSide * 0.012f, 0f, 0f, color)
+            canvas.drawLine(x, centerY - h, x, centerY + h * 0.22f, glow)
+            glow.clearShadowLayer()
+            core.color = withAlpha(color, 235)
+            core.strokeWidth = max(1.2f, barWidth * 0.58f)
+            canvas.drawLine(x, centerY - h, x, centerY, core)
+            reflection.color = withAlpha(color, (85 + level * 65).toInt())
+            reflection.strokeWidth = max(1f, barWidth * 0.38f)
+            canvas.drawLine(x, centerY + 2f, x, centerY + h * 0.58f, reflection)
+            val y = centerY - h * 0.04f + sin(timeMs * 0.002 + i * 0.31).toFloat() * height * 0.008f
+            if (i == 0) {
+                wave.moveTo(x, y)
+                reflectedWave.moveTo(x, centerY + (centerY - y) * 0.22f)
+            } else {
+                wave.lineTo(x, y)
+                reflectedWave.lineTo(x, centerY + (centerY - y) * 0.22f)
+            }
+        }
+        val wavePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = max(1.2f, minSide * 0.002f)
+            color = Color.argb(210, 90, 235, 255)
+            setShadowLayer(minSide * 0.012f, 0f, 0f, Color.CYAN)
+        }
+        canvas.drawPath(wave, wavePaint)
+        wavePaint.color = Color.argb(95, 70, 175, 255)
+        wavePaint.strokeWidth = max(1f, minSide * 0.001f)
+        wavePaint.clearShadowLayer()
+        canvas.drawPath(reflectedWave, wavePaint)
+        mesh.color = Color.argb(58, 75, 205, 255)
+        for (i in 0 until 10) {
+            val x = width * i / 9f
+            canvas.drawLine(x, centerY + height * 0.015f, x + width * 0.075f, centerY + height * (0.07f + (i % 3) * 0.018f), mesh)
+            canvas.drawLine(x, centerY - height * 0.012f, x - width * 0.045f, centerY - height * (0.035f + (i % 2) * 0.02f), mesh)
+        }
+    }
+
     fun isGlowStyle(type: VisualizerType): Boolean = when (type) {
         VisualizerType.AURORA_BLOOM,
         VisualizerType.GLOW_ORBS,
