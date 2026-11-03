@@ -5,6 +5,7 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
 import android.os.Looper
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -43,7 +44,7 @@ class AudioEngine(private val context: Context) {
     private var playheadOffsetOnStart = 0L
     private var tickerJob: Job? = null
 
-    // Reused DSP state. Mutated only by the background ticker coroutine.
+    // Reused DSP state. Mutated only by the main-thread playback ticker.
     private val smoothedBands = FloatArray(32) { 0.06f }
     private var smoothedBass = 0.06f
     private var previousEnvelope = 0f
@@ -68,6 +69,14 @@ class AudioEngine(private val context: Context) {
     private fun initCustomExoPlayer(uriString: String) {
         runCatching {
             exoPlayer.pause()
+            exoPlayer.setAudioAttributes(
+                androidx.media3.common.AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .build(),
+                true
+            )
+            exoPlayer.setHandleAudioBecomingNoisy(true)
             exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(uriString)))
             exoPlayer.repeatMode = Player.REPEAT_MODE_ONE
             exoPlayer.prepare()
