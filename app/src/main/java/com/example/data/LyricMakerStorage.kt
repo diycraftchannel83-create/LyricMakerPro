@@ -30,13 +30,56 @@ object LyricMakerStorage {
         // same document, even if the user changes the visible project title.
         val preferences = context.getSharedPreferences("lyricmakerpro_project_files", Context.MODE_PRIVATE)
         val key = "project_file_${project.id}"
-        val name = preferences.getString(key, null) ?: "${safeName(projectName)}_${project.id.take(8)}.lyricmaker.json"
+        val name = preferences.getString(key, null)
+            ?: findPreviouslySavedProjectName(context, project.id)
+            ?: "${safeName(projectName)}_${project.id.take(8)}.lyricmaker.json"
         val savedUri = saveText(
             context, name, "application/json", "$ROOT/Project",
             ProjectFileCodec.encode(project.copy(title = projectName.trim()))
         )
         preferences.edit().putString(key, name).apply()
         return savedUri
+    }
+
+    /**
+     * Migrate projects saved by older app versions, whose filenames contained a
+     * timestamp, by locating the document with the same embedded project ID.
+     */
+    private fun findPreviouslySavedProjectName(context: Context, projectId: String): String? {
+        val relativeDirectory = "${Environment.DIRECTORY_DOCUMENTS}/$ROOT/Project/"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val collection = MediaStore.Files.getContentUri("external")
+            return context.contentResolver.query(
+                collection,
+                arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME),
+                "${MediaStore.MediaColumns.RELATIVE_PATH}=?",
+                arrayOf(relativeDirectory),
+                null
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+                var matchedName: String? = null
+                while (cursor.moveToNext() && matchedName == null) {
+                    val uri = Uri.withAppendedPath(collection, cursor.getLong(idColumn).toString())
+                    val json = runCatching {
+                        context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                    }.getOrNull()
+                    if (!json.isNullOrBlank() && runCatching { ProjectFileCodec.decode(json).id == projectId }.getOrDefault(false)) {
+                        matchedName = cursor.getString(nameColumn)
+                    }
+                }
+                matchedName
+            }
+        }
+
+        val baseDirectory = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+            ?: File(context.filesDir, Environment.DIRECTORY_DOCUMENTS)
+        return File(baseDirectory, "$ROOT/Project").listFiles()
+            ?.firstOrNull { file ->
+                file.isFile && runCatching {
+                    ProjectFileCodec.decode(file.readText(Charsets.UTF_8)).id == projectId
+                }.getOrDefault(false)
+            }?.name
     }
 
     fun saveLrc(context: Context, project: VideoProject): Uri {
