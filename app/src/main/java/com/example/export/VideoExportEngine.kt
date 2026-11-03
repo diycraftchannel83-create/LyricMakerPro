@@ -437,7 +437,7 @@ class VideoExportEngine(private val context: Context) {
         val visualizerLayer = canvas.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), 210)
         drawVisualizer(canvas, width, height, project.visualizer, project.visualizerColorHex, timeMs, project.audioTrack.bpm,
             project.audioTrack.waveformPeaks, project.durationMs, project.audioTrack.artist.ifBlank { project.artist }, project.audioTrack.title,
-            project.audioTrack.spectrumFrames, project.audioTrack.analysisFrameDurationMs)
+            project.audioTrack.spectrumFrames, project.audioTrack.analysisFrameDurationMs, project.audioTrack.beatTimesMs)
         canvas.restoreToCount(visualizerLayer)
 
         // 3. Lyrics with Typography & Transitions
