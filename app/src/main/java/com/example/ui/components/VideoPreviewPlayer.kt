@@ -478,7 +478,7 @@ private fun drawInto(
     val visualizerLayer = native.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), 210)
     // Reference-style rainbow bars share the same metadata-aware renderer as MP4 export.
     if (project.visualizer == VisualizerType.BARS_SPECTRUM) {
-        val bars = if (project.audioTrack.waveformPeaks.isNotEmpty())
+        val bars = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty())
             AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
         else activeBands
         AudioGlowVisualizerRenderer.drawClassicSpectrum(native, width, height, timeMs, bars,
@@ -487,7 +487,7 @@ private fun drawInto(
     // 2. Visualizer Overlay. Audio Glow styles share the same native renderer as MP4 export.
     val visColor = try { AndroidColor.parseColor(project.visualizerColorHex) } catch (_: Exception) { AndroidColor.CYAN }
     if (AudioGlowVisualizerRenderer.isGlowStyle(project.visualizer)) {
-        val glowBands = if (project.audioTrack.waveformPeaks.isNotEmpty()) {
+        val glowBands = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty()) {
             AudioGlowVisualizerRenderer.bandsFromEnvelope(
                 project.audioTrack.waveformPeaks, timeMs, project.durationMs
             )
@@ -500,7 +500,7 @@ private fun drawInto(
     when (project.visualizer) {
         VisualizerType.BARS_SPECTRUM -> {} // Drawn by AudioGlowVisualizerRenderer above.
         VisualizerType.CIRCULAR_WAVE -> {
-            val sinBars = if (project.audioTrack.waveformPeaks.isNotEmpty())
+            val sinBars = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty())
                 AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
             else activeBands
             AudioGlowVisualizerRenderer.drawSinBars(native, width, height, timeMs, sinBars)
@@ -520,7 +520,7 @@ private fun drawInto(
             }
         }
         VisualizerType.OSCILLOSCOPE -> {
-            val terrainBands = if (project.audioTrack.waveformPeaks.isNotEmpty())
+            val terrainBands = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty())
                 AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
             else activeBands
             AudioGlowVisualizerRenderer.drawTerrainBars(native, width, height, timeMs, terrainBands)
