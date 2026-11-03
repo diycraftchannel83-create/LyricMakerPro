@@ -36,6 +36,7 @@ fun TapToSyncModal(
     playheadMs: Long,
     isPlaying: Boolean,
     onTapNext: () -> Unit,
+    onResetSync: () -> Unit,
     onTogglePlayback: () -> Unit,
     onSeek: (Long) -> Unit,
     onFinish: () -> Unit
@@ -186,6 +187,18 @@ fun TapToSyncModal(
                         )
                     }
 
+                }
+
+                // Reset starts a deliberate fresh pass: cue order is driven only by taps.
+                OutlinedButton(
+                    onClick = onResetSync,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonMagenta),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NeonMagenta.copy(alpha = 0.8f)),
+                    modifier = Modifier.testTag("reset_tap_sync_button")
+                ) {
+                    Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Reset Sync", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
 
                 // Playback controls and seek bar directly above the beat button.
