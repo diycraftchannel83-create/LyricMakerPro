@@ -231,7 +231,8 @@ class VideoExportEngine(private val context: Context) {
             val frameTimeMs = (presentationTimeUs / 1000L).coerceAtLeast(0L)
             owner.drawVisualizer(
                 Canvas(bitmap), width, height, project.visualizer, project.visualizerColorHex,
-                frameTimeMs, project.audioTrack.bpm, project.audioTrack.waveformPeaks, project.durationMs
+                frameTimeMs, project.audioTrack.bpm, project.audioTrack.waveformPeaks, project.durationMs,
+                project.artist.ifBlank { project.audioTrack.artist }, project.title
             )
             owner.drawLyrics(Canvas(bitmap), width, height, project, frameTimeMs)
             if (project.showWatermark) {
@@ -531,9 +532,19 @@ class VideoExportEngine(private val context: Context) {
         timeMs: Long,
         bpm: Int,
         waveformPeaks: List<Float> = emptyList(),
-        durationMs: Long = 1L
+        durationMs: Long = 1L,
+        metadataArtist: String = "",
+        metadataTitle: String = ""
     ) {
         if (type == VisualizerType.NONE) return
+
+        if (type == VisualizerType.BARS_SPECTRUM) {
+            val bars = if (waveformPeaks.isNotEmpty()) envelopeBands else FloatArray(32) { bandLevel(it) }
+            AudioGlowVisualizerRenderer.drawClassicSpectrum(
+                canvas, width, height, timeMs, bars, metadataArtist, metadataTitle
+            )
+            return
+        }
 
         val primaryColor = parseColor(colorHex, Color.parseColor("#00F5D4"))
         val beatIntervalMs = 60_000.0 / bpm.coerceAtLeast(60)
