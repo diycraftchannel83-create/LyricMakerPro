@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.winsmediatama.lyricmakerpro.audio.AudioEngine
 import com.winsmediatama.lyricmakerpro.audio.AudioWaveformExtractor
+import com.winsmediatama.lyricmakerpro.audio.AudioSpectrumAnalyzer
 import com.winsmediatama.lyricmakerpro.data.PresetLibrary
 import com.winsmediatama.lyricmakerpro.export.VideoExportEngine
 import com.winsmediatama.lyricmakerpro.model.*
@@ -57,6 +58,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
 
     // Export state
     private val _isExporting = MutableStateFlow(false)
+    private var exportJob: Job? = null
     val isExporting = _isExporting.asStateFlow()
 
     private val _exportProgress = MutableStateFlow(0f)
@@ -150,7 +152,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         val track = restoredProject.audioTrack
         if (track.beatType == AudioBeatType.CUSTOM_FILE &&
             !track.customUri.isNullOrBlank() &&
-            track.waveformPeaks.isEmpty()
+            (track.waveformPeaks.isEmpty() || track.spectrumFrames.isEmpty())
         ) {
             viewModelScope.launch {
                 val peaks = AudioWaveformExtractor.extract(
@@ -158,6 +160,17 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
                     uriString = track.customUri,
                     durationMs = track.durationMs
                 )
+                val analysis = AudioSpectrumAnalyzer.analyze(getApplication(), track.customUri, track.durationMs)
+                if (analysis.spectrumFrames.isNotEmpty() && _project.value.audioTrack.id == track.id) {
+                    _project.value = _project.value.copy(
+                        audioTrack = _project.value.audioTrack.copy(
+                            spectrumFrames = analysis.spectrumFrames,
+                            pitchFramesHz = analysis.pitchFramesHz,
+                            beatTimesMs = analysis.beatTimesMs,
+                            analysisFrameDurationMs = analysis.frameDurationMs
+                        )
+                    )
+                }
                 if (peaks.isNotEmpty() && _project.value.audioTrack.id == track.id) {
                     _project.value = _project.value.copy(
                         audioTrack = _project.value.audioTrack.copy(waveformPeaks = peaks)
@@ -656,6 +669,17 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
                 uriString = uriString,
                 durationMs = safeDurationMs
             )
+            val analysis = AudioSpectrumAnalyzer.analyze(getApplication(), uriString, safeDurationMs)
+            if (analysis.spectrumFrames.isNotEmpty() && _project.value.audioTrack.id == customTrack.id) {
+                _project.value = _project.value.copy(
+                    audioTrack = _project.value.audioTrack.copy(
+                        spectrumFrames = analysis.spectrumFrames,
+                        pitchFramesHz = analysis.pitchFramesHz,
+                        beatTimesMs = analysis.beatTimesMs,
+                        analysisFrameDurationMs = analysis.frameDurationMs
+                    )
+                )
+            }
             if (peaks.isNotEmpty() && _project.value.audioTrack.id == customTrack.id) {
                 _project.value = _project.value.copy(
                     audioTrack = _project.value.audioTrack.copy(waveformPeaks = peaks)
@@ -673,7 +697,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         _exportProgress.value = 0f
         _exportStatus.value = "Preparing frames..."
 
-        viewModelScope.launch {
+        exportJob = viewModelScope.launch {
             try {
                 val exported = exportEngine.exportVideo(
                     // Watermark is mandatory for free exports, regardless of the editor preview toggle.
@@ -689,13 +713,23 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
                 }
                 _lastExportedFile.value = exported
                 _exportStatus.value = "Ready to Share!"
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                _exportStatus.value = "Rendering cancelled"
+                throw e
             } catch (e: Exception) {
                 e.printStackTrace()
                 _exportStatus.value = "Export failed: ${e.localizedMessage ?: "Unknown error"}"
             } finally {
                 _isExporting.value = false
+                exportJob = null
             }
         }
+    }
+
+    fun cancelExport() {
+        if (!_isExporting.value) return
+        _exportStatus.value = "Cancelling rendering..."
+        exportJob?.cancel(kotlinx.coroutines.CancellationException("Video rendering cancelled by user"))
     }
 
     fun exportCoverImage() {

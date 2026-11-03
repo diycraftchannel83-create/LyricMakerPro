@@ -544,6 +544,11 @@ private fun VisualizerTab(viewModel: LyricMakerViewModel, project: VideoProject)
                             VisualizerType.FLOATING_PARTICLES -> Icons.Default.Grain
                             VisualizerType.VINYL_SPINNER -> Icons.Default.Album
                             VisualizerType.BASS_PULSE -> Icons.Default.SurroundSound
+                            VisualizerType.AURORA_BLOOM -> Icons.Default.AutoAwesome
+                            VisualizerType.GLOW_ORBS -> Icons.Default.Grain
+                            VisualizerType.NEON_RIBBON -> Icons.Default.Waves
+                            VisualizerType.RADIAL_BURST -> Icons.Default.DonutLarge
+                            VisualizerType.SPECTRUM_TUNNEL -> Icons.Default.BarChart
                             VisualizerType.NONE -> Icons.Default.Block
                         },
                         contentDescription = null,

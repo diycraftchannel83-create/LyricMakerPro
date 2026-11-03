@@ -29,11 +29,16 @@ enum class TextTransitionEffect(val label: String, val description: String) {
 
 enum class VisualizerType(val label: String, val description: String) {
     BARS_SPECTRUM("Spectrum Bars", "16-band gradient frequency spectrum equalizer"),
-    CIRCULAR_WAVE("Circular Ring", "Radial glowing pulse rings vibrating with audio bass"),
-    OSCILLOSCOPE("Oscilloscope", "Continuous smooth neon audio waveform wave"),
+    CIRCULAR_WAVE("Sin Bars", "Colorful animated sine-wave spectrum with luminous particles and mesh lines"),
+    OSCILLOSCOPE("Terrain Bars", "Transparent 3D neon terrain spectrum mesh with audio-reactive peaks"),
     FLOATING_PARTICLES("Ambient Dust", "Dreamy floating bokeh dust particles"),
-    VINYL_SPINNER("Vinyl Disc", "Retro rotating vinyl record with groove reflections"),
+    VINYL_SPINNER("Cool Bars", "Vivid multicolor neon spectrum bars with mirrored reflections and waveform mesh"),
     BASS_PULSE("Bass Shockwave", "Expanding concentric acoustic ripples on kick beat"),
+    AURORA_BLOOM("Aurora Bloom", "Soft multicolor glow clouds that breathe with the music"),
+    GLOW_ORBS("Glow Orbs", "Floating luminous particles with depth and audio pulses"),
+    NEON_RIBBON("Neon Ribbon", "Layered flowing light ribbons driven by the spectrum"),
+    RADIAL_BURST("Radial Burst", "A vivid circular spectrum with glowing audio spokes"),
+    SPECTRUM_TUNNEL("Spectrum Tunnel", "A colorful perspective tunnel pulsing to the track"),
     NONE("Off", "Clean background without visualizer overlay")
 }
 
@@ -113,7 +118,11 @@ data class AudioTrackConfig(
     val durationMs: Long = 30_000L,
     val beatType: AudioBeatType = AudioBeatType.SYNTH_SYNTHWAVE,
     val customUri: String? = null,
-    val waveformPeaks: List<Float> = emptyList()
+    val waveformPeaks: List<Float> = emptyList(),
+    val spectrumFrames: List<List<Float>> = emptyList(),
+    val pitchFramesHz: List<Float> = emptyList(),
+    val beatTimesMs: List<Long> = emptyList(),
+    val analysisFrameDurationMs: Long = 23L
 )
 
 enum class MediaClipType { IMAGE, VIDEO }
