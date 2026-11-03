@@ -151,7 +151,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         val track = restoredProject.audioTrack
         if (track.beatType == AudioBeatType.CUSTOM_FILE &&
             !track.customUri.isNullOrBlank() &&
-            track.waveformPeaks.isEmpty()
+            (track.waveformPeaks.isEmpty() || track.spectrumFrames.isEmpty())
         ) {
             viewModelScope.launch {
                 val peaks = AudioWaveformExtractor.extract(
