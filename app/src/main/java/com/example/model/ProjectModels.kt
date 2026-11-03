@@ -30,7 +30,7 @@ enum class TextTransitionEffect(val label: String, val description: String) {
 enum class VisualizerType(val label: String, val description: String) {
     BARS_SPECTRUM("Spectrum Bars", "16-band gradient frequency spectrum equalizer"),
     CIRCULAR_WAVE("Sin Bars", "Colorful animated sine-wave spectrum with luminous particles and mesh lines"),
-    OSCILLOSCOPE("Oscilloscope", "Continuous smooth neon audio waveform wave"),
+    OSCILLOSCOPE("Terrain Bars", "Transparent 3D neon terrain spectrum mesh with audio-reactive peaks"),
     FLOATING_PARTICLES("Ambient Dust", "Dreamy floating bokeh dust particles"),
     VINYL_SPINNER("Vinyl Disc", "Retro rotating vinyl record with groove reflections"),
     BASS_PULSE("Bass Shockwave", "Expanding concentric acoustic ripples on kick beat"),
