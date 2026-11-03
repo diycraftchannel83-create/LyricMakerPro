@@ -314,9 +314,11 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         // both forward and backward to match the preview at the new playhead.
         tapSyncLastCommittedIndex = -1
         audioEngine.seekTo(positionMs)
-        _syncLineIndex.value = previewAlignedLyricIndex(
-            audioEngine.playheadMs.value, _project.value.lyrics
-        )
+        if (!isFreshTapSyncSession) {
+            _syncLineIndex.value = previewAlignedLyricIndex(
+                audioEngine.playheadMs.value, _project.value.lyrics
+            )
+        }
     }
 
     fun tapSyncNext() {
