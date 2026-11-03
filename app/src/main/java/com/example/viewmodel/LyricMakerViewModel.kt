@@ -154,7 +154,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
             val old = currentLyrics[index]
             val newStart = (old.startMs + deltaMs).coerceAtLeast(0L)
             val newEnd = (old.endMs + deltaMs).coerceAtLeast(newStart + 200L)
-            currentLyrics[index] = rebuildLyricLine(old, old.text, newStart, newEnd)
+            currentLyrics[index] = shiftLyricLine(old, newStart - old.startMs, newStart, newEnd)
             _project.value = _project.value.copy(lyrics = currentLyrics.sortedBy { it.startMs })
             audioEngine.seekTo(newStart)
         }
@@ -168,7 +168,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
             val old = currentLyrics[index]
             val newStart = (old.startMs + deltaMs).coerceAtLeast(0L)
             val newEnd = (old.endMs + deltaMs).coerceAtLeast(newStart + 200L)
-            currentLyrics[index] = rebuildLyricLine(old, old.text, newStart, newEnd)
+            currentLyrics[index] = shiftLyricLine(old, newStart - old.startMs, newStart, newEnd)
             _project.value = _project.value.copy(lyrics = currentLyrics.sortedBy { it.startMs })
         }
     }
@@ -180,7 +180,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         if (index != -1) {
             val old = currentLyrics[index]
             val newStart = (old.startMs + deltaMs).coerceIn(0L, old.endMs - 300L)
-            currentLyrics[index] = rebuildLyricLine(old, old.text, newStart, old.endMs)
+            currentLyrics[index] = resizeLyricLine(old, newStart, old.endMs)
             _project.value = _project.value.copy(lyrics = currentLyrics)
         }
     }
@@ -192,7 +192,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         if (index != -1) {
             val old = currentLyrics[index]
             val newEnd = (old.endMs + deltaMs).coerceAtLeast(old.startMs + 300L)
-            currentLyrics[index] = rebuildLyricLine(old, old.text, old.startMs, newEnd)
+            currentLyrics[index] = resizeLyricLine(old, old.startMs, newEnd)
             _project.value = _project.value.copy(lyrics = currentLyrics)
         }
     }
@@ -202,7 +202,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         val index = currentLyrics.indexOfFirst { it.id == id }
         if (index != -1) {
             val old = currentLyrics[index]
-            currentLyrics[index] = rebuildLyricLine(old, newText, old.startMs, old.endMs)
+            currentLyrics[index] = updateLyricWords(old, newText)
             _project.value = _project.value.copy(lyrics = currentLyrics)
         }
     }
@@ -233,6 +233,11 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         _selectedLineId.value = currentLyrics.firstOrNull()?.id
     }
 
+    /**
+     * Rebuilds evenly spaced word cues only for operations that create a new sync
+     * (for example a fresh tap-to-sync pass). Editing an existing line must use the
+     * preservation helpers below so manual word timing is not silently destroyed.
+     */
     private fun rebuildLyricLine(old: LyricLine, text: String, startMs: Long, endMs: Long): LyricLine {
         val tokens = text.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
         val duration = (endMs - startMs).coerceAtLeast(100L)
@@ -243,6 +248,58 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
             LyricWord(text = token, startMs = wordStart, endMs = wordEnd)
         }
         return old.copy(text = text, startMs = startMs, endMs = endMs, words = words)
+    }
+
+    private fun shiftLyricLine(
+        old: LyricLine,
+        deltaMs: Long,
+        startMs: Long,
+        endMs: Long
+    ): LyricLine {
+        val words = old.words.map { word ->
+            val shiftedStart = (word.startMs + deltaMs).coerceAtLeast(startMs)
+            val shiftedEnd = (word.endMs + deltaMs).coerceAtLeast(shiftedStart + 1L)
+            word.copy(startMs = shiftedStart, endMs = shiftedEnd.coerceAtMost(endMs))
+        }
+        return old.copy(startMs = startMs, endMs = endMs, words = words)
+    }
+
+    /** Resize line boundaries while retaining absolute word cues wherever possible. */
+    private fun resizeLyricLine(old: LyricLine, startMs: Long, endMs: Long): LyricLine {
+        val safeEnd = endMs.coerceAtLeast(startMs + 1L)
+        val words = old.words.mapNotNull { word ->
+            val wordStart = word.startMs.coerceIn(startMs, safeEnd)
+            val wordEnd = word.endMs.coerceIn(wordStart, safeEnd)
+            if (wordEnd <= wordStart) null else word.copy(startMs = wordStart, endMs = wordEnd)
+        }
+        return old.copy(startMs = startMs, endMs = safeEnd, words = words)
+    }
+
+    /**
+     * Preserve timestamps for unchanged words by position. Newly inserted words get
+     * a local slot between neighbouring cues instead of retiming the whole sentence.
+     */
+    private fun updateLyricWords(old: LyricLine, newText: String): LyricLine {
+        val tokens = newText.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (tokens.isEmpty()) return old.copy(text = newText, words = emptyList())
+        if (old.words.isEmpty()) return rebuildLyricLine(old, newText, old.startMs, old.endMs)
+
+        val words = tokens.mapIndexed { index, token ->
+            val previous = old.words.getOrNull(index)
+            if (previous != null) {
+                previous.copy(text = token)
+            } else {
+                val slot = (old.endMs - old.startMs).coerceAtLeast(tokens.size.toLong())
+                val start = old.startMs + (slot * index / tokens.size)
+                val end = old.startMs + (slot * (index + 1) / tokens.size)
+                LyricWord(token, start, end.coerceAtLeast(start + 1L))
+            }
+        }.map { word ->
+            val start = word.startMs.coerceIn(old.startMs, old.endMs)
+            val end = word.endMs.coerceIn(start + 1L, old.endMs.coerceAtLeast(start + 1L))
+            word.copy(startMs = start, endMs = end)
+        }
+        return old.copy(text = newText, words = words)
     }
 
     // --- Tap-To-Sync Workflow ---
@@ -334,9 +391,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
             if (index > 0) {
                 val prev = currentLyrics[index - 1]
                 val previousEnd = currentTime.coerceAtLeast(prev.startMs + 200L)
-                currentLyrics[index - 1] = rebuildLyricLine(
-                    prev, prev.text, prev.startMs, previousEnd
-                )
+                currentLyrics[index - 1] = resizeLyricLine(prev, prev.startMs, previousEnd)
             }
             val nextStart = currentLyrics.getOrNull(index + 1)?.startMs
             val estimatedEnd = if (isFreshTapSyncSession) {
