@@ -94,6 +94,8 @@ class MainActivity : ComponentActivity() {
                 val lastExportedFile by viewModel.lastExportedFile.collectAsStateWithLifecycle()
                 val permanentWatermarkRemoved by watermarkBilling.isOwned.collectAsStateWithLifecycle()
                 val watermarkEntitlementResolved by watermarkBilling.isEntitlementResolved.collectAsStateWithLifecycle()
+                // Cached Play purchase state is not trusted until the billing query resolves.
+                val hasConfirmedPermanentWatermarkRemoval = watermarkEntitlementResolved && permanentWatermarkRemoved
                 LaunchedEffect(watermarkEntitlementResolved, permanentWatermarkRemoved) {
                     // Premium owners never initialize or request rewarded ads.
                     if (watermarkEntitlementResolved && !permanentWatermarkRemoved) {
@@ -285,7 +287,7 @@ class MainActivity : ComponentActivity() {
                             // Side-by-side tablet layout
                             Row(modifier = Modifier.fillMaxSize()) {
                                 VideoPreviewPlayer(
-                                    project = project,
+                                    project = project.copy(showWatermark = !hasConfirmedPermanentWatermarkRemoval),
                                     playheadMs = playheadMs,
                                     isPlaying = isPlaying,
                                     spectrumBands = spectrumBands,
@@ -345,7 +347,7 @@ class MainActivity : ComponentActivity() {
                             Box(modifier = Modifier.fillMaxSize()) {
                                 Column(modifier = Modifier.fillMaxSize()) {
                                     VideoPreviewPlayer(
-                                        project = project,
+                                        project = project.copy(showWatermark = !hasConfirmedPermanentWatermarkRemoval),
                                         playheadMs = playheadMs,
                                         isPlaying = isPlaying,
                                         spectrumBands = spectrumBands,
@@ -465,12 +467,12 @@ class MainActivity : ComponentActivity() {
                             exportProgress = exportProgress,
                             exportStatus = exportStatus,
                             lastExportedFile = lastExportedFile,
-                            isPermanentWatermarkRemoved = permanentWatermarkRemoved,
+                            isPermanentWatermarkRemoved = hasConfirmedPermanentWatermarkRemoval,
                             permanentWatermarkPrice = permanentWatermarkPrice,
                             onBuyPermanentWatermark = { watermarkBilling.launchPurchase(this@MainActivity) },
                             onRestorePurchases = { watermarkBilling.restorePurchases() },
                             onStartExport = { quality, durationSec ->
-                                viewModel.startExport(quality, durationSec, removeWatermark = permanentWatermarkRemoved)
+                                viewModel.startExport(quality, durationSec, removeWatermark = hasConfirmedPermanentWatermarkRemoval)
                             },
                             onWatchAdAndExport = { quality, durationSec ->
                                 rewardedAdManager.show(
