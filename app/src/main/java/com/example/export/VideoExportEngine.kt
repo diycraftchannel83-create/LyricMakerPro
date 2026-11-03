@@ -419,7 +419,10 @@ class VideoExportEngine(private val context: Context) {
         }
 
         // 2. Visualizer Overlay
+        // Keep all visualizer styles translucent over imported photo/video frames.
+        val visualizerLayer = canvas.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), 210)
         drawVisualizer(canvas, width, height, project.visualizer, project.visualizerColorHex, timeMs, project.audioTrack.bpm)
+        canvas.restoreToCount(visualizerLayer)
 
         // 3. Lyrics with Typography & Transitions
         drawLyrics(canvas, width, height, project, timeMs)
@@ -603,25 +606,7 @@ class VideoExportEngine(private val context: Context) {
                 AudioGlowVisualizerRenderer.drawSinBars(canvas, width, height, timeMs, envelopeBands)
             }
             VisualizerType.OSCILLOSCOPE -> {
-                val wavePaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.STROKE
-                    strokeWidth = 5f
-                    color = primaryColor
-                }
-                val path = Path()
-                val centerY = height * 0.80f
-                val step = width / 60f
-
-                path.moveTo(0f, centerY)
-                for (i in 0..60) {
-                    val x = i * step
-                    val phase = (x / width) * 4 * Math.PI + (timeMs * 0.008)
-                    val amp = (height * 0.04f) * (1f + bandLevel(i / 2) * 0.8f)
-                    val y = centerY + sin(phase).toFloat() * amp
-                    path.lineTo(x, y)
-                }
-                canvas.drawPath(path, wavePaint)
+                AudioGlowVisualizerRenderer.drawTerrainBars(canvas, width, height, timeMs, envelopeBands)
             }
             VisualizerType.FLOATING_PARTICLES -> {
                 val particlePaint = Paint().apply {
