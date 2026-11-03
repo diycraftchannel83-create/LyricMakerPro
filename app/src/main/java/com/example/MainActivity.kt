@@ -483,6 +483,8 @@ class MainActivity : ComponentActivity() {
                             playheadMs = playheadMs,
                             isPlaying = isPlaying,
                             onTapNext = { viewModel.tapSyncNext() },
+                            onTogglePlayback = { viewModel.audioEngine.togglePlayPause() },
+                            onSeek = { positionMs -> viewModel.audioEngine.seekTo(positionMs) },
                             onFinish = { viewModel.stopTapToSync() }
                         )
                     }
