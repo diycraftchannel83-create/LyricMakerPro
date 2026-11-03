@@ -96,7 +96,8 @@ class VideoExportEngine(private val context: Context) {
                 bgBitmap.recycle()
             }
 
-            val overlay = ProjectLyricOverlay(this@VideoExportEngine, width, height, project)
+            val watermarkBitmap = loadWatermarkBitmap()
+            val overlay = ProjectLyricOverlay(this@VideoExportEngine, width, height, project, watermarkBitmap)
             val effects = listOf<androidx.media3.common.Effect>(
                 androidx.media3.effect.Presentation.createForWidthAndHeight(
                     width, height, androidx.media3.effect.Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
@@ -205,7 +206,8 @@ class VideoExportEngine(private val context: Context) {
         private val owner: VideoExportEngine,
         private val width: Int,
         private val height: Int,
-        private val project: VideoProject
+        private val project: VideoProject,
+        private val watermarkBitmap: Bitmap
     ) : androidx.media3.effect.BitmapOverlay() {
         private var cached: Bitmap? = null
 
@@ -214,8 +216,8 @@ class VideoExportEngine(private val context: Context) {
                 ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { cached = it }
             bitmap.eraseColor(Color.TRANSPARENT)
             owner.drawLyrics(Canvas(bitmap), width, height, project, (presentationTimeUs / 1000L).coerceAtLeast(0L))
-            if (project.showWatermark && project.watermarkText.isNotBlank()) {
-                owner.drawWatermark(Canvas(bitmap), width, height, project.watermarkText)
+            if (project.showWatermark) {
+                owner.drawWatermark(Canvas(bitmap), width, height, watermarkBitmap)
             }
             return bitmap
         }
@@ -223,6 +225,7 @@ class VideoExportEngine(private val context: Context) {
         override fun release() {
             cached?.recycle()
             cached = null
+            if (!watermarkBitmap.isRecycled) watermarkBitmap.recycle()
             super.release()
         }
     }
@@ -403,8 +406,9 @@ class VideoExportEngine(private val context: Context) {
         drawLyrics(canvas, width, height, project, timeMs)
 
         // 4. Watermark / Creator Tag
-        if (project.showWatermark && project.watermarkText.isNotBlank()) {
-            drawWatermark(canvas, width, height, project.watermarkText)
+        if (project.showWatermark) {
+            val watermark = loadWatermarkBitmap()
+            try { drawWatermark(canvas, width, height, watermark) } finally { watermark.recycle() }
         }
     }
 
@@ -887,23 +891,24 @@ class VideoExportEngine(private val context: Context) {
         canvas.drawText(text, x, y, textPaint)
     }
 
-    private fun drawWatermark(canvas: Canvas, width: Int, height: Int, text: String) {
-        // Compact creator mark: target width is 10% of the exported frame.
-        // 70% alpha keeps the branding visible without competing with the lyrics.
-        val label = text.ifBlank { "Created with LyricMakerPro" }
-        val targetWidth = width * 0.10f
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            textSize = (width * 0.018f).coerceAtLeast(12f)
-            color = Color.WHITE
-            alpha = 179
-            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-            textAlign = Paint.Align.RIGHT
+    private fun loadWatermarkBitmap(): Bitmap {
+        val encoded = context.assets.open("lyricmakerpro_watermark.png.b64")
+            .bufferedReader().use { it.readText() }
+        val bytes = android.util.Base64.decode(encoded, android.util.Base64.DEFAULT)
+        return requireNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size)) {
+            "Unable to decode LyricMakerPro watermark asset"
         }
-        val measuredWidth = paint.measureText(label).coerceAtLeast(1f)
-        paint.textScaleX = (targetWidth / measuredWidth).coerceIn(0.08f, 1f)
+    }
+
+    private fun drawWatermark(canvas: Canvas, width: Int, height: Int, bitmap: Bitmap) {
+        if (bitmap.isRecycled || bitmap.width <= 0 || bitmap.height <= 0) return
+        val targetWidth = width * 0.10f
+        val targetHeight = targetWidth * bitmap.height / bitmap.width
         val right = width * 0.97f
-        val baseline = height * 0.965f
-        canvas.drawText(label, right, baseline, paint)
+        val bottom = height * 0.965f
+        val destination = RectF(right - targetWidth, bottom - targetHeight, right, bottom)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { alpha = 179 }
+        canvas.drawBitmap(bitmap, null, destination, paint)
     }
 
     private fun parseColor(hex: String, default: Int): Int {
