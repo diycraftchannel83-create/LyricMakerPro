@@ -111,39 +111,87 @@ object OpenGlVisualizerRenderer {
             vec3 rgb = vec3(0.0);
             float alpha = 0.0;
 
-            if (uType == 0 || uType == 4) {
+            if (uType == 0) {
+                // Spectrum Bars: retain the original 16 segmented rainbow columns,
+                // slanted segment edges, mirrored reflection and bright baseline.
                 float count = 16.0;
                 float x = p.x * count;
                 int idx = int(clamp(floor(x), 0.0, 15.0));
                 float energy = bandAt(idx);
-                float barH = 0.025 + energy * 0.29;
-                float center = uType == 4 ? 0.665 : 0.62;
-                float localX = abs(fract(x) - 0.5);
-                float d = abs(p.y - center);
-                float bar = step(localX, 0.34) * step(d, barH);
+                float shimmer = 0.88 + 0.12 * sin(t * 4.0 + float(idx) * 0.7);
+                float stack = clamp(2.0 + floor(energy * 7.2 * shimmer), 2.0, 9.0);
+                float localX = fract(x);
+                float segment = (0.021 + 0.006);
+                float fromBase = (0.665 - p.y);
+                float segIndex = floor(fromBase / segment);
+                float segY = mod(fromBase, segment);
+                float skew = 0.10;
+                float insideSegment = step(0.0, fromBase) * step(fromBase, stack * segment)
+                    * step(segY, 0.021)
+                    * step(skew * segY / 0.021, localX)
+                    * step(localX, 1.0 - skew * segY / 0.021);
                 vec3 c = rainbow(float(idx) / 15.0);
-                addGlow(rgb, alpha, c, bar * 0.92);
-                float reflection = step(localX, 0.24) * step(center, p.y) * step(p.y, center + barH * 0.55);
-                addGlow(rgb, alpha, c, reflection * 0.30);
-                float glow = exp(-localX * 18.0) * exp(-abs(p.y-center) * 5.0) * energy;
-                addGlow(rgb, alpha, c, glow * 0.22);
+                addGlow(rgb, alpha, c, insideSegment * 0.92);
+                float reflectionY = p.y - 0.677;
+                float reflectionIndex = floor(reflectionY / segment);
+                float reflectionPart = mod(reflectionY, segment);
+                float reflectionMask = step(0.0, reflectionY) * step(reflectionY, stack * segment * 0.58)
+                    * step(reflectionPart, 0.021) * step(reflectionIndex, stack);
+                addGlow(rgb, alpha, c, reflectionMask * 0.22 * (1.0 - reflectionIndex / (stack + 1.0)));
+                float capY = abs(p.y - (0.665 - stack * segment - 0.018));
+                addGlow(rgb, alpha, vec3(1.0), lineGlow(capY, 0.0018) * 0.72);
+                float baseline = lineGlow(p.y - 0.665, 0.0035);
+                addGlow(rgb, alpha, rainbow(p.x), baseline * 0.8);
+                float particle = lineGlow(fract(sin(floor(p.x*115.0)*127.1)*43758.5)-0.5,0.035)
+                    * lineGlow(p.y-(0.12+0.35*fract(sin(floor(p.x*115.0)*71.7)*135.1)),0.003);
+                addGlow(rgb, alpha, c, particle * 0.22);
             } else if (uType == 1) {
-                float radius = length(uv);
-                float angle = atan(uv.y, uv.x);
-                float wave = 0.17 + bandAt(int(mod(floor((angle + PI) * 5.0), 32.0))) * 0.19;
-                float d = abs(radius - wave - 0.025 * sin(angle * 8.0 + t * 2.0));
-                addGlow(rgb, alpha, rainbow((angle + PI) / (2.0 * PI)), lineGlow(d, 0.012) * 0.95);
-                float dots = lineGlow(fract((angle + PI) * 16.0) - 0.5, 0.10) * lineGlow(radius - wave, 0.035);
-                addGlow(rgb, alpha, uAccent, dots * 0.5);
+                // Sin Bars: seven flowing audio-reactive wave lanes, not a circular ring.
+                float center = 0.53;
+                float env = 0.12 + 0.88 * (0.5 + 0.5 * sin(p.x * 6.28318 + 0.35));
+                float laneGlow = 0.0;
+                vec3 laneColor = vec3(0.0);
+                for (int lane = 0; lane < 7; lane++) {
+                    float fi = float(lane - 3);
+                    int bi = int(clamp(p.x * 31.0, 0.0, 31.0));
+                    float energy = bandAt(bi);
+                    float phase = p.x * 21.991 + t * 1.7 + fi * 0.22;
+                    float amp = 0.012 + energy * 0.31;
+                    float y = center + sin(phase) * amp * env
+                        + sin(phase * 2.15 + fi * 0.17) * amp * 0.16;
+                    float d = abs(p.y - y);
+                    float width = lane == 3 ? 0.0022 : 0.00115;
+                    float glow = lineGlow(d, 0.009) * 0.24;
+                    float core = lineGlow(d, width) * (lane == 3 ? 0.72 : 0.28);
+                    vec3 c = rainbow(float(lane) / 6.0);
+                    addGlow(rgb, alpha, c, glow + core);
+                }
+                float centerBeam = lineGlow(p.y - center, 0.0045) * (0.25 + 0.35 * bass);
+                addGlow(rgb, alpha, vec3(0.1,0.85,1.0), centerBeam);
+                float mesh = lineGlow(fract(p.x * 112.0) - 0.5, 0.018)
+                    * lineGlow(p.y - (center + sin(p.x * 21.991 + t*1.7)*0.08), 0.055);
+                addGlow(rgb, alpha, vec3(0.15,0.8,1.0), mesh * 0.18);
             } else if (uType == 2) {
+                // Terrain Bars: layered 3D wireframe ridges with perspective cross-lines.
                 float x = p.x;
-                float row = p.y;
-                float ridge = 0.23 + 0.18 * sin(x * 13.0 + t * 1.1);
-                ridge += bandAt(int(clamp(x * 31.0, 0.0, 31.0))) * 0.22;
-                float d = abs(row - ridge);
-                addGlow(rgb, alpha, rainbow(x * 0.85 + t * 0.025), lineGlow(d, 0.012) * 0.9);
-                float grid = abs(fract(x * 18.0) - 0.5);
-                addGlow(rgb, alpha, uAccent, lineGlow(grid, 0.018) * lineGlow(row-ridge, 0.055) * 0.45);
+                for (int row = 0; row < 9; row++) {
+                    float depth = float(row) / 8.0;
+                    int bi = int(clamp(x * 31.0, 0.0, 31.0));
+                    float energy = bandAt(bi);
+                    float travel = t * 0.48 + float(row) * 0.31;
+                    float ridgeA = abs(sin(x * 14.137 + travel * 0.28));
+                    float ridgeB = abs(sin(x * 25.761 - travel * 0.19 + 0.7));
+                    float envelope = 0.24 + ridgeA * 0.48 + ridgeB * 0.28;
+                    float amplitude = (0.018 + energy * 0.17) * (0.42 + depth * 0.9);
+                    float wave = envelope * amplitude
+                        + sin(x * 21.991 + travel) * (0.008 + energy * 0.025);
+                    float y = 0.43 + depth * 0.105 - wave;
+                    vec3 c = rainbow(float(row) / 8.0);
+                    addGlow(rgb, alpha, c, lineGlow(p.y-y, 0.0028) * 0.62);
+                }
+                float gridX = lineGlow(fract(x * 21.0) - 0.5, 0.012);
+                float gridY = lineGlow(p.y - (0.43 + fract(x*21.0)*0.105 - 0.04), 0.055);
+                addGlow(rgb, alpha, vec3(0.12,0.72,1.0), gridX * gridY * 0.22);
             } else if (uType == 3) {
                 for (int i = 0; i < 28; i++) {
                     float fi = float(i);
@@ -153,6 +201,26 @@ object OpenGlVisualizerRenderer {
                     float d = length((p - vec2(x,y)) * vec2(uResolution.x/uResolution.y,1.0));
                     addGlow(rgb, alpha, rainbow(fi/28.0), lineGlow(d, r * 4.0) * 0.45);
                 }
+            } else if (uType == 4) {
+                // Cool Bars: 64 narrow mirrored neon bars with a central waveform.
+                float count = 64.0;
+                float x = p.x * count;
+                int idx = int(clamp(floor(x * 0.5), 0.0, 31.0));
+                float energy = bandAt(idx);
+                float localX = abs(fract(x) - 0.5);
+                float center = 0.60;
+                float h = 0.025 + energy * 0.30;
+                float bar = step(localX, 0.17) * step(abs(p.y-center), h);
+                vec3 c = rainbow(floor(x) / 64.0);
+                addGlow(rgb, alpha, c, bar * 0.86);
+                float core = step(localX,0.09) * step(center-h,p.y) * step(p.y,center);
+                addGlow(rgb,alpha,c,core*0.95);
+                float reflection = step(localX,0.12) * step(center,p.y) * step(p.y,center+h*0.58);
+                addGlow(rgb,alpha,c,reflection*0.30);
+                float waveY = center - h*0.04 + sin(t*2.0+floor(x)*0.31)*0.008;
+                addGlow(rgb,alpha,vec3(0.35,0.92,1.0),lineGlow(p.y-waveY,0.0018)*0.65);
+                float mesh = lineGlow(fract(p.x*9.0)-0.5,0.018)*0.08;
+                addGlow(rgb,alpha,vec3(0.3,0.8,1.0),mesh);
             } else if (uType == 5) {
                 float radius = length(uv);
                 for (int i = 0; i < 4; i++) {
