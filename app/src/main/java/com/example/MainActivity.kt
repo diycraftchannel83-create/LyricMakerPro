@@ -41,6 +41,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.winsmediatama.lyricmakerpro.ads.RewardedAdManager
+import com.winsmediatama.lyricmakerpro.ads.FreeAppOpenAdManager
+import com.winsmediatama.lyricmakerpro.ads.FreeBannerAd
+import com.winsmediatama.lyricmakerpro.ads.FreeNativeAd
 import com.winsmediatama.lyricmakerpro.billing.PermanentWatermarkBilling
 import com.winsmediatama.lyricmakerpro.model.BackgroundConfig
 import com.winsmediatama.lyricmakerpro.model.BackgroundType
@@ -53,8 +56,19 @@ import com.winsmediatama.lyricmakerpro.viewmodel.LyricMakerViewModel
 class MainActivity : ComponentActivity() {
 
     private lateinit var rewardedAdManager: RewardedAdManager
+    private lateinit var appOpenAdManager: FreeAppOpenAdManager
     private lateinit var watermarkBilling: PermanentWatermarkBilling
     private val viewModel: LyricMakerViewModel by viewModels()
+
+    override fun onStart() {
+        super.onStart()
+        if (::appOpenAdManager.isInitialized) appOpenAdManager.onForeground()
+    }
+
+    override fun onStop() {
+        if (::appOpenAdManager.isInitialized) appOpenAdManager.onBackground()
+        super.onStop()
+    }
 
     override fun onDestroy() {
         if (::watermarkBilling.isInitialized) watermarkBilling.close()
@@ -65,6 +79,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         rewardedAdManager = RewardedAdManager(this)
+        appOpenAdManager = FreeAppOpenAdManager(this)
         watermarkBilling = PermanentWatermarkBilling(this)
         watermarkBilling.connect()
 
@@ -97,9 +112,11 @@ class MainActivity : ComponentActivity() {
                 // Cached Play purchase state is not trusted until the billing query resolves.
                 val hasConfirmedPermanentWatermarkRemoval = watermarkEntitlementResolved && permanentWatermarkRemoved
                 LaunchedEffect(watermarkEntitlementResolved, permanentWatermarkRemoved) {
-                    // Premium owners never initialize or request rewarded ads.
-                    if (watermarkEntitlementResolved && !permanentWatermarkRemoved) {
-                        rewardedAdManager.initialize()
+                    // All ad formats are enabled only after Play Billing confirms Free status.
+                    if (watermarkEntitlementResolved) {
+                        val isPremium = permanentWatermarkRemoved
+                        appOpenAdManager.setPremiumStatus(isPremium)
+                        if (!isPremium) rewardedAdManager.initialize()
                     }
                 }
                 val permanentWatermarkPrice by watermarkBilling.price.collectAsStateWithLifecycle()
@@ -248,6 +265,7 @@ class MainActivity : ComponentActivity() {
                         .background(StudioBackground),
                     contentWindowInsets = WindowInsets.safeDrawing,
                     topBar = {
+                        Column {
                         StudioTopAppBar(
                             projectTitle = project.title,
                             onOpenTemplates = { viewModel.setShowTemplatesSheet(true) },
@@ -273,6 +291,15 @@ class MainActivity : ComponentActivity() {
                                 finishAffinity()
                             }
                         )
+                        if (watermarkEntitlementResolved && !hasConfirmedPermanentWatermarkRemoval) {
+                            FreeNativeAd(isPremium = false)
+                        }
+                        }
+                    },
+                    bottomBar = {
+                        if (watermarkEntitlementResolved && !hasConfirmedPermanentWatermarkRemoval) {
+                            FreeBannerAd(isPremium = false)
+                        }
                     }
                 ) { innerPadding ->
                     BoxWithConstraints(
