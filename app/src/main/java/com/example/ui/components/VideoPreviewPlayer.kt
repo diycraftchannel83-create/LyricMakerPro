@@ -543,6 +543,8 @@ private fun drawInto(
             native.drawCircle(cx, cy, r, pulsePaint)
         }
         VisualizerType.VINYL_SPINNER -> {
+            AudioGlowVisualizerRenderer.drawCoolBars(native, width, height, timeMs, activeBands)
+            /*
             val cx = width / 2f
             val cy = height * 0.32f
             val r = min(width, height) * 0.22f
@@ -569,6 +571,7 @@ private fun drawInto(
             }
             native.drawCircle(cx, cy, r * 0.32f, lPaint)
             native.restore()
+            */
         }
         VisualizerType.AURORA_BLOOM,
         VisualizerType.GLOW_ORBS,
