@@ -645,6 +645,8 @@ class VideoExportEngine(private val context: Context) {
                 }
             }
             VisualizerType.VINYL_SPINNER -> {
+                AudioGlowVisualizerRenderer.drawCoolBars(canvas, width, height, timeMs, envelopeBands)
+                /*
                 val centerX = width / 2f
                 val centerY = height * 0.32f
                 val radius = min(width, height) * 0.22f
