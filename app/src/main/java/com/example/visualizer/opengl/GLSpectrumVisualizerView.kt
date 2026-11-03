@@ -9,6 +9,7 @@ import android.opengl.GLES30
 import android.util.AttributeSet
 import android.util.Log
 import android.view.TextureView
+import android.view.TextureView.SurfaceTextureListener
 import com.winsmediatama.lyricmakerpro.R
 import java.io.BufferedReader
 import java.io.InputStreamReader
