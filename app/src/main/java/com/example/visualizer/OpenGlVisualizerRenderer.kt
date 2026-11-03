@@ -24,6 +24,7 @@ object OpenGlVisualizerRenderer {
     private var surface = EGL14.EGL_NO_SURFACE
     private var surfaceWidth = 0
     private var surfaceHeight = 0
+    private var displayInitialized = false
     private var program = 0
     private var positionLocation = -1
     private var resolutionLocation = -1
@@ -45,7 +46,7 @@ object OpenGlVisualizerRenderer {
     """.trimIndent()
 
     private val fragmentShader = """
-        precision highp float;
+        precision mediump float;
         varying vec2 vUv;
         uniform vec2 uResolution;
         uniform float uTime;
@@ -339,8 +340,11 @@ object OpenGlVisualizerRenderer {
         }
         display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
         check(display != EGL14.EGL_NO_DISPLAY) { "OpenGL ES display unavailable" }
-        val versions = IntArray(2)
-        check(EGL14.eglInitialize(display, versions, 0, versions, 1)) { "OpenGL ES initialization failed" }
+        if (!displayInitialized) {
+            val versions = IntArray(2)
+            check(EGL14.eglInitialize(display, versions, 0, versions, 1)) { "OpenGL ES initialization failed" }
+            displayInitialized = true
+        }
         val configAttrs = intArrayOf(
             EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
             EGL14.EGL_SURFACE_TYPE, EGL14.EGL_PBUFFER_BIT,
