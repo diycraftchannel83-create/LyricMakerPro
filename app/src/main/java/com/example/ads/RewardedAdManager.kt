@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.rewarded.RewardedAd
@@ -52,7 +51,7 @@ class RewardedAdManager(private val activity: Activity) {
             object : RewardedAdLoadCallback() {
                 override fun onAdLoaded(ad: RewardedAd) {
                     isLoading = false
-                    rewardedAd = ad
+                    rewardedAd = if (adsAllowed && !activity.isFinishing && !activity.isDestroyed) ad else null
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
@@ -163,7 +162,7 @@ class FreeAppOpenAdManager(private val activity: Activity) {
             object : com.google.android.gms.ads.appopen.AppOpenAd.AppOpenAdLoadCallback() {
                 override fun onAdLoaded(ad: com.google.android.gms.ads.appopen.AppOpenAd) {
                     loading = false
-                    appOpenAd = ad
+                    appOpenAd = if (adsAllowed && !premiumUser && !activity.isFinishing && !activity.isDestroyed) ad else null
                     showIfReady()
                 }
 
