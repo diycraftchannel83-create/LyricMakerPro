@@ -67,7 +67,7 @@ data class TypographyPreset(
     val id: String = UUID.randomUUID().toString(),
     val name: String,
     val fontFamilyName: String = "SansSerif",
-    val fontSizeSp: Float = 18f,
+    val fontSizeSp: Float = 7f,
     val primaryColorHex: String = "#FFFFFF",
     val highlightColorHex: String = "#00F5D4",
     val strokeColorHex: String = "#000000",
@@ -79,7 +79,7 @@ data class TypographyPreset(
     val isItalic: Boolean = false,
     val textAlign: TextAlign = TextAlign.Center,
     val positionXPercent: Float = 50f,
-    val positionYPercent: Float = 56f,
+    val positionYPercent: Float = 80f,
     val visualEffect: FontVisualEffect = FontVisualEffect.NEON_GLOW,
     val lyricLayout: LyricLayoutMode = LyricLayoutMode.SINGLE_LINE
 )
