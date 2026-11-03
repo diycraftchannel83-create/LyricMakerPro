@@ -391,7 +391,7 @@ object OpenGlVisualizerRenderer {
         typeLocation = GLES20.glGetUniformLocation(program,"uType")
         bassLocation = GLES20.glGetUniformLocation(program,"uBass")
         colorLocation = GLES20.glGetUniformLocation(program,"uAccent")
-        bandsLocation = GLES20.glGetUniformLocation(program,"uBands")
+        bandsLocation = GLES20.glGetUniformLocation(program,"uBands[0]")
         check(positionLocation >= 0 && resolutionLocation >= 0 && bandsLocation >= 0) { "OpenGL ES shader bindings missing" }
     }
 
