@@ -70,7 +70,7 @@ class VideoExportEngine(private val context: Context) {
     suspend fun exportVideo(
         project: VideoProject,
         quality: ExportQuality,
-        durationSeconds: Int = 15,
+        durationSeconds: Int = 0,
         onProgress: (ExportProgress) -> Unit
     ): File = withContext(Dispatchers.Main.immediate) {
         val audioUri = project.audioTrack.customUri
@@ -103,12 +103,23 @@ class VideoExportEngine(private val context: Context) {
                 bgBitmap.recycle()
             }
 
+            // Older projects may not contain cached waveform data. Decode the selected song
+            // before rendering so exported visualizers react to the real track, not only BPM.
+            val visualizerProject = if (project.audioTrack.waveformPeaks.isEmpty()) {
+                val peaks = AudioWaveformExtractor.extract(
+                    context = context,
+                    uriString = audioUri,
+                    durationMs = project.audioTrack.durationMs
+                )
+                project.copy(audioTrack = project.audioTrack.copy(waveformPeaks = peaks))
+            } else project
+
             // Prepare the actual timeline media once. Each encoded frame below will
             // select the clip active at that presentation timestamp.
             mediaAssets = prepareMediaAssets(project.mediaClips)
             val watermarkBitmap = loadWatermarkBitmap()
             val overlay = ProjectLyricOverlay(
-                this@VideoExportEngine, width, height, project, watermarkBitmap, mediaAssets
+                this@VideoExportEngine, width, height, visualizerProject, watermarkBitmap, mediaAssets
             )
             val effects = listOf<androidx.media3.common.Effect>(
                 androidx.media3.effect.Presentation.createForWidthAndHeight(
@@ -229,6 +240,13 @@ class VideoExportEngine(private val context: Context) {
             val bitmap = cached?.takeIf { it.width == width && it.height == height }
                 ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { cached = it }
             bitmap.eraseColor(Color.TRANSPARENT)
+            val frameTimeMs = (presentationTimeUs / 1000L).coerceAtLeast(0L)
+            owner.drawVisualizer(
+                Canvas(bitmap), width, height, project.visualizer, project.visualizerColorHex,
+                frameTimeMs, project.audioTrack.bpm, project.audioTrack.waveformPeaks, project.durationMs,
+                project.audioTrack.artist.ifBlank { project.artist }, project.audioTrack.title,
+                project.audioTrack.spectrumFrames, project.audioTrack.analysisFrameDurationMs, project.audioTrack.beatTimesMs
+            )
             owner.renderFrameInternal(
                 Canvas(bitmap), width, height, project,
                 (presentationTimeUs / 1000L).coerceAtLeast(0L),
@@ -551,6 +569,18 @@ class VideoExportEngine(private val context: Context) {
         val beatIntervalMs = 60_000.0 / bpm.coerceAtLeast(60)
         val beatPhase = (timeMs % beatIntervalMs) / beatIntervalMs
         val fallbackBeat = (1f - (beatPhase * 2.8f).toFloat()).coerceIn(0f, 1f)
+        val peakIndex = if (waveformPeaks.isNotEmpty()) {
+            ((timeMs.coerceAtLeast(0L).toDouble() / durationMs.coerceAtLeast(1L)) * waveformPeaks.size)
+                .toInt().coerceIn(0, waveformPeaks.lastIndex)
+        } else -1
+        val audioLevel = if (peakIndex >= 0) waveformPeaks[peakIndex].coerceIn(0f, 1f) else fallbackBeat
+        fun bandLevel(index: Int): Float {
+            if (waveformPeaks.isEmpty()) return (fallbackBeat * (0.55f + (index % 5) * 0.09f)).coerceIn(0.04f, 1f)
+            val offset = (index * 7) % 31 - 15
+            val sampleIndex = (peakIndex + offset).coerceIn(0, waveformPeaks.lastIndex)
+            val neighbour = waveformPeaks[sampleIndex].coerceIn(0f, 1f)
+            return (audioLevel * 0.62f + neighbour * 0.38f).coerceIn(0.025f, 1f)
+        }
         val envelopeBands = if (spectrumFrames.isNotEmpty()) AudioSpectrumAnalyzer.bandsAt(spectrumFrames, timeMs, analysisFrameDurationMs) else AudioGlowVisualizerRenderer.bandsFromEnvelope(waveformPeaks, timeMs, durationMs)
         val detectedBeat = AudioSpectrumAnalyzer.beatPulseAt(beatTimesMs, timeMs)
         val kickEnergy = max(if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) envelopeBands.take(6).average().toFloat() else fallbackBeat, detectedBeat)
@@ -652,6 +682,113 @@ class VideoExportEngine(private val context: Context) {
                     pulsePaint.color = primaryColor
                     pulsePaint.alpha = alpha
                     canvas.drawCircle(centerX, centerY, r, pulsePaint)
+                }
+            }
+            VisualizerType.THREE_D_TUNNEL -> {
+                // Layered perspective tunnel; every depth plane expands with the decoded audio envelope.
+                val cx = width * 0.5f
+                val cy = height * 0.42f
+                val rotation = (timeMs * 0.012f).toFloat()
+                for (layer in 0..8) {
+                    val depth = (layer + 1) / 9f
+                    val pulse = 1f + bandLevel(layer * 3) * 0.22f
+                    val halfW = width * (0.06f + depth * 0.43f) * pulse
+                    val halfH = height * (0.035f + depth * 0.30f) * pulse
+                    val path = Path()
+                    val points = arrayOf(
+                        floatArrayOf(cx - halfW, cy - halfH),
+                        floatArrayOf(cx + halfW, cy - halfH),
+                        floatArrayOf(cx + halfW, cy + halfH),
+                        floatArrayOf(cx - halfW, cy + halfH)
+                    )
+                    points.forEachIndexed { index, point ->
+                        val angle = rotation + index * (Math.PI / 2.0)
+                        val dx = (point[0] - cx) * cos(angle).toFloat() - (point[1] - cy) * sin(angle).toFloat()
+                        val dy = (point[0] - cx) * sin(angle).toFloat() + (point[1] - cy) * cos(angle).toFloat()
+                        if (index == 0) path.moveTo(cx + dx, cy + dy) else path.lineTo(cx + dx, cy + dy)
+                    }
+                    path.close()
+                    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        style = Paint.Style.STROKE
+                        strokeWidth = max(2f, width * 0.0035f * (1f - depth * 0.35f))
+                        color = if (layer % 2 == 0) primaryColor else Color.MAGENTA
+                        alpha = (90 + bandLevel(layer * 2) * 165).toInt().coerceIn(50, 255)
+                        setShadowLayer(width * 0.012f, 0f, 0f, color)
+                    }
+                    canvas.drawPath(path, paint)
+                }
+            }
+            VisualizerType.THREE_D_RADIAL -> {
+                val cx = width * 0.5f
+                val cy = height * 0.40f
+                val inner = min(width, height) * 0.13f
+                val count = 64
+                for (i in 0 until count) {
+                    val angle = i.toFloat() / count * (Math.PI * 2.0).toFloat()
+                    val level = bandLevel(i)
+                    val length = min(width, height) * (0.045f + level * 0.19f)
+                    val x1 = cx + cos(angle).toFloat() * inner
+                    val y1 = cy + sin(angle).toFloat() * inner
+                    val x2 = cx + cos(angle).toFloat() * (inner + length)
+                    val y2 = cy + sin(angle).toFloat() * (inner + length)
+                    val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = Color.BLACK
+                        strokeWidth = max(3f, width * 0.009f)
+                        alpha = 105
+                        strokeCap = Paint.Cap.ROUND
+                    }
+                    canvas.drawLine(x1 + width * 0.008f, y1 + width * 0.008f, x2 + width * 0.008f, y2 + width * 0.008f, shadow)
+                    val bar = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = if (i % 3 == 0) Color.MAGENTA else primaryColor
+                        strokeWidth = max(2f, width * 0.006f)
+                        strokeCap = Paint.Cap.ROUND
+                        setShadowLayer(width * 0.01f, 0f, 0f, color)
+                    }
+                    canvas.drawLine(x1, y1, x2, y2, bar)
+                }
+                val core = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = primaryColor; alpha = (100 + audioLevel * 155).toInt() }
+                canvas.drawCircle(cx, cy, inner * (0.35f + audioLevel * 0.3f), core)
+            }
+            VisualizerType.THREE_D_WAVE -> {
+                val centerY = height * 0.70f
+                for (layer in 0..4) {
+                    val path = Path()
+                    val depth = layer / 4f
+                    val baseline = centerY + layer * height * 0.035f
+                    val amplitude = height * (0.025f + audioLevel * 0.13f) * (1f - depth * 0.45f)
+                    for (i in 0..96) {
+                        val x = width * i / 96f
+                        val level = bandLevel(i + layer * 11)
+                        val y = baseline + sin(i * 0.19 + timeMs * 0.003 + layer * 0.8).toFloat() * amplitude * (0.35f + level)
+                        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                    }
+                    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        style = Paint.Style.STROKE
+                        strokeWidth = max(2f, width * (0.004f - depth * 0.00035f))
+                        color = if (layer % 2 == 0) primaryColor else Color.MAGENTA
+                        alpha = (210 - layer * 28).coerceIn(60, 255)
+                        setShadowLayer(width * 0.012f, 0f, 0f, color)
+                    }
+                    canvas.drawPath(path, paint)
+                }
+            }
+            VisualizerType.THREE_D_ORBIT -> {
+                val cx = width * 0.5f
+                val cy = height * 0.38f
+                val orbit = min(width, height) * 0.22f
+                for (i in 0 until 42) {
+                    val angle = timeMs * 0.0015 + i * (Math.PI * 2.0 / 42.0)
+                    val z = (sin(angle * 1.7) * 0.5 + 0.5).toFloat()
+                    val level = bandLevel(i)
+                    val radius = (2.5f + z * 5f + level * 7f) * (width / 360f)
+                    val x = cx + cos(angle).toFloat() * orbit * (0.55f + z * 0.65f)
+                    val y = cy + sin(angle * 1.25).toFloat() * orbit * (0.35f + z * 0.5f)
+                    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = if (i % 2 == 0) primaryColor else Color.MAGENTA
+                        alpha = (100 + z * 155).toInt()
+                        setShadowLayer(radius * 2f, 0f, 0f, color)
+                    }
+                    canvas.drawCircle(x, y, radius, paint)
                 }
             }
             VisualizerType.AURORA_BLOOM,
