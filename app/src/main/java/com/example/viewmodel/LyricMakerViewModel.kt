@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.winsmediatama.lyricmakerpro.audio.AudioEngine
 import com.winsmediatama.lyricmakerpro.audio.AudioWaveformExtractor
+import com.winsmediatama.lyricmakerpro.audio.AudioSpectrumAnalyzer
 import com.winsmediatama.lyricmakerpro.data.PresetLibrary
 import com.winsmediatama.lyricmakerpro.export.VideoExportEngine
 import com.winsmediatama.lyricmakerpro.model.*
@@ -158,6 +159,17 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
                     uriString = track.customUri,
                     durationMs = track.durationMs
                 )
+                val analysis = AudioSpectrumAnalyzer.analyze(getApplication(), track.customUri, track.durationMs)
+                if (analysis.spectrumFrames.isNotEmpty() && _project.value.audioTrack.id == track.id) {
+                    _project.value = _project.value.copy(
+                        audioTrack = _project.value.audioTrack.copy(
+                            spectrumFrames = analysis.spectrumFrames,
+                            pitchFramesHz = analysis.pitchFramesHz,
+                            beatTimesMs = analysis.beatTimesMs,
+                            analysisFrameDurationMs = analysis.frameDurationMs
+                        )
+                    )
+                }
                 if (peaks.isNotEmpty() && _project.value.audioTrack.id == track.id) {
                     _project.value = _project.value.copy(
                         audioTrack = _project.value.audioTrack.copy(waveformPeaks = peaks)
@@ -656,6 +668,17 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
                 uriString = uriString,
                 durationMs = safeDurationMs
             )
+            val analysis = AudioSpectrumAnalyzer.analyze(getApplication(), uriString, safeDurationMs)
+            if (analysis.spectrumFrames.isNotEmpty() && _project.value.audioTrack.id == customTrack.id) {
+                _project.value = _project.value.copy(
+                    audioTrack = _project.value.audioTrack.copy(
+                        spectrumFrames = analysis.spectrumFrames,
+                        pitchFramesHz = analysis.pitchFramesHz,
+                        beatTimesMs = analysis.beatTimesMs,
+                        analysisFrameDurationMs = analysis.frameDurationMs
+                    )
+                )
+            }
             if (peaks.isNotEmpty() && _project.value.audioTrack.id == customTrack.id) {
                 _project.value = _project.value.copy(
                     audioTrack = _project.value.audioTrack.copy(waveformPeaks = peaks)
