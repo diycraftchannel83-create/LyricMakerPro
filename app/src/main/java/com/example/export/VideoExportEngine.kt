@@ -13,6 +13,8 @@ import android.os.Build
 import androidx.core.content.FileProvider
 import com.winsmediatama.lyricmakerpro.model.*
 import com.winsmediatama.lyricmakerpro.data.LyricMakerStorage
+import com.winsmediatama.lyricmakerpro.audio.AudioWaveformExtractor
+import com.winsmediatama.lyricmakerpro.visualizer.AudioGlowVisualizerRenderer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -96,8 +98,19 @@ class VideoExportEngine(private val context: Context) {
                 bgBitmap.recycle()
             }
 
+            // Ensure exported visualizers have real song-envelope data even when an older
+            // project was saved before waveform caching was introduced.
+            val visualizerProject = if (project.audioTrack.waveformPeaks.isEmpty()) {
+                val peaks = AudioWaveformExtractor.extract(
+                    context = context,
+                    uriString = audioUri,
+                    durationMs = project.durationMs
+                )
+                project.copy(audioTrack = project.audioTrack.copy(waveformPeaks = peaks))
+            } else project
+
             val watermarkBitmap = loadWatermarkBitmap()
-            val overlay = ProjectLyricOverlay(this@VideoExportEngine, width, height, project, watermarkBitmap)
+            val overlay = ProjectLyricOverlay(this@VideoExportEngine, width, height, visualizerProject, watermarkBitmap)
             val effects = listOf<androidx.media3.common.Effect>(
                 androidx.media3.effect.Presentation.createForWidthAndHeight(
                     width, height, androidx.media3.effect.Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
@@ -215,7 +228,12 @@ class VideoExportEngine(private val context: Context) {
             val bitmap = cached?.takeIf { it.width == width && it.height == height }
                 ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { cached = it }
             bitmap.eraseColor(Color.TRANSPARENT)
-            owner.drawLyrics(Canvas(bitmap), width, height, project, (presentationTimeUs / 1000L).coerceAtLeast(0L))
+            val frameTimeMs = (presentationTimeUs / 1000L).coerceAtLeast(0L)
+            owner.drawVisualizer(
+                Canvas(bitmap), width, height, project.visualizer, project.visualizerColorHex,
+                frameTimeMs, project.audioTrack.bpm, project.audioTrack.waveformPeaks, project.durationMs
+            )
+            owner.drawLyrics(Canvas(bitmap), width, height, project, frameTimeMs)
             if (project.showWatermark) {
                 owner.drawWatermark(Canvas(bitmap), width, height, watermarkBitmap)
             }
@@ -511,14 +529,31 @@ class VideoExportEngine(private val context: Context) {
         type: VisualizerType,
         colorHex: String,
         timeMs: Long,
-        bpm: Int
+        bpm: Int,
+        waveformPeaks: List<Float> = emptyList(),
+        durationMs: Long = 1L
     ) {
         if (type == VisualizerType.NONE) return
 
         val primaryColor = parseColor(colorHex, Color.parseColor("#00F5D4"))
         val beatIntervalMs = 60_000.0 / bpm.coerceAtLeast(60)
         val beatPhase = (timeMs % beatIntervalMs) / beatIntervalMs
-        val kickEnergy = (1f - (beatPhase * 2.8f).toFloat()).coerceIn(0f, 1f)
+        val fallbackBeat = (1f - (beatPhase * 2.8f).toFloat()).coerceIn(0f, 1f)
+        val envelopeBands = AudioGlowVisualizerRenderer.bandsFromEnvelope(waveformPeaks, timeMs, durationMs)
+        val kickEnergy = if (waveformPeaks.isNotEmpty()) envelopeBands[0] else fallbackBeat
+        fun bandLevel(index: Int): Float = if (waveformPeaks.isNotEmpty()) {
+            envelopeBands[index.mod(envelopeBands.size)]
+        } else {
+            (fallbackBeat * (0.55f + (index % 5) * 0.09f)).coerceIn(0.04f, 1f)
+        }
+        if (AudioGlowVisualizerRenderer.isGlowStyle(type)) {
+            AudioGlowVisualizerRenderer.draw(
+                canvas, width, height, type, colorHex, timeMs,
+                if (waveformPeaks.isNotEmpty()) envelopeBands else FloatArray(32) { bandLevel(it) },
+                kickEnergy
+            )
+            return
+        }
 
         when (type) {
             VisualizerType.BARS_SPECTRUM -> {
@@ -536,8 +571,7 @@ class VideoExportEngine(private val context: Context) {
                 }
 
                 for (i in 0 until barCount) {
-                    val freq = sin(timeMs * 0.006 + i * 0.6).toFloat()
-                    val peak = if (i < 4) kickEnergy * 0.85f + 0.15f else (abs(freq) * 0.7f + 0.2f)
+                    val peak = bandLevel(i)
                     val barH = (peak * maxBarHeight).coerceAtLeast(10f)
 
                     val x = startX + i * (barWidth + spacing)
@@ -594,7 +628,7 @@ class VideoExportEngine(private val context: Context) {
                 for (i in 0..60) {
                     val x = i * step
                     val phase = (x / width) * 4 * Math.PI + (timeMs * 0.008)
-                    val amp = (height * 0.04f) * (1f + kickEnergy * 0.5f)
+                    val amp = (height * 0.04f) * (1f + bandLevel(i / 2) * 0.8f)
                     val y = centerY + sin(phase).toFloat() * amp
                     path.lineTo(x, y)
                 }
@@ -612,7 +646,7 @@ class VideoExportEngine(private val context: Context) {
                     val y = (height - ((timeMs * speed + i * 150) % height)).toFloat()
                     val x = ((sin(timeMs * 0.001 + i) * 0.35 + 0.5) * width).toFloat()
                     val radius = (i % 4 + 3) * 2f
-                    particlePaint.alpha = (sin(timeMs * 0.004 + i) * 60 + 120).toInt().coerceIn(40, 200)
+                    particlePaint.alpha = (70 + bandLevel(i) * 150).toInt().coerceIn(40, 220)
                     canvas.drawCircle(x, y, radius, particlePaint)
                 }
             }
@@ -676,6 +710,11 @@ class VideoExportEngine(private val context: Context) {
                     canvas.drawCircle(centerX, centerY, r, pulsePaint)
                 }
             }
+            VisualizerType.AURORA_BLOOM,
+            VisualizerType.GLOW_ORBS,
+            VisualizerType.NEON_RIBBON,
+            VisualizerType.RADIAL_BURST,
+            VisualizerType.SPECTRUM_TUNNEL,
             VisualizerType.NONE -> {}
         }
     }
