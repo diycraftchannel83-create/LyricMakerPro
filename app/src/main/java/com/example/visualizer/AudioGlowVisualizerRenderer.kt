@@ -131,101 +131,127 @@ object AudioGlowVisualizerRenderer {
     ) {
         if (width <= 0 || height <= 0) return
 
+        // Audio Glow reference geometry: 16 slanted LED columns and a mirrored floor.
         val minSide = min(width, height).toFloat()
-        val baseY = height * 0.665f
+        val baseY = height * 0.57f
         val count = 16
-        val gap = width * 0.009f
-        val totalWidth = width * 0.88f
+        val totalWidth = width * 0.94f
+        val gap = width * 0.012f
         val barWidth = (totalWidth - gap * (count - 1)) / count
-        val segmentGap = max(2f, height * 0.006f)
-        val segmentHeight = max(5f, height * 0.021f)
-        val maxSegments = 9
+        val segmentHeight = max(5f, height * 0.0215f)
+        val segmentGap = max(3f, height * 0.008f)
+        val pitch = segmentHeight + segmentGap
+        val maxSegments = 6
+        val startX = (width - totalWidth) * 0.5f
         val centerX = width * 0.5f
 
-        // Metadata header, matching the reference's light, spacious typography.
+        // Fine, airy metadata typography as in the original reference video.
         if (artist.isNotBlank() && !artist.equals("unknown", true)) {
-            titlePaint.textSize = height * 0.078f
-            canvas.drawText(artist.trim(), centerX, height * 0.265f, titlePaint)
+            titlePaint.textSize = height * 0.060f
+            titlePaint.setShadowLayer(minSide * 0.004f, 0f, 0f, Color.WHITE)
+            canvas.drawText(artist.trim(), centerX, height * 0.225f, titlePaint)
+            titlePaint.clearShadowLayer()
         }
         if (trackTitle.isNotBlank() && !trackTitle.equals("unknown", true)) {
-            subtitlePaint.textSize = height * 0.052f
-            canvas.drawText(trackTitle.trim(), centerX, height * 0.315f, subtitlePaint)
+            subtitlePaint.textSize = height * 0.043f
+            subtitlePaint.setShadowLayer(minSide * 0.003f, 0f, 0f, Color.WHITE)
+            canvas.drawText(trackTitle.trim(), centerX, height * 0.27f, subtitlePaint)
+            subtitlePaint.clearShadowLayer()
         }
 
-        // Small spectral particles float above and below the visualizer.
-        val particleCount = if (exportPerformanceMode) 24 else 48
+        // Sparse colored particles remain transparent over imported photo/video.
+        val particleCount = if (exportPerformanceMode) 32 else 48
         for (i in 0 until particleCount) {
             val seed = i * 127.1
             val x = ((sin(seed * 0.73) * 0.5 + 0.5) * width).toFloat()
-            val yBase = ((cos(seed * 1.17) * 0.5 + 0.5) * height * 0.78f)
+            val y = ((cos(seed * 1.17) * 0.5 + 0.5) * height * 0.82f).toFloat()
             val twinkle = (0.35 + 0.65 * (0.5 + 0.5 * sin(timeMs * 0.002 + seed))).toFloat()
-            val radius = minSide * (0.0012f + (i % 3) * 0.00055f)
-            val tint = rainbowColors[i % rainbowColors.size]
-            particlePaint.color = withAlpha(tint, (35 + twinkle * 155).toInt().coerceIn(20, 190))
-            canvas.drawCircle(x, yBase.toFloat(), radius * (0.7f + twinkle), particlePaint)
+            val radius = minSide * (0.0011f + (i % 3) * 0.00045f)
+            particlePaint.color = withAlpha(rainbowColors[i % rainbowColors.size],
+                (35 + twinkle * 125).toInt().coerceIn(20, 165))
+            canvas.drawCircle(x, y, radius * (0.7f + twinkle), particlePaint)
         }
 
-        val startX = (width - totalWidth) * 0.5f
         var bassEnergy = 0f
         for (i in 0 until min(5, bands.size)) bassEnergy = max(bassEnergy, bands[i].coerceIn(0f, 1f))
 
-        // Bright neon floor: layered strokes create the glow without an opaque fill.
-        baselinePaint.shader = null
-        baselinePaint.strokeCap = Paint.Cap.ROUND
-        baselinePaint.color = withAlpha(Color.WHITE, 245)
-        baselinePaint.strokeWidth = max(2f, minSide * 0.0032f)
-        baselinePaint.setShadowLayer(minSide * (0.018f + bassEnergy * 0.012f), 0f, 0f, Color.WHITE)
+        // One continuous rainbow neon baseline, matching the left-to-right spectrum palette.
+        baselinePaint.shader = LinearGradient(
+            0f, baseY, width.toFloat(), baseY,
+            intArrayOf(
+                Color.rgb(80, 110, 255), Color.rgb(65, 45, 255),
+                Color.rgb(155, 0, 255), Color.rgb(255, 0, 150),
+                Color.rgb(255, 35, 45), Color.rgb(255, 105, 15),
+                Color.rgb(255, 190, 0), Color.rgb(255, 240, 0),
+                Color.rgb(170, 255, 0), Color.rgb(45, 255, 35)
+            ), null, Shader.TileMode.CLAMP
+        )
+        baselinePaint.strokeCap = Paint.Cap.SQUARE
+        baselinePaint.strokeWidth = max(2f, minSide * 0.0025f)
+        baselinePaint.setShadowLayer(minSide * (0.018f + bassEnergy * 0.008f), 0f, 0f, Color.WHITE)
         canvas.drawLine(width * 0.015f, baseY, width * 0.985f, baseY, baselinePaint)
-        baselinePaint.setShadowLayer(minSide * 0.022f, 0f, 0f, rainbowColors[8])
-        baselinePaint.color = withAlpha(rainbowColors[8], (100 + bassEnergy * 100).toInt())
-        baselinePaint.strokeWidth = max(4f, minSide * 0.009f)
-        canvas.drawLine(width * 0.02f, baseY, width * 0.98f, baseY, baselinePaint)
+        baselinePaint.strokeWidth = max(1.2f, minSide * 0.0015f)
         baselinePaint.clearShadowLayer()
-        baselinePaint.color = Color.WHITE
-        baselinePaint.strokeWidth = max(1.5f, minSide * 0.002f)
-        canvas.drawLine(width * 0.02f, baseY, width * 0.98f, baseY, baselinePaint)
+        canvas.drawLine(width * 0.015f, baseY, width * 0.985f, baseY, baselinePaint)
+        baselinePaint.shader = null
 
         for (i in 0 until count) {
-            val bandIndex = if (bands.isEmpty()) 0 else (i * (bands.size - 1) / (count - 1)).coerceIn(0, bands.lastIndex)
-            val raw = if (bands.isEmpty()) 0.12f else bands[bandIndex].coerceIn(0.04f, 1f)
-            val energy = (raw * (0.94f + 0.06f * sin(timeMs * 0.004 + i * 0.55).toFloat())).coerceIn(0.04f, 1f)
-            val stack = (2 + energy * (maxSegments - 2)).toInt().coerceIn(2, maxSegments)
+            val bandIndex = if (bands.isEmpty()) 0 else
+                (i * (bands.size - 1) / (count - 1)).coerceIn(0, bands.lastIndex)
+            val raw = if (bands.isEmpty()) 0.12f else bands[bandIndex].coerceIn(0.035f, 1f)
+            val energy = (raw * (0.96f + 0.04f *
+                sin(timeMs * 0.004 + i * 0.55).toFloat())).coerceIn(0.035f, 1f)
+            val stack = (3 + energy * (maxSegments - 3)).toInt().coerceIn(3, maxSegments)
             val x = startX + i * (barWidth + gap)
-            val skew = barWidth * 0.10f
+            val skew = barWidth * 0.17f
             val tint = rainbowColors[(i * rainbowColors.size / count).coerceIn(0, rainbowColors.lastIndex)]
-            val corner = barWidth * 0.12f
 
-            // Segmented bar stack with subtle dark separators.
+            // Solid angled LED segments (not rounded rectangles): top edge is shifted right.
             for (segment in 0 until stack) {
-                val top = baseY - (segment + 1) * (segmentHeight + segmentGap)
-                cachedRect.set(x + skew, top, x + barWidth - skew, top + segmentHeight)
-                barPaint.color = withAlpha(tint, 238)
+                val top = baseY - (segment + 1) * pitch
+                cachedPath.reset()
+                cachedPath.moveTo(x + skew, top)
+                cachedPath.lineTo(x + barWidth, top)
+                cachedPath.lineTo(x + barWidth - skew, top + segmentHeight)
+                cachedPath.lineTo(x, top + segmentHeight)
+                cachedPath.close()
                 barPaint.shader = null
-                canvas.drawRoundRect(cachedRect, corner, corner, barPaint)
+                barPaint.color = withAlpha(tint, 245)
+                canvas.drawPath(cachedPath, barPaint)
 
-                // Thin luminous top edge gives each segment the crisp reference look.
-                cachedRect.set(x + skew + 1f, top + 1f, x + barWidth - skew - 1f, top + max(2f, segmentHeight * 0.16f))
-                capPaint.color = withAlpha(Color.WHITE, 52)
-                canvas.drawRoundRect(cachedRect, corner * 0.5f, corner * 0.5f, capPaint)
+                // Subtle luminous upper edge gives the LED its crisp highlight.
+                coreStrokePaint.shader = null
+                coreStrokePaint.color = withAlpha(Color.WHITE, 34)
+                coreStrokePaint.strokeWidth = max(1f, minSide * 0.001f)
+                canvas.drawLine(x + skew + 2f, top + 1f, x + barWidth - 2f, top + 1f, coreStrokePaint)
 
-                // Mirrored segmented reflection, fading toward the bottom.
-                val reflectionTop = baseY + segmentGap + segment * (segmentHeight + segmentGap)
-                cachedRect.set(x + skew, reflectionTop, x + barWidth - skew, reflectionTop + segmentHeight * 0.78f)
-                barPaint.color = withAlpha(tint, (76f * (1f - segment / (stack + 1f))).toInt().coerceIn(8, 76))
-                canvas.drawRoundRect(cachedRect, corner, corner, barPaint)
+                // Mirrored parallelogram reflection with progressive fade.
+                val reflectionTop = baseY + max(2f, height * 0.006f) + segment * pitch
+                cachedReflectPath.reset()
+                cachedReflectPath.moveTo(x, reflectionTop)
+                cachedReflectPath.lineTo(x + barWidth - skew, reflectionTop)
+                cachedReflectPath.lineTo(x + barWidth, reflectionTop + segmentHeight * 0.82f)
+                cachedReflectPath.lineTo(x + skew, reflectionTop + segmentHeight * 0.82f)
+                cachedReflectPath.close()
+                val reflectionAlpha = (82f * (1f - segment / (stack + 0.5f))).toInt().coerceIn(8, 82)
+                barPaint.color = withAlpha(tint, reflectionAlpha)
+                canvas.drawPath(cachedReflectPath, barPaint)
             }
 
-            // Floating white peak marker above each column.
-            val peak = updatePeakCap(i, energy)
-            val peakY = baseY - peak * maxSegments * (segmentHeight + segmentGap) - segmentGap * 1.8f
+            // Thin white peak dash floats just above the highest active LED segment.
+            val peakY = baseY - stack * pitch - max(5f, height * 0.009f)
             capPaint.color = withAlpha(Color.WHITE, 225)
+            capPaint.strokeWidth = max(1.5f, minSide * 0.002f)
+            capPaint.strokeCap = Paint.Cap.SQUARE
             capPaint.setShadowLayer(minSide * 0.004f, 0f, 0f, Color.WHITE)
-            cachedRect.set(x - barWidth * 0.08f, peakY, x + barWidth * 1.08f, peakY + max(2f, minSide * 0.002f))
-            canvas.drawRoundRect(cachedRect, 2f, 2f, capPaint)
+            canvas.drawLine(x - barWidth * 0.03f, peakY, x + barWidth * 1.03f, peakY, capPaint)
             capPaint.clearShadowLayer()
         }
+
         baselinePaint.clearShadowLayer()
         baselinePaint.shader = null
+        barPaint.shader = null
+        coreStrokePaint.shader = null
     }
 
     /** Cool Bars: Dual-sided symmetrical neon equalizer with central waveform line. */
