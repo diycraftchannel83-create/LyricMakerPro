@@ -538,14 +538,6 @@ class VideoExportEngine(private val context: Context) {
     ) {
         if (type == VisualizerType.NONE) return
 
-        if (type == VisualizerType.BARS_SPECTRUM) {
-            val bars = if (waveformPeaks.isNotEmpty()) envelopeBands else FloatArray(32) { bandLevel(it) }
-            AudioGlowVisualizerRenderer.drawClassicSpectrum(
-                canvas, width, height, timeMs, bars, metadataArtist, metadataTitle
-            )
-            return
-        }
-
         val primaryColor = parseColor(colorHex, Color.parseColor("#00F5D4"))
         val beatIntervalMs = 60_000.0 / bpm.coerceAtLeast(60)
         val beatPhase = (timeMs % beatIntervalMs) / beatIntervalMs
@@ -556,6 +548,14 @@ class VideoExportEngine(private val context: Context) {
             envelopeBands[index.mod(envelopeBands.size)]
         } else {
             (fallbackBeat * (0.55f + (index % 5) * 0.09f)).coerceIn(0.04f, 1f)
+        }
+
+        if (type == VisualizerType.BARS_SPECTRUM) {
+            val bars = if (waveformPeaks.isNotEmpty()) envelopeBands else FloatArray(32) { bandLevel(it) }
+            AudioGlowVisualizerRenderer.drawClassicSpectrum(
+                canvas, width, height, timeMs, bars, metadataArtist, metadataTitle
+            )
+            return
         }
         if (AudioGlowVisualizerRenderer.isGlowStyle(type)) {
             AudioGlowVisualizerRenderer.draw(
