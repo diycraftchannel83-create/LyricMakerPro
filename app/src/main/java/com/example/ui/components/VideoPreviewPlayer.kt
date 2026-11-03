@@ -534,9 +534,11 @@ private fun drawInto(
                 strokeWidth = 3f
                 color = visColor
             }
-            val beatPhase = (timeMs % 500) / 500f
-            val r = beatPhase * maxR
-            pulsePaint.alpha = ((1f - beatPhase) * 220).toInt().coerceIn(0, 255)
+            val detectedBeat = AudioSpectrumAnalyzer.beatPulseAt(project.audioTrack.beatTimesMs, timeMs)
+            val beatPhase = if (project.audioTrack.beatTimesMs.isNotEmpty()) 1f - detectedBeat else (timeMs % 500) / 500f
+            val r = (beatPhase * maxR).coerceIn(0f, maxR)
+            pulsePaint.alpha = if (project.audioTrack.beatTimesMs.isNotEmpty()) (detectedBeat * 220).toInt().coerceIn(0, 255)
+                else ((1f - beatPhase) * 220).toInt().coerceIn(0, 255)
             native.drawCircle(cx, cy, r, pulsePaint)
         }
         VisualizerType.VINYL_SPINNER -> {
