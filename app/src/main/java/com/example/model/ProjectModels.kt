@@ -34,6 +34,11 @@ enum class VisualizerType(val label: String, val description: String) {
     FLOATING_PARTICLES("Ambient Dust", "Dreamy floating bokeh dust particles"),
     VINYL_SPINNER("Vinyl Disc", "Retro rotating vinyl record with groove reflections"),
     BASS_PULSE("Bass Shockwave", "Expanding concentric acoustic ripples on kick beat"),
+    AURORA_BLOOM("Aurora Bloom", "Soft multicolor glow clouds that breathe with the music"),
+    GLOW_ORBS("Glow Orbs", "Floating luminous particles with depth and audio pulses"),
+    NEON_RIBBON("Neon Ribbon", "Layered flowing light ribbons driven by the spectrum"),
+    RADIAL_BURST("Radial Burst", "A vivid circular spectrum with glowing audio spokes"),
+    SPECTRUM_TUNNEL("Spectrum Tunnel", "A colorful perspective tunnel pulsing to the track"),
     NONE("Off", "Clean background without visualizer overlay")
 }
 
