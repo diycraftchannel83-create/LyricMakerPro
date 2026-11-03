@@ -6,6 +6,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -34,6 +36,8 @@ fun TapToSyncModal(
     playheadMs: Long,
     isPlaying: Boolean,
     onTapNext: () -> Unit,
+    onTogglePlayback: () -> Unit,
+    onSeek: (Long) -> Unit,
     onFinish: () -> Unit
 ) {
     val currentLine = project.lyrics.getOrNull(currentLineIndex)
@@ -102,11 +106,46 @@ fun TapToSyncModal(
                     }
                 }
 
+                // Previously synchronized lyrics stay visible in green.
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 112.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(StudioSurfaceVariant)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (currentLineIndex > 0) {
+                        project.lyrics.take(currentLineIndex).forEachIndexed { index, line ->
+                            Text(
+                                text = "${index + 1}. ${line.text}",
+                                color = Color(0xFF39E58C),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "Synced lyrics will appear here",
+                            color = TextMuted,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
                 // Center Cue Prompter
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    modifier = Modifier
+                        .weight(1f, fill = true)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.Center
                 ) {
                     Text(
                         text = "Line ${(currentLineIndex + 1).coerceAtMost(project.lyrics.size)} of ${project.lyrics.size}",
@@ -148,19 +187,51 @@ fun TapToSyncModal(
                     // Next Upcoming Line Preview
                     if (nextLine != null) {
                         Text(
-                            text = "Next: \"${nextLine.text}\"",
-                            fontSize = 13.sp,
-                            color = TextSecondary,
+                            text = "NEXT LYRIC\n${nextLine.text}",
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFFFFD54F),
                             textAlign = TextAlign.Center
                         )
                     }
 
-                    // Audio Timecode
+                }
+
+                // Playback controls and seek bar directly above the beat button.
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        IconButton(onClick = onTogglePlayback, modifier = Modifier.size(44.dp)) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (isPlaying) "Pause audio" else "Play audio",
+                                tint = NeonCyan,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
+                        Slider(
+                            value = playheadMs.coerceIn(0L, project.durationMs.coerceAtLeast(1L)).toFloat(),
+                            onValueChange = { onSeek(it.toLong()) },
+                            valueRange = 0f..project.durationMs.coerceAtLeast(1L).toFloat(),
+                            modifier = Modifier.weight(1f),
+                            colors = SliderDefaults.colors(
+                                thumbColor = NeonCyan,
+                                activeTrackColor = NeonCyan,
+                                inactiveTrackColor = TextMuted
+                            )
+                        )
+                    }
                     Text(
                         text = "${formatMs(playheadMs)} / ${formatMs(project.durationMs)}",
-                        fontSize = 14.sp,
                         color = TextMuted,
-                        fontWeight = FontWeight.Medium
+                        fontSize = 12.sp
                     )
                 }
 
