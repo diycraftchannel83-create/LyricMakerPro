@@ -26,8 +26,60 @@ object LyricMakerStorage {
     private fun timestamp(): String = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
 
     fun saveProject(context: Context, project: VideoProject, projectName: String = project.title): Uri {
-        val name = "${safeName(projectName)}_${timestamp()}.lyricmaker.json"
-        return saveText(context, name, "application/json", "$ROOT/Project", ProjectFileCodec.encode(project.copy(title = projectName.trim())))
+        // Keep a stable filename for this project ID so subsequent saves replace the
+        // same document, even if the user changes the visible project title.
+        val preferences = context.getSharedPreferences("lyricmakerpro_project_files", Context.MODE_PRIVATE)
+        val key = "project_file_${project.id}"
+        val name = preferences.getString(key, null)
+            ?: findPreviouslySavedProjectName(context, project.id)
+            ?: "${safeName(projectName)}_${project.id.take(8)}.lyricmaker.json"
+        val savedUri = saveText(
+            context, name, "application/json", "$ROOT/Project",
+            ProjectFileCodec.encode(project.copy(title = projectName.trim()))
+        )
+        preferences.edit().putString(key, name).apply()
+        return savedUri
+    }
+
+    /**
+     * Migrate projects saved by older app versions, whose filenames contained a
+     * timestamp, by locating the document with the same embedded project ID.
+     */
+    private fun findPreviouslySavedProjectName(context: Context, projectId: String): String? {
+        val relativeDirectory = "${Environment.DIRECTORY_DOCUMENTS}/$ROOT/Project/"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val collection = MediaStore.Files.getContentUri("external")
+            return context.contentResolver.query(
+                collection,
+                arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME),
+                "${MediaStore.MediaColumns.RELATIVE_PATH}=?",
+                arrayOf(relativeDirectory),
+                null
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+                var matchedName: String? = null
+                while (cursor.moveToNext() && matchedName == null) {
+                    val uri = Uri.withAppendedPath(collection, cursor.getLong(idColumn).toString())
+                    val json = runCatching {
+                        context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                    }.getOrNull()
+                    if (!json.isNullOrBlank() && runCatching { ProjectFileCodec.decode(json).id == projectId }.getOrDefault(false)) {
+                        matchedName = cursor.getString(nameColumn)
+                    }
+                }
+                matchedName
+            }
+        }
+
+        val baseDirectory = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+            ?: File(context.filesDir, Environment.DIRECTORY_DOCUMENTS)
+        return File(baseDirectory, "$ROOT/Project").listFiles()
+            ?.firstOrNull { file ->
+                file.isFile && runCatching {
+                    ProjectFileCodec.decode(file.readText(Charsets.UTF_8)).id == projectId
+                }.getOrDefault(false)
+            }?.name
     }
 
     fun saveLrc(context: Context, project: VideoProject): Uri {
@@ -36,7 +88,8 @@ object LyricMakerStorage {
         val content = project.lyrics.sortedBy { it.startMs }.joinToString("\n") { line ->
             "[${formatLrcTime(line.startMs)}]${line.text}"
         }
-        return saveText(context, name, "text/plain", "$ROOT/LrcLyric", content + "\n")
+        // Use an LRC MIME type and an explicit .lrc display name; never append .txt.
+        return saveText(context, name, "application/x-lrc", "$ROOT/LrcLyric", content + "\n")
     }
 
     private fun formatLrcTime(ms: Long): String {
@@ -57,8 +110,25 @@ object LyricMakerStorage {
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
             val collection = MediaStore.Files.getContentUri("external")
-            val uri = requireNotNull(context.contentResolver.insert(collection, values)) { "Cannot create $name" }
+            val relativeDirectory = "${Environment.DIRECTORY_DOCUMENTS}/$relativePath/"
+            val existingUri = context.contentResolver.query(
+                collection,
+                arrayOf(MediaStore.MediaColumns._ID),
+                "${MediaStore.MediaColumns.DISPLAY_NAME}=? AND ${MediaStore.MediaColumns.RELATIVE_PATH}=?",
+                arrayOf(name, relativeDirectory),
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    Uri.withAppendedPath(collection, cursor.getLong(0).toString())
+                } else null
+            }
+            val uri = existingUri ?: requireNotNull(context.contentResolver.insert(collection, values)) {
+                "Cannot create $name"
+            }
             try {
+                if (existingUri != null) {
+                    context.contentResolver.update(uri, values, null, null)
+                }
                 val output = context.contentResolver.openOutputStream(uri, "wt")
                     ?: error("Cannot open output stream for $name")
                 output.bufferedWriter(Charsets.UTF_8).use { writer ->
@@ -70,7 +140,7 @@ object LyricMakerStorage {
                 if (updated <= 0) error("Could not publish saved file $name")
                 return uri
             } catch (error: Exception) {
-                context.contentResolver.delete(uri, null, null)
+                if (existingUri == null) context.contentResolver.delete(uri, null, null)
                 throw error
             }
         }

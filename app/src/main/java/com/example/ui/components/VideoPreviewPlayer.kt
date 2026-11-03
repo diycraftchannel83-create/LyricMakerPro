@@ -45,6 +45,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.winsmediatama.lyricmakerpro.model.*
+import com.winsmediatama.lyricmakerpro.visualizer.AudioGlowVisualizerRenderer
+import com.winsmediatama.lyricmakerpro.audio.AudioSpectrumAnalyzer
 import com.winsmediatama.lyricmakerpro.ui.theme.*
 import kotlin.math.*
 import kotlinx.coroutines.delay
@@ -421,6 +423,8 @@ private fun drawInto(
     watermarkBitmap: Bitmap? = null
 ) {
     val native = drawScope.drawContext.canvas.nativeCanvas
+    val fftBands = AudioSpectrumAnalyzer.bandsAt(project.audioTrack.spectrumFrames, timeMs, project.audioTrack.analysisFrameDurationMs)
+    val activeBands = if (project.audioTrack.spectrumFrames.isNotEmpty()) fftBands else spectrumBands
 
     // 1. Background
     val bg = project.background
@@ -470,49 +474,37 @@ private fun drawInto(
         }
     }
 
-    // 2. Visualizer Overlay
+    // Render every visualizer on a translucent overlay so imported media remains visible.
+    val visualizerLayer = native.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), 210)
+    // Reference-style rainbow bars share the same metadata-aware renderer as MP4 export.
+    if (project.visualizer == VisualizerType.BARS_SPECTRUM) {
+        val bars = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty())
+            AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
+        else activeBands
+        AudioGlowVisualizerRenderer.drawClassicSpectrum(native, width, height, timeMs, bars,
+            project.audioTrack.artist, project.audioTrack.title)
+    }
+    // 2. Visualizer Overlay. Audio Glow styles share the same native renderer as MP4 export.
     val visColor = try { AndroidColor.parseColor(project.visualizerColorHex) } catch (_: Exception) { AndroidColor.CYAN }
+    if (AudioGlowVisualizerRenderer.isGlowStyle(project.visualizer)) {
+        val glowBands = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty()) {
+            AudioGlowVisualizerRenderer.bandsFromEnvelope(
+                project.audioTrack.waveformPeaks, timeMs, project.durationMs
+            )
+        } else activeBands
+        AudioGlowVisualizerRenderer.draw(
+            native, width, height, project.visualizer, project.visualizerColorHex,
+            timeMs, glowBands, glowBands.firstOrNull() ?: bassEnergy,
+            previewQuality = true
+        )
+    }
     when (project.visualizer) {
-        VisualizerType.BARS_SPECTRUM -> {
-            val barCount = 16
-            val spacing = width * 0.012f
-            val totalW = width * 0.88f
-            val barW = (totalW - (spacing * (barCount - 1))) / barCount
-            val startX = (width - totalW) / 2f
-            val baseY = height * 0.82f
-            val maxH = height * 0.16f
-
-            val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply { style = AndroidPaint.Style.FILL }
-
-            for (i in 0 until barCount) {
-                val bandLevel = spectrumBands.getOrElse(i) { 0.2f }
-                val barH = (bandLevel * maxH).coerceAtLeast(6f)
-                val x = startX + i * (barW + spacing)
-                paint.shader = LinearGradient(x, baseY - barH, x, baseY, intArrayOf(visColor, AndroidColor.MAGENTA), null, Shader.TileMode.CLAMP)
-                native.drawRoundRect(x, baseY - barH, x + barW, baseY, barW / 2f, barW / 2f, paint)
-            }
-        }
+        VisualizerType.BARS_SPECTRUM -> {} // Drawn by AudioGlowVisualizerRenderer above.
         VisualizerType.CIRCULAR_WAVE -> {
-            val cx = width / 2f
-            val cy = height * 0.35f
-            val baseR = min(width, height) * 0.18f
-            val r = baseR * (1f + (bassEnergy - 0.15f).coerceAtLeast(0f) * 0.15f)
-
-            val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.STROKE
-                strokeWidth = 4f
-                color = visColor
-                alpha = 220
-            }
-            native.drawCircle(cx, cy, r, paint)
-
-            val outerPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.STROKE
-                strokeWidth = 2f
-                color = AndroidColor.parseColor("#FF007F")
-                alpha = (bassEnergy * 150).toInt().coerceIn(30, 255)
-            }
-            native.drawCircle(cx, cy, r * 1.25f, outerPaint)
+            val sinBars = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty())
+                AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
+            else activeBands
+            AudioGlowVisualizerRenderer.drawSinBars(native, width, height, timeMs, sinBars)
         }
         VisualizerType.FLOATING_PARTICLES -> {
             val pPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
@@ -529,23 +521,10 @@ private fun drawInto(
             }
         }
         VisualizerType.OSCILLOSCOPE -> {
-            val wavePaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.STROKE
-                strokeWidth = 4f
-                color = visColor
-            }
-            val path = android.graphics.Path()
-            val centerY = height * 0.78f
-            val step = width / 40f
-            path.moveTo(0f, centerY)
-            for (i in 0..40) {
-                val x = i * step
-                val phase = (x / width) * 4 * Math.PI + (timeMs * 0.008)
-                val amp = (height * 0.035f) * (1f + bassEnergy * 0.6f)
-                val y = centerY + sin(phase).toFloat() * amp
-                path.lineTo(x, y)
-            }
-            native.drawPath(path, wavePaint)
+            val terrainBands = if (project.audioTrack.spectrumFrames.isEmpty() && project.audioTrack.waveformPeaks.isNotEmpty())
+                AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
+            else activeBands
+            AudioGlowVisualizerRenderer.drawTerrainBars(native, width, height, timeMs, terrainBands)
         }
         VisualizerType.BASS_PULSE -> {
             val cx = width / 2f
@@ -556,12 +535,16 @@ private fun drawInto(
                 strokeWidth = 3f
                 color = visColor
             }
-            val beatPhase = (timeMs % 500) / 500f
-            val r = beatPhase * maxR
-            pulsePaint.alpha = ((1f - beatPhase) * 220).toInt().coerceIn(0, 255)
+            val detectedBeat = AudioSpectrumAnalyzer.beatPulseAt(project.audioTrack.beatTimesMs, timeMs)
+            val beatPhase = if (project.audioTrack.beatTimesMs.isNotEmpty()) 1f - detectedBeat else (timeMs % 500) / 500f
+            val r = (beatPhase * maxR).coerceIn(0f, maxR)
+            pulsePaint.alpha = if (project.audioTrack.beatTimesMs.isNotEmpty()) (detectedBeat * 220).toInt().coerceIn(0, 255)
+                else ((1f - beatPhase) * 220).toInt().coerceIn(0, 255)
             native.drawCircle(cx, cy, r, pulsePaint)
         }
         VisualizerType.VINYL_SPINNER -> {
+            AudioGlowVisualizerRenderer.drawCoolBars(native, width, height, timeMs, activeBands)
+            /*
             val cx = width / 2f
             val cy = height * 0.32f
             val r = min(width, height) * 0.22f
@@ -588,9 +571,17 @@ private fun drawInto(
             }
             native.drawCircle(cx, cy, r * 0.32f, lPaint)
             native.restore()
+            */
         }
+        VisualizerType.AURORA_BLOOM,
+        VisualizerType.GLOW_ORBS,
+        VisualizerType.NEON_RIBBON,
+        VisualizerType.RADIAL_BURST,
+        VisualizerType.SPECTRUM_TUNNEL,
         VisualizerType.NONE -> {}
     }
+
+    native.restoreToCount(visualizerLayer)
 
     // 3. Lyrics
     val lyrics = project.lyrics
