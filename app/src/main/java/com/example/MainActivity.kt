@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.winsmediatama.lyricmakerpro.ads.RewardedAdManager
 import com.winsmediatama.lyricmakerpro.ads.AdsConsentManager
+import com.google.android.gms.ads.MobileAds
 import com.winsmediatama.lyricmakerpro.ads.FreeAppOpenAdManager
 import com.winsmediatama.lyricmakerpro.ads.FreeBannerAd
 import com.winsmediatama.lyricmakerpro.ads.FreeNativeAd
@@ -60,7 +61,37 @@ class MainActivity : ComponentActivity() {
     private lateinit var appOpenAdManager: FreeAppOpenAdManager
     private lateinit var adsConsentManager: AdsConsentManager
     private lateinit var watermarkBilling: PermanentWatermarkBilling
+    private var mobileAdsInitializationStarted = false
+    private var mobileAdsInitialized = false
+    private var shouldEnableAds = false
     private val viewModel: LyricMakerViewModel by viewModels()
+
+    private fun updateAdEligibility(canRequestAds: Boolean, entitlementResolved: Boolean, isPremium: Boolean) {
+        shouldEnableAds = canRequestAds && entitlementResolved && !isPremium
+        if (!shouldEnableAds) {
+            if (::appOpenAdManager.isInitialized) appOpenAdManager.setAdsAllowed(false)
+            if (::rewardedAdManager.isInitialized) rewardedAdManager.setAdsAllowed(false)
+            return
+        }
+
+        if (mobileAdsInitialized) {
+            appOpenAdManager.setAdsAllowed(true)
+            rewardedAdManager.setAdsAllowed(true)
+            return
+        }
+        if (mobileAdsInitializationStarted) return
+
+        mobileAdsInitializationStarted = true
+        MobileAds.initialize(this) {
+            runOnUiThread {
+                mobileAdsInitialized = true
+                if (shouldEnableAds && !isFinishing && !isDestroyed) {
+                    appOpenAdManager.setAdsAllowed(true)
+                    rewardedAdManager.setAdsAllowed(true)
+                }
+            }
+        }
+    }
 
     override fun onStart() {
         super.onStart()
@@ -121,8 +152,7 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(watermarkEntitlementResolved, permanentWatermarkRemoved, canRequestAds) {
                     val isPremium = watermarkEntitlementResolved && permanentWatermarkRemoved
                     appOpenAdManager.setPremiumStatus(isPremium)
-                    appOpenAdManager.setAdsAllowed(canRequestAds && watermarkEntitlementResolved && !isPremium)
-                    rewardedAdManager.setAdsAllowed(canRequestAds && watermarkEntitlementResolved && !isPremium)
+                    updateAdEligibility(canRequestAds, watermarkEntitlementResolved, isPremium)
                 }
                 val permanentWatermarkPrice by watermarkBilling.price.collectAsStateWithLifecycle()
                 val billingMessage by watermarkBilling.message.collectAsStateWithLifecycle()
