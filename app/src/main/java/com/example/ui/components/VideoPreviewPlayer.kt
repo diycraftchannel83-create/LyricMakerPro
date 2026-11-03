@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.winsmediatama.lyricmakerpro.model.*
+import com.winsmediatama.lyricmakerpro.visualizer.AudioGlowVisualizerRenderer
 import com.winsmediatama.lyricmakerpro.ui.theme.*
 import kotlin.math.*
 import kotlinx.coroutines.delay
@@ -470,8 +471,19 @@ private fun drawInto(
         }
     }
 
-    // 2. Visualizer Overlay
+    // 2. Visualizer Overlay. Audio Glow styles share the same native renderer as MP4 export.
     val visColor = try { AndroidColor.parseColor(project.visualizerColorHex) } catch (_: Exception) { AndroidColor.CYAN }
+    if (AudioGlowVisualizerRenderer.isGlowStyle(project.visualizer)) {
+        val glowBands = if (project.audioTrack.waveformPeaks.isNotEmpty()) {
+            AudioGlowVisualizerRenderer.bandsFromEnvelope(
+                project.audioTrack.waveformPeaks, timeMs, project.durationMs
+            )
+        } else spectrumBands
+        AudioGlowVisualizerRenderer.draw(
+            native, width, height, project.visualizer, project.visualizerColorHex,
+            timeMs, glowBands, glowBands.firstOrNull() ?: bassEnergy
+        )
+    }
     when (project.visualizer) {
         VisualizerType.BARS_SPECTRUM -> {
             val barCount = 16
@@ -589,6 +601,11 @@ private fun drawInto(
             native.drawCircle(cx, cy, r * 0.32f, lPaint)
             native.restore()
         }
+        VisualizerType.AURORA_BLOOM,
+        VisualizerType.GLOW_ORBS,
+        VisualizerType.NEON_RIBBON,
+        VisualizerType.RADIAL_BURST,
+        VisualizerType.SPECTRUM_TUNNEL,
         VisualizerType.NONE -> {}
     }
 
