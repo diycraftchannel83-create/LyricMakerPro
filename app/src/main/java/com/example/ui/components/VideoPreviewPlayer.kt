@@ -46,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.winsmediatama.lyricmakerpro.model.*
 import com.winsmediatama.lyricmakerpro.visualizer.AudioGlowVisualizerRenderer
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.winsmediatama.lyricmakerpro.audio.AudioEngine
 import com.winsmediatama.lyricmakerpro.audio.AudioSpectrumAnalyzer
 import com.winsmediatama.lyricmakerpro.ui.theme.*
 import kotlin.math.*
@@ -54,10 +56,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun VideoPreviewPlayer(
     project: VideoProject,
-    playheadMs: Long,
-    isPlaying: Boolean,
-    spectrumBands: FloatArray,
-    bassEnergy: Float,
+    audioEngine: AudioEngine,
     onTogglePlay: () -> Unit,
     onSeek: (Long) -> Unit,
     onTextPositionChange: (Float, Float) -> Unit,
@@ -65,6 +64,10 @@ fun VideoPreviewPlayer(
     videoAudioMuted: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val playheadMs by audioEngine.playheadMs.collectAsStateWithLifecycle()
+    val isPlaying by audioEngine.isPlaying.collectAsStateWithLifecycle()
+    val spectrumBands by audioEngine.spectrumBands.collectAsStateWithLifecycle()
+    val bassEnergy by audioEngine.bassEnergy.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val watermarkBitmap = remember(context) {
         runCatching {
