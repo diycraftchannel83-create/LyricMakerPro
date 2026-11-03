@@ -104,7 +104,9 @@ object OpenGlVisualizerRenderer {
             alpha = max(alpha, a * 0.88);
         }
         void main() {
-            vec2 p = vUv;
+            // Convert GL's bottom-left UV origin to Canvas' top-left coordinate system.
+            // Readback is vertically flipped below, so this keeps legacy layout positions exact.
+            vec2 p = vec2(vUv.x, 1.0 - vUv.y);
             vec2 uv = (gl_FragCoord.xy - 0.5 * uResolution) / min(uResolution.x, uResolution.y);
             float t = uTime;
             float bass = clamp(uBass, 0.0, 1.0);
