@@ -54,6 +54,36 @@ import kotlin.math.*
 import kotlinx.coroutines.delay
 
 @Composable
+private fun PreviewSpectrumCanvas(
+    project: VideoProject,
+    playheadMs: Long,
+    audioEngine: AudioEngine,
+    drawBackground: Boolean,
+    watermarkBitmap: Bitmap?
+) {
+    val spectrumBands by audioEngine.spectrumBands.collectAsStateWithLifecycle()
+    val bassEnergy by audioEngine.bassEnergy.collectAsStateWithLifecycle()
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val canvasWidth = size.width.toInt()
+        val canvasHeight = size.height.toInt()
+        if (canvasWidth <= 0 || canvasHeight <= 0) return@Canvas
+
+        drawInto(
+            drawScope = this,
+            project = project,
+            timeMs = playheadMs,
+            width = canvasWidth,
+            height = canvasHeight,
+            spectrumBands = spectrumBands,
+            bassEnergy = bassEnergy,
+            drawBackground = drawBackground,
+            watermarkBitmap = watermarkBitmap
+        )
+    }
+}
+
+@Composable
 fun VideoPreviewPlayer(
     project: VideoProject,
     audioEngine: AudioEngine,
@@ -66,8 +96,6 @@ fun VideoPreviewPlayer(
 ) {
     val playheadMs by audioEngine.playheadMs.collectAsStateWithLifecycle()
     val isPlaying by audioEngine.isPlaying.collectAsStateWithLifecycle()
-    val spectrumBands by audioEngine.spectrumBands.collectAsStateWithLifecycle()
-    val bassEnergy by audioEngine.bassEnergy.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val watermarkBitmap = remember(context) {
         runCatching {
@@ -219,24 +247,13 @@ fun VideoPreviewPlayer(
                     }
                 }
 
-                // Real-time Canvas Rendering
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val canvasWidth = size.width.toInt()
-                    val canvasHeight = size.height.toInt()
-                    if (canvasWidth <= 0 || canvasHeight <= 0) return@Canvas
-
-                    drawInto(
-                        drawScope = this,
-                        project = project,
-                        timeMs = playheadMs,
-                        width = canvasWidth,
-                        height = canvasHeight,
-                        spectrumBands = spectrumBands,
-                        bassEnergy = bassEnergy,
-                        drawBackground = activeMedia == null,
-                        watermarkBitmap = watermarkBitmap
-                    )
-                }
+                PreviewSpectrumCanvas(
+                    project = project,
+                    playheadMs = playheadMs,
+                    audioEngine = audioEngine,
+                    drawBackground = activeMedia == null,
+                    watermarkBitmap = watermarkBitmap
+                )
 
                 // Center alignment guides appear while lyric position is snapped to canvas center.
                 val verticalAligned = kotlin.math.abs(project.typography.positionXPercent - 50f) < 0.01f
@@ -322,7 +339,7 @@ fun VideoPreviewPlayer(
                     }
                 }
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    FullscreenPreviewCanvas(project, playheadMs, isPlaying, spectrumBands, bassEnergy, videoAudioMuted)
+                    FullscreenPreviewCanvas(project, playheadMs, isPlaying, audioEngine, videoAudioMuted)
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     IconButton(onClick = onTogglePlay, modifier = Modifier.testTag("fullscreen_play_pause_button")) {
@@ -350,10 +367,11 @@ private fun FullscreenPreviewCanvas(
     project: VideoProject,
     playheadMs: Long,
     isPlaying: Boolean,
-    spectrumBands: FloatArray,
-    bassEnergy: Float,
+    audioEngine: AudioEngine,
     videoAudioMuted: Boolean
 ) {
+    val spectrumBands by audioEngine.spectrumBands.collectAsStateWithLifecycle()
+    val bassEnergy by audioEngine.bassEnergy.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val watermarkBitmap = remember(context) {
         runCatching {
