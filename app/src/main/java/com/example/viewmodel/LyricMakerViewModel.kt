@@ -313,15 +313,16 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
             // start time while preserving the remaining saved timeline.
             if (index > 0) {
                 val prev = currentLyrics[index - 1]
-                currentLyrics[index - 1] = PresetLibrary.createLyricLineWithWords(
-                    prev.text, prev.startMs, currentTime
+                val previousEnd = currentTime.coerceAtLeast(prev.startMs + 200L)
+                currentLyrics[index - 1] = rebuildLyricLine(
+                    prev, prev.text, prev.startMs, previousEnd
                 )
             }
             val nextStart = currentLyrics.getOrNull(index + 1)?.startMs
             val estimatedEnd = nextStart?.takeIf { it > currentTime }
                 ?: (currentTime + 3000L)
-            currentLyrics[index] = PresetLibrary.createLyricLineWithWords(
-                old.text, currentTime, estimatedEnd
+            currentLyrics[index] = rebuildLyricLine(
+                old, old.text, currentTime, estimatedEnd.coerceAtLeast(currentTime + 200L)
             )
 
             _project.value = _project.value.copy(lyrics = currentLyrics)
