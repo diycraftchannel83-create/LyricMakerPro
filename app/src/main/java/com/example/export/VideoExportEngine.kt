@@ -550,6 +550,7 @@ class VideoExportEngine(private val context: Context) {
             (fallbackBeat * (0.55f + (index % 5) * 0.09f)).coerceIn(0.04f, 1f)
         }
 
+        // Resolve waveform-derived levels before rendering the classic rainbow spectrum.
         if (type == VisualizerType.BARS_SPECTRUM) {
             val bars = if (waveformPeaks.isNotEmpty()) envelopeBands else FloatArray(32) { bandLevel(it) }
             AudioGlowVisualizerRenderer.drawClassicSpectrum(
