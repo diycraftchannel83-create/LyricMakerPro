@@ -158,7 +158,11 @@ class PermanentWatermarkBilling(context: Context) : PurchasesUpdatedListener {
 
     override fun onPurchasesUpdated(result: BillingResult, purchases: MutableList<Purchase>?) {
         when (result.responseCode) {
-            BillingClient.BillingResponseCode.OK -> purchases.orEmpty().forEach(::processPurchase)
+            BillingClient.BillingResponseCode.OK -> {
+                purchases.orEmpty().forEach(::processPurchase)
+                // Reconcile the complete owned-product state after purchase callbacks.
+                restorePurchases()
+            }
             BillingClient.BillingResponseCode.USER_CANCELED -> _message.value = "Pembayaran dibatalkan."
             else -> _message.value = "Pembayaran gagal: ${result.debugMessage}"
         }
@@ -198,6 +202,7 @@ class PermanentWatermarkBilling(context: Context) : PurchasesUpdatedListener {
     }
 
     fun close() {
+        connecting = false
         if (billingClient.isReady) billingClient.endConnection()
     }
 }
