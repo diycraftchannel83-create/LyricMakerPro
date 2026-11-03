@@ -471,6 +471,14 @@ private fun drawInto(
         }
     }
 
+    // Reference-style rainbow bars share the same metadata-aware renderer as MP4 export.
+    if (project.visualizer == VisualizerType.BARS_SPECTRUM) {
+        val bars = if (project.audioTrack.waveformPeaks.isNotEmpty())
+            AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
+        else spectrumBands
+        AudioGlowVisualizerRenderer.drawClassicSpectrum(native, width, height, timeMs, bars,
+            project.audioTrack.artist, project.audioTrack.title)
+    }
     // 2. Visualizer Overlay. Audio Glow styles share the same native renderer as MP4 export.
     val visColor = try { AndroidColor.parseColor(project.visualizerColorHex) } catch (_: Exception) { AndroidColor.CYAN }
     if (AudioGlowVisualizerRenderer.isGlowStyle(project.visualizer)) {
