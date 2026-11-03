@@ -105,7 +105,7 @@ class FreeAppOpenAdManager(private val activity: Activity) {
         if (!isPremium) {
             if (!initialized) {
                 initialized = true
-                load()
+                com.google.android.gms.ads.MobileAds.initialize(activity) { load() }
             }
             showIfReady()
         } else {
