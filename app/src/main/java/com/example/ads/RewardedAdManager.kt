@@ -65,6 +65,7 @@ class RewardedAdManager(private val activity: Activity) {
             }
 
             override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                onUnavailable()
                 load()
             }
         }
