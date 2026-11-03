@@ -163,7 +163,15 @@ class VideoExportEngine(private val context: Context) {
                 val progressHolder = androidx.media3.transformer.ProgressHolder()
                 val active = java.util.concurrent.atomic.AtomicBoolean(true)
                 lateinit var transformer: androidx.media3.transformer.Transformer
+                val encoderFactory = androidx.media3.transformer.DefaultEncoderFactory.Builder(
+                    context.applicationContext
+                ).setRequestedVideoEncoderSettings(
+                    androidx.media3.transformer.VideoEncoderSettings.Builder()
+                        .setBitrate(quality.targetBitrate)
+                        .build()
+                ).build()
                 transformer = androidx.media3.transformer.Transformer.Builder(context.applicationContext)
+                    .setEncoderFactory(encoderFactory)
                     .setVideoMimeType(androidx.media3.common.MimeTypes.VIDEO_H264)
                     .setAudioMimeType(androidx.media3.common.MimeTypes.AUDIO_AAC)
                     .setEnsureFileStartsOnVideoFrameEnabled(true)
@@ -603,7 +611,8 @@ class VideoExportEngine(private val context: Context) {
         if (type == VisualizerType.BARS_SPECTRUM) {
             val bars = if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) envelopeBands else FloatArray(32) { bandLevel(it) }
             AudioGlowVisualizerRenderer.drawClassicSpectrum(
-                canvas, width, height, timeMs, bars, metadataArtist, metadataTitle
+                canvas, width, height, timeMs, bars, metadataArtist, metadataTitle,
+                exportPerformanceMode = true
             )
             return
         }
@@ -611,7 +620,8 @@ class VideoExportEngine(private val context: Context) {
             AudioGlowVisualizerRenderer.draw(
                 canvas, width, height, type, colorHex, timeMs,
                 if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) envelopeBands else FloatArray(32) { bandLevel(it) },
-                kickEnergy
+                kickEnergy,
+                previewQuality = true
             )
             return
         }
@@ -649,7 +659,9 @@ class VideoExportEngine(private val context: Context) {
                 }
             }
             VisualizerType.CIRCULAR_WAVE -> {
-                AudioGlowVisualizerRenderer.drawSinBars(canvas, width, height, timeMs, envelopeBands)
+                AudioGlowVisualizerRenderer.drawSinBars(
+                    canvas, width, height, timeMs, envelopeBands, exportPerformanceMode = true
+                )
             }
             VisualizerType.OSCILLOSCOPE -> {
                 AudioGlowVisualizerRenderer.drawTerrainBars(canvas, width, height, timeMs, envelopeBands)
