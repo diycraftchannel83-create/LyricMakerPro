@@ -33,6 +33,7 @@ object OpenGlVisualizerRenderer {
     private var colorLocation = -1
     private var bandsLocation = -1
     private var vertexBuffer: FloatBuffer? = null
+    private var bitmapCache: Bitmap? = null
 
     private val vertexShader = """
         attribute vec2 aPosition;
@@ -221,20 +222,17 @@ object OpenGlVisualizerRenderer {
         title: String = ""
     ) {
         if (width <= 0 || height <= 0 || visualizerOrdinal == 11) return
-        val bitmap = try {
-            render(width, height, visualizerOrdinal, timeMs, bands, bass, colorHex)
-        } catch (_: Throwable) {
-            synchronized(lock) {
+        synchronized(lock) {
+            val bitmap = try {
+                render(width, height, visualizerOrdinal, timeMs, bands, bass, colorHex)
+            } catch (_: Throwable) {
                 if (display != EGL14.EGL_NO_DISPLAY) {
                     runCatching { EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT) }
                 }
+                drawFallback(canvas, width, height, visualizerOrdinal, bands, colorHex)
+                null
             }
-            drawFallback(canvas, width, height, visualizerOrdinal, bands, colorHex)
-            null
-        }
-        if (bitmap != null) {
-            canvas.drawBitmap(bitmap, 0f, 0f, null)
-            bitmap.recycle()
+            if (bitmap != null) canvas.drawBitmap(bitmap, 0f, 0f, null)
         }
 
         // Metadata remains legible and is deliberately drawn after the transparent GPU layer.
@@ -304,7 +302,13 @@ object OpenGlVisualizerRenderer {
             }
         }
         runCatching { EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT) }
-        Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { it.setPixels(argb,0,width,0,0,width,height) }
+        val output = bitmapCache?.takeIf { it.width == width && it.height == height }
+            ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { previous ->
+                bitmapCache?.recycle()
+                bitmapCache = previous
+            }
+        output.setPixels(argb,0,width,0,0,width,height)
+        output
     }
 
 
