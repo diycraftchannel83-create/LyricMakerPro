@@ -14,6 +14,7 @@ import androidx.core.content.FileProvider
 import com.winsmediatama.lyricmakerpro.model.*
 import com.winsmediatama.lyricmakerpro.data.LyricMakerStorage
 import com.winsmediatama.lyricmakerpro.audio.AudioWaveformExtractor
+import com.winsmediatama.lyricmakerpro.audio.AudioSpectrumAnalyzer
 import com.winsmediatama.lyricmakerpro.visualizer.AudioGlowVisualizerRenderer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -100,14 +101,26 @@ class VideoExportEngine(private val context: Context) {
 
             // Ensure exported visualizers have real song-envelope data even when an older
             // project was saved before waveform caching was introduced.
-            val visualizerProject = if (project.audioTrack.waveformPeaks.isEmpty()) {
-                val peaks = AudioWaveformExtractor.extract(
-                    context = context,
-                    uriString = audioUri,
-                    durationMs = project.durationMs
+            var visualizerProject = project
+            if (visualizerProject.audioTrack.waveformPeaks.isEmpty()) {
+                val peaks = AudioWaveformExtractor.extract(context, audioUri, project.durationMs)
+                visualizerProject = visualizerProject.copy(
+                    audioTrack = visualizerProject.audioTrack.copy(waveformPeaks = peaks)
                 )
-                project.copy(audioTrack = project.audioTrack.copy(waveformPeaks = peaks))
-            } else project
+            }
+            if (visualizerProject.audioTrack.spectrumFrames.isEmpty()) {
+                val analysis = AudioSpectrumAnalyzer.analyze(context, audioUri, project.durationMs)
+                if (analysis.spectrumFrames.isNotEmpty()) {
+                    visualizerProject = visualizerProject.copy(
+                        audioTrack = visualizerProject.audioTrack.copy(
+                            spectrumFrames = analysis.spectrumFrames,
+                            pitchFramesHz = analysis.pitchFramesHz,
+                            beatTimesMs = analysis.beatTimesMs,
+                            analysisFrameDurationMs = analysis.frameDurationMs
+                        )
+                    )
+                }
+            }
 
             val watermarkBitmap = loadWatermarkBitmap()
             val overlay = ProjectLyricOverlay(this@VideoExportEngine, width, height, visualizerProject, watermarkBitmap)
@@ -232,7 +245,8 @@ class VideoExportEngine(private val context: Context) {
             owner.drawVisualizer(
                 Canvas(bitmap), width, height, project.visualizer, project.visualizerColorHex,
                 frameTimeMs, project.audioTrack.bpm, project.audioTrack.waveformPeaks, project.durationMs,
-                project.audioTrack.artist.ifBlank { project.artist }, project.audioTrack.title
+                project.audioTrack.artist.ifBlank { project.artist }, project.audioTrack.title,
+                project.audioTrack.spectrumFrames, project.audioTrack.analysisFrameDurationMs
             )
             owner.drawLyrics(Canvas(bitmap), width, height, project, frameTimeMs)
             if (project.showWatermark) {
@@ -537,7 +551,9 @@ class VideoExportEngine(private val context: Context) {
         waveformPeaks: List<Float> = emptyList(),
         durationMs: Long = 1L,
         metadataArtist: String = "",
-        metadataTitle: String = ""
+        metadataTitle: String = "",
+        spectrumFrames: List<List<Float>> = emptyList(),
+        analysisFrameDurationMs: Long = 23L
     ) {
         if (type == VisualizerType.NONE) return
 
@@ -545,7 +561,7 @@ class VideoExportEngine(private val context: Context) {
         val beatIntervalMs = 60_000.0 / bpm.coerceAtLeast(60)
         val beatPhase = (timeMs % beatIntervalMs) / beatIntervalMs
         val fallbackBeat = (1f - (beatPhase * 2.8f).toFloat()).coerceIn(0f, 1f)
-        val envelopeBands = AudioGlowVisualizerRenderer.bandsFromEnvelope(waveformPeaks, timeMs, durationMs)
+        val envelopeBands = if (spectrumFrames.isNotEmpty()) AudioSpectrumAnalyzer.bandsAt(spectrumFrames, timeMs, analysisFrameDurationMs) else AudioGlowVisualizerRenderer.bandsFromEnvelope(waveformPeaks, timeMs, durationMs)
         val kickEnergy = if (waveformPeaks.isNotEmpty()) envelopeBands[0] else fallbackBeat
         fun bandLevel(index: Int): Float = if (waveformPeaks.isNotEmpty()) {
             envelopeBands[index.mod(envelopeBands.size)]
@@ -555,7 +571,7 @@ class VideoExportEngine(private val context: Context) {
 
         // Resolve waveform-derived levels before rendering the classic rainbow spectrum.
         if (type == VisualizerType.BARS_SPECTRUM) {
-            val bars = if (waveformPeaks.isNotEmpty()) envelopeBands else FloatArray(32) { bandLevel(it) }
+            val bars = if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) envelopeBands else FloatArray(32) { bandLevel(it) }
             AudioGlowVisualizerRenderer.drawClassicSpectrum(
                 canvas, width, height, timeMs, bars, metadataArtist, metadataTitle
             )
