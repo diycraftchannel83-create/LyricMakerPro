@@ -67,6 +67,10 @@ fun VideoPreviewPlayer(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val useGlSpectrum = remember(context, project.visualizer) {
+        project.visualizer == VisualizerType.BARS_SPECTRUM &&
+            GLSpectrumVisualizerView.isSupported(context)
+    }
     val watermarkBitmap = remember(context) {
         runCatching {
             val encoded = context.assets.open("lyricmakerpro_watermark.png.b64").bufferedReader().use { it.readText() }
@@ -221,7 +225,7 @@ fun VideoPreviewPlayer(
 
                 // Spectrum Bars preview uses the OpenGL ES 3.0 renderer.
                 // Canvas remains responsible for lyrics, watermark, and all other visualizer modes.
-                if (project.visualizer == VisualizerType.BARS_SPECTRUM) {
+                if (useGlSpectrum) {
                     val glBands = if (project.audioTrack.spectrumFrames.isNotEmpty()) {
                         AudioSpectrumAnalyzer.bandsAt(
                             project.audioTrack.spectrumFrames,
@@ -257,7 +261,7 @@ fun VideoPreviewPlayer(
                         spectrumBands = spectrumBands,
                         bassEnergy = bassEnergy,
                         watermarkBitmap = watermarkBitmap,
-                        renderSpectrumBars = project.visualizer != VisualizerType.BARS_SPECTRUM
+                        renderSpectrumBars = !useGlSpectrum
                     )
                 }
 

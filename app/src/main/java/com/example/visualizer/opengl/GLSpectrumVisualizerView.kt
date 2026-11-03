@@ -1,5 +1,6 @@
 package com.winsmediatama.lyricmakerpro.visualizer.opengl
 
+import android.app.ActivityManager
 import android.content.Context
 import android.graphics.SurfaceTexture
 import android.opengl.EGL14
@@ -226,5 +227,10 @@ class GLSpectrumVisualizerView @JvmOverloads constructor(
     companion object {
         private const val TAG = "GLSpectrumPreview"
         private const val EGL_OPENGL_ES3_BIT_KHR = 0x0040
+
+        fun isSupported(context: Context): Boolean {
+            val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            return (manager?.deviceConfigurationInfo?.reqGlEsVersion ?: 0) >= 0x00030000
+        }
     }
 }
