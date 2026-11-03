@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.winsmediatama.lyricmakerpro.model.*
 import com.winsmediatama.lyricmakerpro.visualizer.AudioGlowVisualizerRenderer
+import com.winsmediatama.lyricmakerpro.audio.AudioSpectrumAnalyzer
 import com.winsmediatama.lyricmakerpro.ui.theme.*
 import kotlin.math.*
 import kotlinx.coroutines.delay
@@ -422,6 +423,8 @@ private fun drawInto(
     watermarkBitmap: Bitmap? = null
 ) {
     val native = drawScope.drawContext.canvas.nativeCanvas
+    val fftBands = AudioSpectrumAnalyzer.bandsAt(project.audioTrack.spectrumFrames, timeMs, project.audioTrack.analysisFrameDurationMs)
+    val activeBands = if (project.audioTrack.spectrumFrames.isNotEmpty()) fftBands else spectrumBands
 
     // 1. Background
     val bg = project.background
@@ -477,7 +480,7 @@ private fun drawInto(
     if (project.visualizer == VisualizerType.BARS_SPECTRUM) {
         val bars = if (project.audioTrack.waveformPeaks.isNotEmpty())
             AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
-        else spectrumBands
+        else activeBands
         AudioGlowVisualizerRenderer.drawClassicSpectrum(native, width, height, timeMs, bars,
             project.audioTrack.artist, project.audioTrack.title)
     }
@@ -488,7 +491,7 @@ private fun drawInto(
             AudioGlowVisualizerRenderer.bandsFromEnvelope(
                 project.audioTrack.waveformPeaks, timeMs, project.durationMs
             )
-        } else spectrumBands
+        } else activeBands
         AudioGlowVisualizerRenderer.draw(
             native, width, height, project.visualizer, project.visualizerColorHex,
             timeMs, glowBands, glowBands.firstOrNull() ?: bassEnergy
@@ -499,7 +502,7 @@ private fun drawInto(
         VisualizerType.CIRCULAR_WAVE -> {
             val sinBars = if (project.audioTrack.waveformPeaks.isNotEmpty())
                 AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
-            else spectrumBands
+            else activeBands
             AudioGlowVisualizerRenderer.drawSinBars(native, width, height, timeMs, sinBars)
         }
         VisualizerType.FLOATING_PARTICLES -> {
@@ -519,7 +522,7 @@ private fun drawInto(
         VisualizerType.OSCILLOSCOPE -> {
             val terrainBands = if (project.audioTrack.waveformPeaks.isNotEmpty())
                 AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
-            else spectrumBands
+            else activeBands
             AudioGlowVisualizerRenderer.drawTerrainBars(native, width, height, timeMs, terrainBands)
         }
         VisualizerType.BASS_PULSE -> {
