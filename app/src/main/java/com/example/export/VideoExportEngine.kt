@@ -738,10 +738,10 @@ class VideoExportEngine(private val context: Context) {
                     val angle = (i.toFloat() / count * (Math.PI * 2.0)).toFloat()
                     val level = bandLevel(i)
                     val length = min(width, height) * (0.045f + level * 0.19f)
-                    val x1 = cx + cos(angle) * inner
-                    val y1 = cy + sin(angle) * inner
-                    val x2 = cx + cos(angle) * (inner + length)
-                    val y2 = cy + sin(angle) * (inner + length)
+                    val x1 = cx + cos(angle).toFloat() * inner
+                    val y1 = cy + sin(angle).toFloat() * inner
+                    val x2 = cx + cos(angle).toFloat() * (inner + length)
+                    val y2 = cy + sin(angle).toFloat() * (inner + length)
                     val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = Color.BLACK
                         strokeWidth = max(3f, width * 0.009f)
