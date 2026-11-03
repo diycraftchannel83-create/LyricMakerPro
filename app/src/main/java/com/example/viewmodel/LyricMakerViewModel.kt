@@ -207,7 +207,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun addLyricLine(afterId: String? = null) {
+    fun addLyricLine(afterId: String? = null, initialText: String = "New lyric line") {
         val currentLyrics = _project.value.lyrics.toMutableList()
         val insertIndex = if (afterId != null) {
             currentLyrics.indexOfFirst { it.id == afterId } + 1
@@ -219,7 +219,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         val newStart = refLine?.endMs ?: audioEngine.playheadMs.value
         val newEnd = newStart + 3500L
 
-        val newLine = PresetLibrary.createLyricLineWithWords("New lyric line", newStart, newEnd)
+        val newLine = PresetLibrary.createLyricLineWithWords(initialText, newStart, newEnd)
         currentLyrics.add(insertIndex.coerceIn(0, currentLyrics.size), newLine)
         _project.value = _project.value.copy(lyrics = currentLyrics)
         _selectedLineId.value = newLine.id
