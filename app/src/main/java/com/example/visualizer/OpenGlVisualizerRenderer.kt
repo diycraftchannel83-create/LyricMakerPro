@@ -5,12 +5,10 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.opengl.EGL14
-import android.opengl.EGLExt
 import android.opengl.GLES20
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
-import kotlin.math.max
 
 /**
  * Shared GLES 2.0 off-screen visualizer renderer.
@@ -204,7 +202,7 @@ object OpenGlVisualizerRenderer {
                 float rays = abs(sin(atan(q.y,q.x)*8.0));
                 addGlow(rgb,alpha,uAccent,lineGlow(rays,0.025)*0.18);
             }
-            float outAlpha = clamp(alpha,0.0,0.92);\n            gl_FragColor = vec4(clamp(rgb,0.0,1.0) * outAlpha, outAlpha);
+            float outAlpha = clamp(alpha,0.0,0.92);\n            gl_FragColor = vec4(clamp(rgb,0.0,1.0), outAlpha);
         }
     """.trimIndent()
 
@@ -286,8 +284,7 @@ object OpenGlVisualizerRenderer {
         buffer.position(0)
         GLES20.glEnableVertexAttribArray(positionLocation)
         GLES20.glVertexAttribPointer(positionLocation, 2, GLES20.GL_FLOAT, false, 0, buffer)
-        GLES20.glEnable(GLES20.GL_BLEND)
-        GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+        GLES20.glDisable(GLES20.GL_BLEND)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
         GLES20.glDisableVertexAttribArray(positionLocation)
 
@@ -349,8 +346,10 @@ object OpenGlVisualizerRenderer {
         val count = IntArray(1)
         check(EGL14.eglChooseConfig(display,configAttrs,0,configs,0,1,count,0) && count[0] > 0) { "No RGBA OpenGL ES config" }
         val contextAttrs = intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION,2,EGL14.EGL_NONE)
-        context = EGL14.eglCreateContext(display,configs[0],EGL14.EGL_NO_CONTEXT,contextAttrs,0)
-        check(context != EGL14.EGL_NO_CONTEXT) { "OpenGL ES context creation failed" }
+        if (context == EGL14.EGL_NO_CONTEXT) {
+            context = EGL14.eglCreateContext(display,configs[0],EGL14.EGL_NO_CONTEXT,contextAttrs,0)
+            check(context != EGL14.EGL_NO_CONTEXT) { "OpenGL ES context creation failed" }
+        }
         val surfaceAttrs = intArrayOf(EGL14.EGL_WIDTH,width,EGL14.EGL_HEIGHT,height,EGL14.EGL_NONE)
         surface = EGL14.eglCreatePbufferSurface(display,configs[0],surfaceAttrs,0)
         check(surface != EGL14.EGL_NO_SURFACE) { "OpenGL ES surface creation failed" }
