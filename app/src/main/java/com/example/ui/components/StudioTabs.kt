@@ -468,7 +468,7 @@ private fun EffectsTab(viewModel: LyricMakerViewModel, project: VideoProject) {
                                 TextTransitionEffect.NEON_PULSE -> Icons.Default.Flare
                                 TextTransitionEffect.TYPEWRITER_GLITCH -> Icons.Default.Terminal
                                 TextTransitionEffect.SLIDE_FADE_UP -> Icons.Default.ArrowUpward
-                                TextTransitionEffect.WAVE_RIPPLE -> Icons.Default.ShowChart
+                                TextTransitionEffect.WAVE_RIPPLE -> Icons.Default.Waves
                                 TextTransitionEffect.BURST_ZOOM -> Icons.Default.FitScreen
                             },
                             contentDescription = null,
