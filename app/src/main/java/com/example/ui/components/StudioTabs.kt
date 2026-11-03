@@ -743,11 +743,50 @@ private fun LyricsSyncTab(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             items(project.lyrics, key = { it.id }) { line ->
-                LyricLineEditorCard(
-                    line = line,
-                    onTextChange = { viewModel.updateLyricText(line.id, it) },
-                    onSelect = { viewModel.selectLyricLine(line.id) }
-                )
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    LyricLineEditorCard(
+                        line = line,
+                        onTextChange = { viewModel.updateLyricText(line.id, it) },
+                        onSelect = { viewModel.selectLyricLine(line.id) }
+                    )
+
+                    // Compact insertion control between adjacent lyric rows.
+                    if (line.id != project.lyrics.lastOrNull()?.id) {
+                        TextButton(
+                            onClick = {
+                                viewModel.addLyricLine(afterId = line.id, initialText = "")
+                            },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            modifier = Modifier
+                                .height(26.dp)
+                                .testTag("insert_lyric_after_${line.id}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Insert lyric line here",
+                                tint = NeonCyan,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(Modifier.width(3.dp))
+                            Text("Add line", color = NeonCyan, fontSize = 10.sp)
+                        }
+                    }
+                }
+            }
+            if (project.lyrics.isEmpty()) {
+                item {
+                    OutlinedButton(
+                        onClick = { viewModel.addLyricLine(initialText = "") },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = NeonCyan)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Add first lyric line", color = NeonCyan)
+                    }
+                }
             }
         }
     }
@@ -803,7 +842,8 @@ private fun LyricLineEditorCard(
                     focusedBorderColor = NeonCyan,
                     unfocusedBorderColor = Color.Transparent
                 ),
-                singleLine = true
+                singleLine = true,
+                placeholder = { Text("Enter lyric text...", color = TextMuted, fontSize = 12.sp) }
             )
         }
     }
