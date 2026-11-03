@@ -561,6 +561,78 @@ private fun drawInto(
             pulsePaint.alpha = ((1f - beatPhase) * 220).toInt().coerceIn(0, 255)
             native.drawCircle(cx, cy, r, pulsePaint)
         }
+        VisualizerType.THREE_D_TUNNEL -> {
+            val cx = width * 0.5f
+            val cy = height * 0.42f
+            for (layer in 0..8) {
+                val depth = (layer + 1) / 9f
+                val level = spectrumBands.getOrElse(layer * 3) { bassEnergy }.coerceIn(0f, 1f)
+                val halfW = width * (0.06f + depth * 0.43f) * (1f + level * 0.2f)
+                val halfH = height * (0.035f + depth * 0.30f) * (1f + level * 0.2f)
+                val path = android.graphics.Path().apply {
+                    moveTo(cx - halfW, cy - halfH); lineTo(cx + halfW, cy - halfH)
+                    lineTo(cx + halfW, cy + halfH); lineTo(cx - halfW, cy + halfH); close()
+                }
+                val p = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                    style = AndroidPaint.Style.STROKE; strokeWidth = max(2f, width * 0.0035f)
+                    color = if (layer % 2 == 0) visColor else AndroidColor.MAGENTA
+                    alpha = (90 + level * 165).toInt().coerceIn(50, 255)
+                    setShadowLayer(width * 0.01f, 0f, 0f, color)
+                }
+                native.drawPath(path, p)
+            }
+        }
+        VisualizerType.THREE_D_RADIAL -> {
+            val cx = width * 0.5f; val cy = height * 0.40f
+            val inner = min(width, height) * 0.13f
+            for (i in 0 until 64) {
+                val angle = i.toFloat() / 64f * (Math.PI * 2.0).toFloat()
+                val level = spectrumBands.getOrElse(i % 32) { bassEnergy }.coerceIn(0f, 1f)
+                val length = min(width, height) * (0.045f + level * 0.19f)
+                val p = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                    color = if (i % 3 == 0) AndroidColor.MAGENTA else visColor
+                    strokeWidth = max(2f, width * 0.006f); strokeCap = AndroidPaint.Cap.ROUND
+                    setShadowLayer(width * 0.01f, 0f, 0f, color)
+                }
+                native.drawLine(cx + kotlin.math.cos(angle) * inner, cy + kotlin.math.sin(angle) * inner,
+                    cx + kotlin.math.cos(angle) * (inner + length), cy + kotlin.math.sin(angle) * (inner + length), p)
+            }
+        }
+        VisualizerType.THREE_D_WAVE -> {
+            for (layer in 0..4) {
+                val path = android.graphics.Path()
+                val baseline = height * (0.66f + layer * 0.035f)
+                for (i in 0..96) {
+                    val x = width * i / 96f
+                    val level = spectrumBands.getOrElse((i + layer * 5) % 32) { bassEnergy }.coerceIn(0f, 1f)
+                    val y = baseline + sin(i * 0.19 + timeMs * 0.003 + layer * 0.8).toFloat() *
+                        height * (0.025f + level * 0.13f) * (1f - layer * 0.08f)
+                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                val p = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                    style = AndroidPaint.Style.STROKE; strokeWidth = max(2f, width * 0.004f)
+                    color = if (layer % 2 == 0) visColor else AndroidColor.MAGENTA
+                    alpha = 210 - layer * 28; setShadowLayer(width * 0.01f, 0f, 0f, color)
+                }
+                native.drawPath(path, p)
+            }
+        }
+        VisualizerType.THREE_D_ORBIT -> {
+            val cx = width * 0.5f; val cy = height * 0.38f
+            val orbit = min(width, height) * 0.22f
+            for (i in 0 until 42) {
+                val angle = timeMs * 0.0015 + i * (Math.PI * 2.0 / 42.0)
+                val z = (sin(angle * 1.7) * 0.5 + 0.5).toFloat()
+                val level = spectrumBands.getOrElse(i % 32) { bassEnergy }.coerceIn(0f, 1f)
+                val radius = (2.5f + z * 5f + level * 7f) * (width / 360f)
+                val p = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                    color = if (i % 2 == 0) visColor else AndroidColor.MAGENTA
+                    alpha = (100 + z * 155).toInt(); setShadowLayer(radius * 2f, 0f, 0f, color)
+                }
+                native.drawCircle(cx + kotlin.math.cos(angle).toFloat() * orbit * (0.55f + z * 0.65f),
+                    cy + kotlin.math.sin(angle * 1.25).toFloat() * orbit * (0.35f + z * 0.5f), radius, p)
+            }
+        }
         VisualizerType.VINYL_SPINNER -> {
             val cx = width / 2f
             val cy = height * 0.32f
