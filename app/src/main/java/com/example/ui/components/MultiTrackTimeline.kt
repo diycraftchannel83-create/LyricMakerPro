@@ -512,7 +512,7 @@ private fun TimeRuler(
             // Canvas coordinates are physical pixels, while pxPerMs is dp/ms.
             // Convert once so ruler ticks stay aligned with the dp-positioned tracks
             // at every device density and continue through the full song duration.
-            val pixelsPerMs = pxPerMs * density
+            val pixelsPerMs = pxPerMs * density.density
             val secStepPx = 1000f * pixelsPerMs
             for (sec in 0..totalSec) {
                 val x = sec * secStepPx
