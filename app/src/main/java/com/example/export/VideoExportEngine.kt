@@ -16,6 +16,7 @@ import com.winsmediatama.lyricmakerpro.data.LyricMakerStorage
 import com.winsmediatama.lyricmakerpro.audio.AudioWaveformExtractor
 import com.winsmediatama.lyricmakerpro.audio.AudioSpectrumAnalyzer
 import com.winsmediatama.lyricmakerpro.visualizer.AudioGlowVisualizerRenderer
+import com.winsmediatama.lyricmakerpro.visualizer.OpenGlVisualizerRenderer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -592,126 +593,32 @@ class VideoExportEngine(private val context: Context) {
         analysisFrameDurationMs: Long = 23L,
         beatTimesMs: List<Long> = emptyList()
     ) {
-        if (type == VisualizerType.NONE) return
-
-        val primaryColor = parseColor(colorHex, Color.parseColor("#00F5D4"))
+        if (type == VisualizerType.NONE || width <= 0 || height <= 0) return
         val beatIntervalMs = 60_000.0 / bpm.coerceAtLeast(60)
         val beatPhase = (timeMs % beatIntervalMs) / beatIntervalMs
         val fallbackBeat = (1f - (beatPhase * 2.8f).toFloat()).coerceIn(0f, 1f)
-        val envelopeBands = if (spectrumFrames.isNotEmpty()) AudioSpectrumAnalyzer.bandsAt(spectrumFrames, timeMs, analysisFrameDurationMs) else AudioGlowVisualizerRenderer.bandsFromEnvelope(waveformPeaks, timeMs, durationMs)
-        val detectedBeat = AudioSpectrumAnalyzer.beatPulseAt(beatTimesMs, timeMs)
-        val kickEnergy = max(if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) envelopeBands.take(6).average().toFloat() else fallbackBeat, detectedBeat)
-        fun bandLevel(index: Int): Float = if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) {
-            envelopeBands[index.mod(envelopeBands.size)]
+        val bands = if (spectrumFrames.isNotEmpty()) {
+            AudioSpectrumAnalyzer.bandsAt(spectrumFrames, timeMs, analysisFrameDurationMs)
         } else {
-            (fallbackBeat * (0.55f + (index % 5) * 0.09f)).coerceIn(0.04f, 1f)
+            AudioGlowVisualizerRenderer.bandsFromEnvelope(waveformPeaks, timeMs, durationMs)
         }
-
-        // Resolve waveform-derived levels before rendering the classic rainbow spectrum.
-        if (type == VisualizerType.BARS_SPECTRUM) {
-            val bars = if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) envelopeBands else FloatArray(32) { bandLevel(it) }
-            AudioGlowVisualizerRenderer.drawClassicSpectrum(
-                canvas, width, height, timeMs, bars, metadataArtist, metadataTitle,
-                exportPerformanceMode = true
-            )
-            return
-        }
-        if (AudioGlowVisualizerRenderer.isGlowStyle(type)) {
-            AudioGlowVisualizerRenderer.draw(
-                canvas, width, height, type, colorHex, timeMs,
-                if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) envelopeBands else FloatArray(32) { bandLevel(it) },
-                kickEnergy,
-                previewQuality = true
-            )
-            return
-        }
-
-        when (type) {
-            VisualizerType.BARS_SPECTRUM -> {
-                val barCount = 18
-                val spacing = width * 0.012f
-                val totalWidth = width * 0.88f
-                val barWidth = (totalWidth - (spacing * (barCount - 1))) / barCount
-                val startX = (width - totalWidth) / 2f
-                val baseY = height * 0.82f
-                val maxBarHeight = height * 0.16f
-
-                val barPaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.FILL
-                }
-
-                for (i in 0 until barCount) {
-                    val peak = bandLevel(i)
-                    val barH = (peak * maxBarHeight).coerceAtLeast(10f)
-
-                    val x = startX + i * (barWidth + spacing)
-                    val rect = RectF(x, baseY - barH, x + barWidth, baseY)
-
-                    val shader = LinearGradient(
-                        x, baseY - barH, x, baseY,
-                        intArrayOf(primaryColor, Color.parseColor("#FF007F")),
-                        null,
-                        Shader.TileMode.CLAMP
-                    )
-                    barPaint.shader = shader
-                    canvas.drawRoundRect(rect, barWidth / 2f, barWidth / 2f, barPaint)
-                }
-            }
-            VisualizerType.CIRCULAR_WAVE -> {
-                AudioGlowVisualizerRenderer.drawSinBars(
-                    canvas, width, height, timeMs, envelopeBands, exportPerformanceMode = true
-                )
-            }
-            VisualizerType.OSCILLOSCOPE -> {
-                AudioGlowVisualizerRenderer.drawTerrainBars(canvas, width, height, timeMs, envelopeBands)
-            }
-            VisualizerType.FLOATING_PARTICLES -> {
-                val particlePaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.FILL
-                    color = primaryColor
-                }
-                val count = 24
-                for (i in 0 until count) {
-                    val speed = (i % 5 + 2) * 0.04f
-                    val y = (height - ((timeMs * speed + i * 150) % height)).toFloat()
-                    val x = ((sin(timeMs * 0.001 + i) * 0.35 + 0.5) * width).toFloat()
-                    val radius = (i % 4 + 3) * 2f
-                    particlePaint.alpha = (70 + bandLevel(i) * 150).toInt().coerceIn(40, 220)
-                    canvas.drawCircle(x, y, radius, particlePaint)
-                }
-            }
-            VisualizerType.VINYL_SPINNER -> {
-                AudioGlowVisualizerRenderer.drawCoolBars(canvas, width, height, timeMs, envelopeBands)
-            }
-            VisualizerType.BASS_PULSE -> {
-                val centerX = width / 2f
-                val centerY = height * 0.40f
-                val maxRadius = width * 0.45f
-
-                val pulsePaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.STROKE
-                    strokeWidth = 4f
-                }
-
-                for (ring in 0..2) {
-                    val ringProgress = ((beatPhase + ring * 0.33) % 1.0).toFloat()
-                    val r = ringProgress * maxRadius
-                    val alpha = ((1f - ringProgress) * 200).toInt().coerceIn(0, 255)
-                    pulsePaint.color = primaryColor
-                    pulsePaint.alpha = alpha
-                    canvas.drawCircle(centerX, centerY, r, pulsePaint)
-                }
-            }
-            VisualizerType.AURORA_BLOOM,
-            VisualizerType.GLOW_ORBS,
-            VisualizerType.NEON_RIBBON,
-            VisualizerType.RADIAL_BURST,
-            VisualizerType.SPECTRUM_TUNNEL,
-            VisualizerType.NONE -> {}
-        }
+        val detectedBeat = AudioSpectrumAnalyzer.beatPulseAt(beatTimesMs, timeMs)
+        val bass = max(
+            if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) bands.take(6).average().toFloat() else fallbackBeat,
+            detectedBeat
+        )
+        OpenGlVisualizerRenderer.draw(
+            canvas = canvas,
+            width = width,
+            height = height,
+            visualizerOrdinal = type.ordinal,
+            timeMs = timeMs,
+            bands = bands,
+            bass = bass,
+            colorHex = colorHex,
+            artist = metadataArtist,
+            title = metadataTitle
+        )
     }
 
     private fun drawLyrics(canvas: Canvas, width: Int, height: Int, project: VideoProject, timeMs: Long) {
