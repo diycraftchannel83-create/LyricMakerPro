@@ -50,6 +50,8 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
 
     private val _syncLineIndex = MutableStateFlow(0)
     val syncLineIndex = _syncLineIndex.asStateFlow()
+    private var tapSyncTrackingJob: Job? = null
+    private var tapSyncLastCommittedIndex: Int = -1
 
     // Export state
     private val _isExporting = MutableStateFlow(false)
@@ -244,14 +246,44 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
     // --- Tap-To-Sync Workflow ---
     fun startTapToSync() {
         _isTapToSyncActive.value = true
+        tapSyncLastCommittedIndex = -1
         _syncLineIndex.value = 0
         audioEngine.seekTo(0L)
+
+        // Follow the project's saved lyric timeline during playback. This also
+        // lets users revisit and correct timestamps instead of restarting at line 1.
+        tapSyncTrackingJob?.cancel()
+        tapSyncTrackingJob = viewModelScope.launch {
+            audioEngine.playheadMs.collect { position ->
+                val lyrics = _project.value.lyrics
+                if (lyrics.isEmpty()) {
+                    _syncLineIndex.value = 0
+                } else {
+                    val activeIndex = lyrics.indexOfLast { line ->
+                        position >= line.startMs && position < line.endMs
+                    }
+                    if (activeIndex >= 0 && activeIndex > tapSyncLastCommittedIndex) {
+                        _syncLineIndex.value = activeIndex
+                    } else if (activeIndex < 0 && tapSyncLastCommittedIndex < 0) {
+                        val upcomingIndex = lyrics.indexOfFirst { it.startMs > position }
+                        if (upcomingIndex >= 0) _syncLineIndex.value = upcomingIndex
+                    }
+                }
+            }
+        }
         audioEngine.play()
     }
 
     fun stopTapToSync() {
         _isTapToSyncActive.value = false
+        tapSyncTrackingJob?.cancel()
+        tapSyncTrackingJob = null
         audioEngine.pause()
+    }
+
+    fun seekTapSyncTo(positionMs: Long) {
+        tapSyncLastCommittedIndex = -1
+        audioEngine.seekTo(positionMs)
     }
 
     fun tapSyncNext() {
@@ -260,22 +292,28 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         val index = _syncLineIndex.value
         val currentTime = audioEngine.playheadMs.value
 
-        if (index < currentLyrics.size) {
+        if (index in currentLyrics.indices) {
             val old = currentLyrics[index]
-            // If previous line exists, close its end boundary
+            // Close the preceding line at this exact beat and correct this line's
+            // start time while preserving the remaining saved timeline.
             if (index > 0) {
                 val prev = currentLyrics[index - 1]
-                currentLyrics[index - 1] = PresetLibrary.createLyricLineWithWords(prev.text, prev.startMs, currentTime)
+                currentLyrics[index - 1] = PresetLibrary.createLyricLineWithWords(
+                    prev.text, prev.startMs, currentTime
+                )
             }
-            // Mark start of current line
-            val estimatedEnd = currentTime + 3000L
-            currentLyrics[index] = PresetLibrary.createLyricLineWithWords(old.text, currentTime, estimatedEnd)
+            val nextStart = currentLyrics.getOrNull(index + 1)?.startMs
+            val estimatedEnd = nextStart?.takeIf { it > currentTime }
+                ?: (currentTime + 3000L)
+            currentLyrics[index] = PresetLibrary.createLyricLineWithWords(
+                old.text, currentTime, estimatedEnd
+            )
 
             _project.value = _project.value.copy(lyrics = currentLyrics)
             _selectedLineId.value = old.id
-            _syncLineIndex.value = index + 1
+            tapSyncLastCommittedIndex = index
+            _syncLineIndex.value = (index + 1).coerceAtMost(currentLyrics.size)
         } else {
-            // Reached end of lyrics
             stopTapToSync()
         }
     }
