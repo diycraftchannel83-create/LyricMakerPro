@@ -58,6 +58,19 @@ class VideoExportEngine(private val context: Context) {
         alpha = 179
     }
     private val exportRectF = RectF()
+    // Reuse immutable background shaders across encoded frames to avoid repeated
+    // allocations while rendering the same built-in background at 30 FPS.
+    private var cachedBackgroundShaderKey: String? = null
+    private var cachedBackgroundShader: Shader? = null
+    private val cachedBackgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    private fun backgroundShader(key: String, create: () -> Shader): Shader {
+        if (cachedBackgroundShaderKey != key || cachedBackgroundShader == null) {
+            cachedBackgroundShader = create()
+            cachedBackgroundShaderKey = key
+        }
+        return cachedBackgroundShader!!
+    }
 
     private fun prepareMediaAssets(clips: List<MediaClip>): List<ExportMediaAsset> = clips.mapNotNull { clip ->
         runCatching {
@@ -540,12 +553,10 @@ class VideoExportEngine(private val context: Context) {
                 val c2 = parseColor(bg.secondaryColorHex, Color.parseColor("#1B112C"))
                 val c3 = parseColor(bg.accentColorHex, Color.parseColor("#FF007F"))
 
-                val shader = LinearGradient(
-                    0f, 0f, width.toFloat(), height.toFloat(),
-                    intArrayOf(c1, c2, c3),
-                    floatArrayOf(0f, 0.65f, 1f),
-                    Shader.TileMode.CLAMP
-                )
+                val shader = backgroundShader("gradient:$width:$height:$c1:$c2:$c3") {
+                    LinearGradient(0f, 0f, width.toFloat(), height.toFloat(),
+                        intArrayOf(c1, c2, c3), floatArrayOf(0f, 0.65f, 1f), Shader.TileMode.CLAMP)
+                }
                 exportBgPaint.shader = shader
                 canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), exportBgPaint)
 
@@ -579,23 +590,23 @@ class VideoExportEngine(private val context: Context) {
             BackgroundType.MESH -> {
                 val c1 = parseColor(bg.primaryColorHex, Color.parseColor("#12141A"))
                 val c2 = parseColor(bg.secondaryColorHex, Color.parseColor("#281630"))
-                val shader = RadialGradient(
-                    width * 0.5f, height * 0.4f, width * 0.8f,
-                    intArrayOf(c2, c1),
-                    null,
-                    Shader.TileMode.CLAMP
-                )
-                val paint = Paint().apply { this.shader = shader }
-                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+                val shader = backgroundShader("mesh:$width:$height:$c1:$c2") {
+                    RadialGradient(width * 0.5f, height * 0.4f, width * 0.8f,
+                        intArrayOf(c2, c1), null, Shader.TileMode.CLAMP)
+                }
+                cachedBackgroundPaint.shader = shader
+                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), cachedBackgroundPaint)
             }
             BackgroundType.IMAGE -> {
                 canvas.drawColor(Color.BLACK)
                 // If user selected image, fall back to aesthetic gradient if unresolvable
                 val c1 = parseColor(bg.primaryColorHex, Color.DKGRAY)
                 val c2 = parseColor(bg.secondaryColorHex, Color.BLACK)
-                val shader = LinearGradient(0f, 0f, 0f, height.toFloat(), c1, c2, Shader.TileMode.CLAMP)
-                val paint = Paint().apply { this.shader = shader }
-                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+                val shader = backgroundShader("image-fallback:$width:$height:$c1:$c2") {
+                    LinearGradient(0f, 0f, 0f, height.toFloat(), c1, c2, Shader.TileMode.CLAMP)
+                }
+                cachedBackgroundPaint.shader = shader
+                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), cachedBackgroundPaint)
             }
         }
     }
@@ -624,7 +635,11 @@ class VideoExportEngine(private val context: Context) {
         val fallbackBeat = (1f - (beatPhase * 2.8f).toFloat()).coerceIn(0f, 1f)
         val envelopeBands = if (spectrumFrames.isNotEmpty()) AudioSpectrumAnalyzer.bandsAt(spectrumFrames, timeMs, analysisFrameDurationMs) else AudioGlowVisualizerRenderer.bandsFromEnvelope(waveformPeaks, timeMs, durationMs)
         val detectedBeat = AudioSpectrumAnalyzer.beatPulseAt(beatTimesMs, timeMs)
-        val kickEnergy = max(if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) envelopeBands.take(6).average().toFloat() else fallbackBeat, detectedBeat)
+        var lowBandSum = 0f
+        val lowBandCount = min(6, envelopeBands.size)
+        for (i in 0 until lowBandCount) lowBandSum += envelopeBands[i]
+        val lowBandAverage = if (lowBandCount > 0) lowBandSum / lowBandCount else fallbackBeat
+        val kickEnergy = max(if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) lowBandAverage else fallbackBeat, detectedBeat)
         fun bandLevel(index: Int): Float = if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) {
             envelopeBands[index.mod(envelopeBands.size)]
         } else {
