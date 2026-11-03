@@ -118,7 +118,11 @@ data class AudioTrackConfig(
     val durationMs: Long = 30_000L,
     val beatType: AudioBeatType = AudioBeatType.SYNTH_SYNTHWAVE,
     val customUri: String? = null,
-    val waveformPeaks: List<Float> = emptyList()
+    val waveformPeaks: List<Float> = emptyList(),
+    val spectrumFrames: List<List<Float>> = emptyList(),
+    val pitchFramesHz: List<Float> = emptyList(),
+    val beatTimesMs: List<Long> = emptyList(),
+    val analysisFrameDurationMs: Long = 23L
 )
 
 enum class MediaClipType { IMAGE, VIDEO }
