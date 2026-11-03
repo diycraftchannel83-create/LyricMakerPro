@@ -435,7 +435,9 @@ class VideoExportEngine(private val context: Context) {
         // 2. Visualizer Overlay
         // Keep all visualizer styles translucent over imported photo/video frames.
         val visualizerLayer = canvas.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), 210)
-        drawVisualizer(canvas, width, height, project.visualizer, project.visualizerColorHex, timeMs, project.audioTrack.bpm)
+        drawVisualizer(canvas, width, height, project.visualizer, project.visualizerColorHex, timeMs, project.audioTrack.bpm,
+            project.audioTrack.waveformPeaks, project.durationMs, project.audioTrack.artist.ifBlank { project.artist }, project.audioTrack.title,
+            project.audioTrack.spectrumFrames, project.audioTrack.analysisFrameDurationMs)
         canvas.restoreToCount(visualizerLayer)
 
         // 3. Lyrics with Typography & Transitions
@@ -562,8 +564,8 @@ class VideoExportEngine(private val context: Context) {
         val beatPhase = (timeMs % beatIntervalMs) / beatIntervalMs
         val fallbackBeat = (1f - (beatPhase * 2.8f).toFloat()).coerceIn(0f, 1f)
         val envelopeBands = if (spectrumFrames.isNotEmpty()) AudioSpectrumAnalyzer.bandsAt(spectrumFrames, timeMs, analysisFrameDurationMs) else AudioGlowVisualizerRenderer.bandsFromEnvelope(waveformPeaks, timeMs, durationMs)
-        val kickEnergy = if (waveformPeaks.isNotEmpty()) envelopeBands[0] else fallbackBeat
-        fun bandLevel(index: Int): Float = if (waveformPeaks.isNotEmpty()) {
+        val kickEnergy = if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) envelopeBands[0] else fallbackBeat
+        fun bandLevel(index: Int): Float = if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) {
             envelopeBands[index.mod(envelopeBands.size)]
         } else {
             (fallbackBeat * (0.55f + (index % 5) * 0.09f)).coerceIn(0.04f, 1f)
@@ -580,7 +582,7 @@ class VideoExportEngine(private val context: Context) {
         if (AudioGlowVisualizerRenderer.isGlowStyle(type)) {
             AudioGlowVisualizerRenderer.draw(
                 canvas, width, height, type, colorHex, timeMs,
-                if (waveformPeaks.isNotEmpty()) envelopeBands else FloatArray(32) { bandLevel(it) },
+                if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) envelopeBands else FloatArray(32) { bandLevel(it) },
                 kickEnergy
             )
             return
