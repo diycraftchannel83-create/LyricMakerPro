@@ -134,16 +134,10 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         audioEngine.stop()
         val restoredLyrics = newProject.lyrics
             .sortedWith(compareBy<LyricLine> { it.startMs }.thenBy { it.endMs })
-        // Apply the requested editor defaults whenever a project is opened.
-        // Lyric timestamps and word-level synchronization remain untouched.
-        val restoredProject = newProject.copy(
-            lyrics = restoredLyrics,
-            typography = newProject.typography.copy(
-                fontSizeSp = 7f,
-                positionXPercent = 50f,
-                positionYPercent = 80f
-            )
-        )
+        // Keep the saved typography exactly as authored by the user.
+        // New projects and legacy JSON files without typography receive defaults
+        // from VideoProject/TypographyPreset constructor defaults.
+        val restoredProject = newProject.copy(lyrics = restoredLyrics)
         _project.value = restoredProject
         _selectedLineId.value = restoredLyrics.firstOrNull()?.id
         _currentTab.value = StudioTab.TIMELINE
