@@ -747,7 +747,7 @@ class VideoExportEngine(private val context: Context) {
                 val inner = min(width, height) * 0.13f
                 val count = 64
                 for (i in 0 until count) {
-                    val angle = (i.toFloat() / count * (Math.PI * 2.0)).toFloat()
+                    val angle = i.toFloat() / count * (Math.PI * 2.0).toFloat()
                     val level = bandLevel(i)
                     val length = min(width, height) * (0.045f + level * 0.19f)
                     val x1 = cx + cos(angle).toFloat() * inner
