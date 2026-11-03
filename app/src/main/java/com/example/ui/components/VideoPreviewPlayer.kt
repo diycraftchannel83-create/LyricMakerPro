@@ -494,7 +494,8 @@ private fun drawInto(
         } else activeBands
         AudioGlowVisualizerRenderer.draw(
             native, width, height, project.visualizer, project.visualizerColorHex,
-            timeMs, glowBands, glowBands.firstOrNull() ?: bassEnergy
+            timeMs, glowBands, glowBands.firstOrNull() ?: bassEnergy,
+            previewQuality = true
         )
     }
     when (project.visualizer) {
