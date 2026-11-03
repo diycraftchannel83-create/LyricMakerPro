@@ -85,6 +85,21 @@ class VideoExportEngine(private val context: Context) {
         var mediaAssets: List<ExportMediaAsset> = emptyList()
 
         try {
+            // Media3 still requires a concrete image source to establish video
+            // dimensions and duration. The frame overlay replaces its pixels with
+            // the real project background/media on every encoded frame.
+            val bgBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            try {
+                drawBackground(Canvas(bgBitmap), width, height, project.background, 0L)
+                FileOutputStream(backgroundFile).use { stream ->
+                    check(bgBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)) {
+                        "Unable to prepare project background"
+                    }
+                }
+            } finally {
+                bgBitmap.recycle()
+            }
+
             // Prepare the actual timeline media once. Each encoded frame below will
             // select the clip active at that presentation timestamp.
             mediaAssets = prepareMediaAssets(project.mediaClips)
