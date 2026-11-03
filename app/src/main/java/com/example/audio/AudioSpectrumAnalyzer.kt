@@ -7,6 +7,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.ByteOrder
@@ -51,6 +52,7 @@ object AudioSpectrumAnalyzer {
             val window = FloatArray(N)
             var filled = 0
             var frameIndex = 0
+            var lastPitchHz = 0f
             var inputDone = false
             var outputDone = false
             val info = MediaCodec.BufferInfo()
@@ -61,7 +63,11 @@ object AudioSpectrumAnalyzer {
                 if (filled == N) {
                     val levels = logBands(fft(window), rate)
                     spectra.add(levels.toList())
-                    pitches.add(if (frameIndex++ % 4 == 0) estimatePitch(window, rate) else 0f)
+                    if (frameIndex++ % 4 == 0) {
+                        val estimate = estimatePitch(window, rate)
+                        if (estimate > 0f) lastPitchHz = estimate
+                    }
+                    pitches.add(lastPitchHz)
                     bass.add(levels.take(6).average().toFloat())
                     System.arraycopy(window, HOP, window, 0, N - HOP)
                     filled = N - HOP
@@ -123,6 +129,8 @@ object AudioSpectrumAnalyzer {
                 if (flux > max(0.018f, baseline * 0.2f) && t - lastBeat >= 180L) { beats.add(t); lastBeat = t }
             }
             AudioAnalysisResult(spectra, pitches, beats, frameMs)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Throwable) {
             empty()
         } finally {
@@ -206,7 +214,7 @@ object AudioSpectrumAnalyzer {
             val last = (high * N / rate).toInt().coerceIn(first, mag.lastIndex)
             var sum = 0f
             for (i in first..last) sum += mag[i]
-            (ln(1f + sum / (last - first + 1) * 18f) / ln(19f)).coerceIn(0f, 1f)
+            (ln(1f + sum / N * 10f) / ln(11f)).coerceIn(0f, 1f)
         }
     }
 
