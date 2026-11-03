@@ -67,7 +67,14 @@ class AudioEngine(private val context: Context) {
                         .build()
                 )
                 prepare()
-                isLooping = true
+                isLooping = false
+                setOnCompletionListener {
+                    // Loop at the actual decoded media duration rather than stale project metadata.
+                    if (_isPlaying.value) {
+                        seekTo(0)
+                        start()
+                    }
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -147,23 +154,18 @@ class AudioEngine(private val context: Context) {
         tickerJob?.cancel()
         tickerJob = scope.launch {
             while (isActive && _isPlaying.value) {
-                val elapsed = System.currentTimeMillis() - playbackStartSystemTime
-                var newPos = playheadOffsetOnStart + elapsed
-
-                if (newPos >= track.durationMs) {
-                    // Loop back to start
-                    newPos = 0L
-                    playheadOffsetOnStart = 0L
-                    playbackStartSystemTime = System.currentTimeMillis()
-                    if (isCustomFile) {
-                        mediaPlayer?.seekTo(0)
-                    }
+                // MediaPlayer is the playback clock. A wall-clock ticker drifts during
+                // buffering, audio focus changes, and device load.
+                val player = mediaPlayer
+                val position = if (isCustomFile && player != null) {
+                    runCatching { player.currentPosition.toLong() }.getOrDefault(_playheadMs.value)
+                } else {
+                    val elapsed = System.currentTimeMillis() - playbackStartSystemTime
+                    (playheadOffsetOnStart + elapsed).coerceAtMost(track.durationMs)
                 }
-
-                _playheadMs.value = newPos
-                updateSpectrumForPosition(newPos, track)
-
-                delay(16) // ~60fps sync updates
+                _playheadMs.value = position.coerceAtLeast(0L)
+                updateSpectrumForPosition(_playheadMs.value, track)
+                delay(33) // ~30fps is sufficient for timeline/playhead UI updates.
             }
         }
     }
