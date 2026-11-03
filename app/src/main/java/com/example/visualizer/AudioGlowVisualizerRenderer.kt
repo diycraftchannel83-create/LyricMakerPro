@@ -115,8 +115,9 @@ object AudioGlowVisualizerRenderer {
     }
 
     /**
-     * Draws Avee Player / Winamp style classic rainbow spectrum bars.
-     * Accurately tracks bass kicks on the left and treble sparkle on the right.
+     * Audio Glow-inspired segmented rainbow spectrum.
+     * Transparent overlay: never paints an opaque background, so imported media remains visible.
+     * Uses cached Paint/RectF instances and a reduced particle count in export mode.
      */
     fun drawClassicSpectrum(
         canvas: Canvas,
@@ -131,85 +132,100 @@ object AudioGlowVisualizerRenderer {
         if (width <= 0 || height <= 0) return
 
         val minSide = min(width, height).toFloat()
-        val baseY = height * 0.68f
-        val count = 20
-        val gap = width * 0.008f
+        val baseY = height * 0.665f
+        val count = 16
+        val gap = width * 0.009f
         val totalWidth = width * 0.88f
         val barWidth = (totalWidth - gap * (count - 1)) / count
-        val maxBarHeight = height * 0.28f
-
-        // 1. Artist & Song Metadata
+        val segmentGap = max(2f, height * 0.006f)
+        val segmentHeight = max(5f, height * 0.021f)
+        val maxSegments = 9
         val centerX = width * 0.5f
+
+        // Metadata header, matching the reference's light, spacious typography.
         if (artist.isNotBlank() && !artist.equals("unknown", true)) {
-            titlePaint.textSize = height * 0.052f
-            canvas.drawText(artist.trim(), centerX, height * 0.25f, titlePaint)
+            titlePaint.textSize = height * 0.078f
+            canvas.drawText(artist.trim(), centerX, height * 0.265f, titlePaint)
         }
         if (trackTitle.isNotBlank() && !trackTitle.equals("unknown", true)) {
-            subtitlePaint.textSize = height * 0.034f
-            canvas.drawText(trackTitle.trim(), centerX, height * 0.295f, subtitlePaint)
+            subtitlePaint.textSize = height * 0.052f
+            canvas.drawText(trackTitle.trim(), centerX, height * 0.315f, subtitlePaint)
         }
 
-        // 2. Treble-reactive floating sparkle particles
-        val trebleSum = if (bands.size >= 8) bands.takeLast(8).maxOrNull() ?: 0.1f else 0.1f
-        val particleCount = if (exportPerformanceMode) 28 else 64
+        // Small spectral particles float above and below the visualizer.
+        val particleCount = if (exportPerformanceMode) 24 else 48
         for (i in 0 until particleCount) {
-            val seed = i * 117.3
+            val seed = i * 127.1
             val x = ((sin(seed * 0.73) * 0.5 + 0.5) * width).toFloat()
-            val speed = 0.0018 + (i % 5) * 0.0006
-            val yOffset = ((timeMs * speed + seed) % 1.0).toFloat()
-            val y = baseY - yOffset * height * 0.42f
+            val yBase = ((cos(seed * 1.17) * 0.5 + 0.5) * height * 0.78f)
+            val twinkle = (0.35 + 0.65 * (0.5 + 0.5 * sin(timeMs * 0.002 + seed))).toFloat()
+            val radius = minSide * (0.0012f + (i % 3) * 0.00055f)
             val tint = rainbowColors[i % rainbowColors.size]
-            val r = minSide * (0.0018f + (i % 3) * 0.0012f) * (1f + trebleSum * 0.8f)
-            val alpha = ((1f - yOffset) * 210 * (0.4f + trebleSum * 0.6f)).toInt().coerceIn(0, 240)
-            particlePaint.color = withAlpha(tint, alpha)
-            canvas.drawCircle(x, y, r, particlePaint)
+            particlePaint.color = withAlpha(tint, (35 + twinkle * 155).toInt().coerceIn(20, 190))
+            canvas.drawCircle(x, yBase.toFloat(), radius * (0.7f + twinkle), particlePaint)
         }
 
-        // 3. Bass Kick Shockwave Floor Line
-        val bassKick = if (bands.isNotEmpty()) bands.take(5).maxOrNull() ?: 0.08f else 0.08f
-        val floorGlowAlpha = (40 + bassKick * 170).toInt().coerceIn(40, 255)
-        baselinePaint.color = withAlpha(Color.rgb(0, 245, 212), floorGlowAlpha)
-        baselinePaint.strokeWidth = max(2f, minSide * (0.004f + bassKick * 0.005f))
-        canvas.drawLine(width * 0.04f, baseY, width * 0.96f, baseY, baselinePaint)
+        val startX = (width - totalWidth) * 0.5f
+        var bassEnergy = 0f
+        for (i in 0 until min(5, bands.size)) bassEnergy = max(bassEnergy, bands[i].coerceIn(0f, 1f))
 
-        // 4. Spectrum Bars & Floating Peak Caps
-        val startX = (width - totalWidth) / 2f
+        // Bright neon floor: layered strokes create the glow without an opaque fill.
+        baselinePaint.shader = null
+        baselinePaint.strokeCap = Paint.Cap.ROUND
+        baselinePaint.color = withAlpha(Color.WHITE, 245)
+        baselinePaint.strokeWidth = max(2f, minSide * 0.0032f)
+        baselinePaint.setShadowLayer(minSide * (0.018f + bassEnergy * 0.012f), 0f, 0f, Color.WHITE)
+        canvas.drawLine(width * 0.015f, baseY, width * 0.985f, baseY, baselinePaint)
+        baselinePaint.setShadowLayer(minSide * 0.022f, 0f, 0f, rainbowColors[8])
+        baselinePaint.color = withAlpha(rainbowColors[8], (100 + bassEnergy * 100).toInt())
+        baselinePaint.strokeWidth = max(4f, minSide * 0.009f)
+        canvas.drawLine(width * 0.02f, baseY, width * 0.98f, baseY, baselinePaint)
+        baselinePaint.clearShadowLayer()
+        baselinePaint.color = Color.WHITE
+        baselinePaint.strokeWidth = max(1.5f, minSide * 0.002f)
+        canvas.drawLine(width * 0.02f, baseY, width * 0.98f, baseY, baselinePaint)
+
         for (i in 0 until count) {
-            // Map 20 visible bars to the 32 input logarithmic bands
-            val bandIdx = (i * (bands.size - 1) / (count - 1)).coerceIn(0, bands.lastIndex)
-            val rawEnergy = bands.getOrElse(bandIdx) { 0.1f }.coerceIn(0.04f, 1f)
-
-            // Dynamic bounce with subtle micro-phase shimmer
-            val energy = (rawEnergy * (0.92f + 0.08f * sin(timeMs * 0.005 + i * 0.6).toFloat())).coerceIn(0.04f, 1f)
-            val barH = (energy * maxBarHeight).coerceAtLeast(minSide * 0.006f)
+            val bandIndex = if (bands.isEmpty()) 0 else (i * (bands.size - 1) / (count - 1)).coerceIn(0, bands.lastIndex)
+            val raw = if (bands.isEmpty()) 0.12f else bands[bandIndex].coerceIn(0.04f, 1f)
+            val energy = (raw * (0.94f + 0.06f * sin(timeMs * 0.004 + i * 0.55).toFloat())).coerceIn(0.04f, 1f)
+            val stack = (2 + energy * (maxSegments - 2)).toInt().coerceIn(2, maxSegments)
             val x = startX + i * (barWidth + gap)
+            val skew = barWidth * 0.10f
             val tint = rainbowColors[(i * rainbowColors.size / count).coerceIn(0, rainbowColors.lastIndex)]
+            val corner = barWidth * 0.12f
 
-            // Bar Body (Upwards from baseline)
-            cachedRect.set(x, baseY - barH, x + barWidth, baseY)
-            val cornerR = barWidth * 0.28f
+            // Segmented bar stack with subtle dark separators.
+            for (segment in 0 until stack) {
+                val top = baseY - (segment + 1) * (segmentHeight + segmentGap)
+                cachedRect.set(x + skew, top, x + barWidth - skew, top + segmentHeight)
+                barPaint.color = withAlpha(tint, 238)
+                barPaint.shader = null
+                canvas.drawRoundRect(cachedRect, corner, corner, barPaint)
 
-            // Halo glow pass
-            haloPaint.color = withAlpha(tint, 75 + (energy * 65).toInt())
-            canvas.drawRoundRect(cachedRect, cornerR, cornerR, haloPaint)
+                // Thin luminous top edge gives each segment the crisp reference look.
+                cachedRect.set(x + skew + 1f, top + 1f, x + barWidth - skew - 1f, top + max(2f, segmentHeight * 0.16f))
+                capPaint.color = withAlpha(Color.WHITE, 52)
+                canvas.drawRoundRect(cachedRect, corner * 0.5f, corner * 0.5f, capPaint)
 
-            // Core solid pass
-            barPaint.color = withAlpha(tint, 225)
-            canvas.drawRoundRect(cachedRect, cornerR, cornerR, barPaint)
+                // Mirrored segmented reflection, fading toward the bottom.
+                val reflectionTop = baseY + segmentGap + segment * (segmentHeight + segmentGap)
+                cachedRect.set(x + skew, reflectionTop, x + barWidth - skew, reflectionTop + segmentHeight * 0.78f)
+                barPaint.color = withAlpha(tint, (76f * (1f - segment / (stack + 1f))).toInt().coerceIn(8, 76))
+                canvas.drawRoundRect(cachedRect, corner, corner, barPaint)
+            }
 
-            // Floating Peak Cap (Iconic Avee Player ballistics)
-            val peakEnergy = updatePeakCap(i, energy)
-            val peakY = baseY - (peakEnergy * maxBarHeight) - minSide * 0.008f
-            cachedRect.set(x - barWidth * 0.05f, peakY - minSide * 0.0022f, x + barWidth * 1.05f, peakY + minSide * 0.0022f)
-            capPaint.color = withAlpha(Color.WHITE, (180 + peakEnergy * 75).toInt().coerceIn(180, 255))
-            canvas.drawRoundRect(cachedRect, cornerR, cornerR, capPaint)
-
-            // Mirrored Floor Reflection (Soft fade-out downwards)
-            val reflectH = barH * 0.42f
-            cachedRect.set(x, baseY + minSide * 0.004f, x + barWidth, baseY + minSide * 0.004f + reflectH)
-            barPaint.color = withAlpha(tint, (65 * (1f - energy * 0.2f)).toInt().coerceIn(20, 80))
-            canvas.drawRoundRect(cachedRect, cornerR, cornerR, barPaint)
+            // Floating white peak marker above each column.
+            val peak = updatePeakCap(i, energy)
+            val peakY = baseY - peak * maxSegments * (segmentHeight + segmentGap) - segmentGap * 1.8f
+            capPaint.color = withAlpha(Color.WHITE, 225)
+            capPaint.setShadowLayer(minSide * 0.004f, 0f, 0f, Color.WHITE)
+            cachedRect.set(x - barWidth * 0.08f, peakY, x + barWidth * 1.08f, peakY + max(2f, minSide * 0.002f))
+            canvas.drawRoundRect(cachedRect, 2f, 2f, capPaint)
+            capPaint.clearShadowLayer()
         }
+        baselinePaint.clearShadowLayer()
+        baselinePaint.shader = null
     }
 
     /** Cool Bars: Dual-sided symmetrical neon equalizer with central waveform line. */
