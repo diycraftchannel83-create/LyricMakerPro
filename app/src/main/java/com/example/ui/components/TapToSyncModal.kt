@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.winsmediatama.lyricmakerpro.audio.AudioEngine
 import com.winsmediatama.lyricmakerpro.model.VideoProject
 import com.winsmediatama.lyricmakerpro.ui.theme.*
 
@@ -33,14 +35,15 @@ import com.winsmediatama.lyricmakerpro.ui.theme.*
 fun TapToSyncModal(
     project: VideoProject,
     currentLineIndex: Int,
-    playheadMs: Long,
-    isPlaying: Boolean,
+    audioEngine: AudioEngine,
     onTapNext: () -> Unit,
     onResetSync: () -> Unit,
     onTogglePlayback: () -> Unit,
     onSeek: (Long) -> Unit,
     onFinish: () -> Unit
 ) {
+    val playheadMs by audioEngine.playheadMs.collectAsStateWithLifecycle()
+    val isPlaying by audioEngine.isPlaying.collectAsStateWithLifecycle()
     val currentLine = project.lyrics.getOrNull(currentLineIndex)
     val nextLine = project.lyrics.getOrNull(currentLineIndex + 1)
 
