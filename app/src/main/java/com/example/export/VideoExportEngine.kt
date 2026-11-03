@@ -85,8 +85,12 @@ class VideoExportEngine(private val context: Context) {
         val backgroundFile = File(exportDir, "LyricBackground_${System.currentTimeMillis()}.png")
         val width = (project.canvasRatio.exportWidth * quality.scaleFactor).toInt().let { if (it % 2 != 0) it + 1 else it }
         val height = (project.canvasRatio.exportHeight * quality.scaleFactor).toInt().let { if (it % 2 != 0) it + 1 else it }
+        var mediaAssets: List<ExportMediaAsset> = emptyList()
 
         try {
+            // Media3 still requires a concrete image source to establish video
+            // dimensions and duration. The frame overlay replaces its pixels with
+            // the real project background/media on every encoded frame.
             val bgBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             try {
                 drawBackground(Canvas(bgBitmap), width, height, project.background, 0L)
@@ -99,31 +103,13 @@ class VideoExportEngine(private val context: Context) {
                 bgBitmap.recycle()
             }
 
-            // Ensure exported visualizers have real song-envelope data even when an older
-            // project was saved before waveform caching was introduced.
-            var visualizerProject = project
-            if (visualizerProject.audioTrack.waveformPeaks.isEmpty()) {
-                val peaks = AudioWaveformExtractor.extract(context, audioUri, project.durationMs)
-                visualizerProject = visualizerProject.copy(
-                    audioTrack = visualizerProject.audioTrack.copy(waveformPeaks = peaks)
-                )
-            }
-            if (visualizerProject.audioTrack.spectrumFrames.isEmpty()) {
-                val analysis = AudioSpectrumAnalyzer.analyze(context, audioUri, project.durationMs)
-                if (analysis.spectrumFrames.isNotEmpty()) {
-                    visualizerProject = visualizerProject.copy(
-                        audioTrack = visualizerProject.audioTrack.copy(
-                            spectrumFrames = analysis.spectrumFrames,
-                            pitchFramesHz = analysis.pitchFramesHz,
-                            beatTimesMs = analysis.beatTimesMs,
-                            analysisFrameDurationMs = analysis.frameDurationMs
-                        )
-                    )
-                }
-            }
-
+            // Prepare the actual timeline media once. Each encoded frame below will
+            // select the clip active at that presentation timestamp.
+            mediaAssets = prepareMediaAssets(project.mediaClips)
             val watermarkBitmap = loadWatermarkBitmap()
-            val overlay = ProjectLyricOverlay(this@VideoExportEngine, width, height, visualizerProject, watermarkBitmap)
+            val overlay = ProjectLyricOverlay(
+                this@VideoExportEngine, width, height, project, watermarkBitmap, mediaAssets
+            )
             val effects = listOf<androidx.media3.common.Effect>(
                 androidx.media3.effect.Presentation.createForWidthAndHeight(
                     width, height, androidx.media3.effect.Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
@@ -223,6 +209,7 @@ class VideoExportEngine(private val context: Context) {
                 }
             }
         } finally {
+            releaseMediaAssets(mediaAssets)
             backgroundFile.delete()
         }
     }
@@ -233,7 +220,8 @@ class VideoExportEngine(private val context: Context) {
         private val width: Int,
         private val height: Int,
         private val project: VideoProject,
-        private val watermarkBitmap: Bitmap
+        private val watermarkBitmap: Bitmap,
+        private val mediaAssets: List<ExportMediaAsset>
     ) : androidx.media3.effect.BitmapOverlay() {
         private var cached: Bitmap? = null
 
@@ -241,17 +229,11 @@ class VideoExportEngine(private val context: Context) {
             val bitmap = cached?.takeIf { it.width == width && it.height == height }
                 ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { cached = it }
             bitmap.eraseColor(Color.TRANSPARENT)
-            val frameTimeMs = (presentationTimeUs / 1000L).coerceAtLeast(0L)
-            owner.drawVisualizer(
-                Canvas(bitmap), width, height, project.visualizer, project.visualizerColorHex,
-                frameTimeMs, project.audioTrack.bpm, project.audioTrack.waveformPeaks, project.durationMs,
-                project.audioTrack.artist.ifBlank { project.artist }, project.audioTrack.title,
-                project.audioTrack.spectrumFrames, project.audioTrack.analysisFrameDurationMs, project.audioTrack.beatTimesMs
+            owner.renderFrameInternal(
+                Canvas(bitmap), width, height, project,
+                (presentationTimeUs / 1000L).coerceAtLeast(0L),
+                mediaAssets, watermarkBitmap
             )
-            owner.drawLyrics(Canvas(bitmap), width, height, project, frameTimeMs)
-            if (project.showWatermark) {
-                owner.drawWatermark(Canvas(bitmap), width, height, watermarkBitmap)
-            }
             return bitmap
         }
 
@@ -408,10 +390,11 @@ class VideoExportEngine(private val context: Context) {
         height: Int,
         project: VideoProject,
         timeMs: Long,
-        mediaAssets: List<ExportMediaAsset>
+        mediaAssets: List<ExportMediaAsset>,
+        watermarkBitmap: Bitmap? = null
     ) {
         val activeAsset = mediaAssets
-            .filter { asset -> timeMs >= asset.clip.startMs && timeMs < asset.clip.startMs + asset.clip.exportDurationMs }
+            .filter { asset -> timeMs >= asset.clip.startMs && timeMs < asset.clip.endMs }
             .maxByOrNull { it.clip.startMs }
         val frameBitmap = when {
             activeAsset?.image != null -> activeAsset.image
@@ -445,8 +428,12 @@ class VideoExportEngine(private val context: Context) {
 
         // 4. Watermark / Creator Tag
         if (project.showWatermark) {
-            val watermark = loadWatermarkBitmap()
-            try { drawWatermark(canvas, width, height, watermark) } finally { watermark.recycle() }
+            if (watermarkBitmap != null && !watermarkBitmap.isRecycled) {
+                drawWatermark(canvas, width, height, watermarkBitmap)
+            } else {
+                val watermark = loadWatermarkBitmap()
+                try { drawWatermark(canvas, width, height, watermark) } finally { watermark.recycle() }
+            }
         }
     }
 
