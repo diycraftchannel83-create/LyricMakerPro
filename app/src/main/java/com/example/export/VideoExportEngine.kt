@@ -600,30 +600,7 @@ class VideoExportEngine(private val context: Context) {
                 }
             }
             VisualizerType.CIRCULAR_WAVE -> {
-                val centerX = width / 2f
-                val centerY = height * 0.35f
-                val baseRadius = min(width, height) * 0.18f
-                val radius = baseRadius * (1f + kickEnergy * 0.12f)
-
-                val ringPaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.STROKE
-                    strokeWidth = 6f
-                    color = primaryColor
-                    alpha = (180 + kickEnergy * 75).toInt()
-                }
-
-                canvas.drawCircle(centerX, centerY, radius, ringPaint)
-
-                // Outer faint shockwave
-                val outerPaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.STROKE
-                    strokeWidth = 3f
-                    color = Color.parseColor("#FF007F")
-                    alpha = (kickEnergy * 140).toInt()
-                }
-                canvas.drawCircle(centerX, centerY, radius * 1.3f, outerPaint)
+                AudioGlowVisualizerRenderer.drawSinBars(canvas, width, height, timeMs, envelopeBands)
             }
             VisualizerType.OSCILLOSCOPE -> {
                 val wavePaint = Paint().apply {
