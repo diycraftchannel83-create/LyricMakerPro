@@ -349,6 +349,14 @@ private fun FullscreenPreviewCanvas(
     bassEnergy: Float,
     videoAudioMuted: Boolean
 ) {
+    val context = LocalContext.current
+    val watermarkBitmap = remember(context) {
+        runCatching {
+            val encoded = context.assets.open("lyricmakerpro_watermark.png.b64").bufferedReader().use { it.readText() }
+            val bytes = android.util.Base64.decode(encoded, android.util.Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        }.getOrNull()
+    }
     val activeMedia = project.mediaClips.filter { playheadMs >= it.startMs && playheadMs < it.endMs }.maxByOrNull { it.startMs }
     var activeVideoPlayer by remember(activeMedia?.id) { mutableStateOf<MediaPlayer?>(null) }
     LaunchedEffect(activeVideoPlayer, videoAudioMuted) {
