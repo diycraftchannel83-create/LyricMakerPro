@@ -28,8 +28,13 @@ class VideoExportEngine(private val context: Context) {
     private data class ExportMediaAsset(
         val clip: MediaClip,
         val image: Bitmap? = null,
-        val retriever: MediaMetadataRetriever? = null
+        val retriever: MediaMetadataRetriever? = null,
+        val sourceWidth: Int = 0,
+        val sourceHeight: Int = 0
     )
+
+    // Reuse the paint for every frame instead of allocating one 30 times per second.
+    private val mediaFramePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
     private fun prepareMediaAssets(clips: List<MediaClip>): List<ExportMediaAsset> = clips.mapNotNull { clip ->
         runCatching {
@@ -42,7 +47,19 @@ class VideoExportEngine(private val context: Context) {
                     val retriever = MediaMetadataRetriever()
                     try {
                         retriever.setDataSource(context, Uri.parse(clip.uri))
-                        ExportMediaAsset(clip = clip, retriever = retriever)
+                        val rawWidth = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+                            ?.toIntOrNull() ?: 0
+                        val rawHeight = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+                            ?.toIntOrNull() ?: 0
+                        val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
+                            ?.toIntOrNull() ?: 0
+                        val swapsDimensions = rotation == 90 || rotation == 270
+                        ExportMediaAsset(
+                            clip = clip,
+                            retriever = retriever,
+                            sourceWidth = if (swapsDimensions) rawHeight else rawWidth,
+                            sourceHeight = if (swapsDimensions) rawWidth else rawHeight
+                        )
                     } catch (error: Exception) {
                         retriever.release()
                         throw error
@@ -393,17 +410,39 @@ class VideoExportEngine(private val context: Context) {
         mediaAssets: List<ExportMediaAsset>,
         watermarkBitmap: Bitmap? = null
     ) {
-        val activeAsset = mediaAssets
-            .filter { asset -> timeMs >= asset.clip.startMs && timeMs < asset.clip.endMs }
-            .maxByOrNull { it.clip.startMs }
+        // Find the topmost active clip without creating a filtered list on every frame.
+        var activeAsset: ExportMediaAsset? = null
+        for (asset in mediaAssets) {
+            if (timeMs >= asset.clip.startMs && timeMs < asset.clip.endMs &&
+                (activeAsset == null || asset.clip.startMs >= activeAsset.clip.startMs)
+            ) {
+                activeAsset = asset
+            }
+        }
         val frameBitmap = when {
             activeAsset?.image != null -> activeAsset.image
             activeAsset?.retriever != null -> runCatching {
-                activeAsset.retriever.getFrameAtTime(
-                    (activeAsset.clip.sourceOffsetMs +
-                        (timeMs - activeAsset.clip.startMs).coerceAtLeast(0L)) * 1_000L,
-                    MediaMetadataRetriever.OPTION_CLOSEST
-                )
+                val sourceTimeUs = (activeAsset.clip.sourceOffsetMs +
+                    (timeMs - activeAsset.clip.startMs).coerceAtLeast(0L)) * 1_000L
+                val retriever = activeAsset.retriever
+                // Decode directly near the final canvas size on API 27+.
+                // Preserve the source aspect ratio so drawMediaFrame keeps its
+                // existing center-crop behavior without stretching the image.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 &&
+                    activeAsset.sourceWidth > 0 && activeAsset.sourceHeight > 0
+                ) {
+                    val scale = max(
+                        width.toFloat() / activeAsset.sourceWidth,
+                        height.toFloat() / activeAsset.sourceHeight
+                    )
+                    val decodeWidth = ceil(activeAsset.sourceWidth * scale).toInt().coerceAtLeast(1)
+                    val decodeHeight = ceil(activeAsset.sourceHeight * scale).toInt().coerceAtLeast(1)
+                    retriever.getScaledFrameAtTime(
+                        sourceTimeUs, MediaMetadataRetriever.OPTION_CLOSEST, decodeWidth, decodeHeight
+                    )
+                } else {
+                    retriever.getFrameAtTime(sourceTimeUs, MediaMetadataRetriever.OPTION_CLOSEST)
+                }
             }.getOrNull()
             else -> null
         }
@@ -452,7 +491,7 @@ class VideoExportEngine(private val context: Context) {
             (left + cropWidth).toInt().coerceAtMost(bitmap.width),
             (top + cropHeight).toInt().coerceAtMost(bitmap.height)
         )
-        canvas.drawBitmap(bitmap, source, Rect(0, 0, width, height), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+        canvas.drawBitmap(bitmap, source, Rect(0, 0, width, height), mediaFramePaint)
     }
 
     private fun drawBackground(canvas: Canvas, width: Int, height: Int, bg: BackgroundConfig, timeMs: Long) {
