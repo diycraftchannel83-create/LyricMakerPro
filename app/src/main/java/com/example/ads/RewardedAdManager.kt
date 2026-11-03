@@ -22,7 +22,6 @@ class RewardedAdManager(private val activity: Activity) {
     private var rewardedAd: RewardedAd? = null
     private var isLoading = false
     private var isShowing = false
-    private var isInitialized = false
     private var adsAllowed = false
 
     private val adUnitId: String
@@ -38,13 +37,7 @@ class RewardedAdManager(private val activity: Activity) {
             rewardedAd = null
             return
         }
-        initialize()
-    }
-
-    fun initialize() {
-        if (!adsAllowed || isInitialized || activity.isFinishing || activity.isDestroyed) return
-        isInitialized = true
-        MobileAds.initialize(activity) { load() }
+        load()
     }
 
     fun load() {
@@ -119,7 +112,6 @@ class FreeAppOpenAdManager(private val activity: Activity) {
     private var adsAllowed = false
     private var hasShownThisForeground = false
     private var isForeground = false
-    private var initialized = false
 
     private val adUnitId: String
         get() = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG)
@@ -131,7 +123,6 @@ class FreeAppOpenAdManager(private val activity: Activity) {
         if (isPremium) {
             appOpenAd = null
         } else {
-            initializeIfAllowed()
             showIfReady()
         }
     }
@@ -142,14 +133,9 @@ class FreeAppOpenAdManager(private val activity: Activity) {
             appOpenAd = null
             return
         }
-        initializeIfAllowed()
-        if (isForeground && !premiumUser && appOpenAd == null) load()
-    }
-
-    private fun initializeIfAllowed() {
-        if (!adsAllowed || premiumUser || initialized || activity.isFinishing || activity.isDestroyed) return
-        initialized = true
-        com.google.android.gms.ads.MobileAds.initialize(activity) { load() }
+        if (isForeground && !premiumUser) {
+            if (appOpenAd == null) load() else showIfReady()
+        }
     }
 
     fun onForeground() {
