@@ -106,36 +106,27 @@ fun TapToSyncModal(
                     }
                 }
 
-                // Previously synchronized lyrics stay visible in green.
-                Column(
+                // Show only the immediately preceding synchronized lyric,
+                // centered and aligned with the timeline currently being played.
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 112.dp)
+                        .heightIn(min = 54.dp, max = 72.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(StudioSurfaceVariant)
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    if (currentLineIndex > 0) {
-                        project.lyrics.take(currentLineIndex).forEachIndexed { index, line ->
-                            Text(
-                                text = "${index + 1}. ${line.text}",
-                                color = Color(0xFF39E58C),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    } else {
-                        Text(
-                            text = "Synced lyrics will appear here",
-                            color = TextMuted,
-                            fontSize = 12.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+                    val syncedLine = project.lyrics.getOrNull(currentLineIndex - 1)
+                    Text(
+                        text = syncedLine?.text ?: "Synced lyric will appear here",
+                        color = if (syncedLine != null) Color(0xFF39E58C) else TextMuted,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
 
                 // Center Cue Prompter
