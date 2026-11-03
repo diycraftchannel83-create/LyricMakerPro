@@ -32,7 +32,7 @@ enum class VisualizerType(val label: String, val description: String) {
     CIRCULAR_WAVE("Sin Bars", "Colorful animated sine-wave spectrum with luminous particles and mesh lines"),
     OSCILLOSCOPE("Terrain Bars", "Transparent 3D neon terrain spectrum mesh with audio-reactive peaks"),
     FLOATING_PARTICLES("Ambient Dust", "Dreamy floating bokeh dust particles"),
-    VINYL_SPINNER("Vinyl Disc", "Retro rotating vinyl record with groove reflections"),
+    VINYL_SPINNER("Cool Bars", "Vivid multicolor neon spectrum bars with mirrored reflections and waveform mesh"),
     BASS_PULSE("Bass Shockwave", "Expanding concentric acoustic ripples on kick beat"),
     AURORA_BLOOM("Aurora Bloom", "Soft multicolor glow clouds that breathe with the music"),
     GLOW_ORBS("Glow Orbs", "Floating luminous particles with depth and audio pulses"),
