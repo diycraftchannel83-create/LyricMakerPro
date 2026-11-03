@@ -215,7 +215,6 @@ object AudioGlowVisualizerRenderer {
         }
     }
 
-
     /** Reference-style rainbow spectrum bars with metadata header and mirrored neon reflection. */
     fun drawClassicSpectrum(canvas: Canvas, width: Int, height: Int, timeMs: Long,
         bands: FloatArray, artist: String, trackTitle: String) {
@@ -317,7 +316,6 @@ object AudioGlowVisualizerRenderer {
         canvas.drawLine(width * 0.015f, baseY, width * 0.985f, baseY, baseline)
     }
 
-
     /** Transparent multicolor sine-wave mesh inspired by the supplied reference. */
     fun drawSinBars(canvas: Canvas, width: Int, height: Int, timeMs: Long, bands: FloatArray) {
         if (width <= 0 || height <= 0) return
@@ -325,8 +323,18 @@ object AudioGlowVisualizerRenderer {
         val centerY = height * 0.53f
         val count = 112
         val stepX = width.toFloat() / (count - 1)
-        val colors = intArrayOf(Color.CYAN, Color.rgb(0,145,255), Color.rgb(45,245,220), Color.rgb(110,100,255), Color.rgb(0,255,190), Color.rgb(30,190,255))
-        fun energy(i: Int): Float = bands.getOrElse((i * 32 / count).coerceIn(0,31)) { 0.2f }.coerceIn(0.025f,1f)
+        // Seven lanes are rendered below, so keep one dedicated tint per lane.
+        // The former six-color array caused colors[6] to crash on the final lane.
+        val colors = intArrayOf(
+            Color.CYAN,
+            Color.rgb(0, 145, 255),
+            Color.rgb(45, 245, 220),
+            Color.rgb(110, 100, 255),
+            Color.rgb(0, 255, 190),
+            Color.rgb(30, 190, 255),
+            Color.rgb(190, 80, 255)
+        )
+        fun energy(i: Int): Float = bands.getOrElse((i * 32 / count).coerceIn(0, 31)) { 0.2f }.coerceIn(0.025f, 1f)
         fun wave(i: Int, lane: Int): Float {
             val x = i.toDouble() / (count - 1)
             val env = (0.12 + 0.88 * (0.5 + 0.5 * sin(x * PI * 2.0 + 0.35))).toFloat()
@@ -341,7 +349,7 @@ object AudioGlowVisualizerRenderer {
                 val x = i * stepX
                 if (i == 0) path.moveTo(x, wave(i,lane)) else path.lineTo(x, wave(i,lane))
             }
-            val tint = colors[lane + 3]
+            val tint = colors.getOrElse(lane + 3) { colors[(lane + 3).mod(colors.size)] }
             val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 style = Paint.Style.STROKE; strokeWidth = minSide * 0.010f
                 color = withAlpha(tint, 28); setShadowLayer(minSide * 0.018f,0f,0f,tint)
