@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.rewarded.RewardedAd
@@ -21,6 +20,8 @@ import com.google.android.gms.ads.OnUserEarnedRewardListener
 class RewardedAdManager(private val activity: Activity) {
     private var rewardedAd: RewardedAd? = null
     private var isLoading = false
+    private var isShowing = false
+    private var adsAllowed = false
 
     private val adUnitId: String
         get() = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG) {
@@ -29,12 +30,19 @@ class RewardedAdManager(private val activity: Activity) {
             PRODUCTION_REWARDED_AD_UNIT_ID
         }
 
-    fun initialize() {
-        MobileAds.initialize(activity) { load() }
+    fun setAdsAllowed(allowed: Boolean) {
+        adsAllowed = allowed
+        if (!allowed) {
+            rewardedAd = null
+            return
+        }
+        load()
     }
 
     fun load() {
-        if (isLoading || rewardedAd != null || activity.isFinishing) return
+        if (!adsAllowed || isLoading || rewardedAd != null || isShowing ||
+            activity.isFinishing || activity.isDestroyed
+        ) return
         isLoading = true
         RewardedAd.load(
             activity,
@@ -43,7 +51,7 @@ class RewardedAdManager(private val activity: Activity) {
             object : RewardedAdLoadCallback() {
                 override fun onAdLoaded(ad: RewardedAd) {
                     isLoading = false
-                    rewardedAd = ad
+                    rewardedAd = if (adsAllowed && !activity.isFinishing && !activity.isDestroyed) ad else null
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
@@ -55,6 +63,10 @@ class RewardedAdManager(private val activity: Activity) {
     }
 
     fun show(onRewardEarned: () -> Unit, onUnavailable: () -> Unit) {
+        if (!adsAllowed || isShowing || activity.isFinishing || activity.isDestroyed) {
+            onUnavailable()
+            return
+        }
         val ad = rewardedAd
         if (ad == null) {
             load()
@@ -62,13 +74,16 @@ class RewardedAdManager(private val activity: Activity) {
             return
         }
         rewardedAd = null
+        isShowing = true
         var earnedReward = false
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdDismissedFullScreenContent() {
+                isShowing = false
                 load()
             }
 
             override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                isShowing = false
                 onUnavailable()
                 load()
             }
@@ -93,9 +108,9 @@ class FreeAppOpenAdManager(private val activity: Activity) {
     private var appOpenAd: com.google.android.gms.ads.appopen.AppOpenAd? = null
     private var loading = false
     private var premiumUser = true
+    private var adsAllowed = false
     private var hasShownThisForeground = false
     private var isForeground = false
-    private var initialized = false
 
     private val adUnitId: String
         get() = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG)
@@ -104,21 +119,28 @@ class FreeAppOpenAdManager(private val activity: Activity) {
 
     fun setPremiumStatus(isPremium: Boolean) {
         premiumUser = isPremium
-        if (!isPremium) {
-            if (!initialized) {
-                initialized = true
-                com.google.android.gms.ads.MobileAds.initialize(activity) { load() }
-            }
-            showIfReady()
-        } else {
+        if (isPremium) {
             appOpenAd = null
+        } else {
+            showIfReady()
+        }
+    }
+
+    fun setAdsAllowed(allowed: Boolean) {
+        adsAllowed = allowed
+        if (!allowed) {
+            appOpenAd = null
+            return
+        }
+        if (isForeground && !premiumUser) {
+            if (appOpenAd == null) load() else showIfReady()
         }
     }
 
     fun onForeground() {
         isForeground = true
         hasShownThisForeground = false
-        if (!premiumUser) {
+        if (!premiumUser && adsAllowed) {
             if (appOpenAd == null) load() else showIfReady()
         }
     }
@@ -129,7 +151,9 @@ class FreeAppOpenAdManager(private val activity: Activity) {
     }
 
     private fun load() {
-        if (loading || appOpenAd != null || activity.isFinishing || premiumUser) return
+        if (!adsAllowed || loading || appOpenAd != null || activity.isFinishing ||
+            activity.isDestroyed || premiumUser
+        ) return
         loading = true
         com.google.android.gms.ads.appopen.AppOpenAd.load(
             activity,
@@ -138,7 +162,7 @@ class FreeAppOpenAdManager(private val activity: Activity) {
             object : com.google.android.gms.ads.appopen.AppOpenAd.AppOpenAdLoadCallback() {
                 override fun onAdLoaded(ad: com.google.android.gms.ads.appopen.AppOpenAd) {
                     loading = false
-                    appOpenAd = ad
+                    appOpenAd = if (adsAllowed && !premiumUser && !activity.isFinishing && !activity.isDestroyed) ad else null
                     showIfReady()
                 }
 
@@ -151,7 +175,7 @@ class FreeAppOpenAdManager(private val activity: Activity) {
 
     private fun showIfReady() {
         val ad = appOpenAd ?: return
-        if (premiumUser || hasShownThisForeground || activity.isFinishing ||
+        if (!adsAllowed || premiumUser || hasShownThisForeground || activity.isFinishing ||
             activity.isDestroyed || !isForeground
         ) return
         hasShownThisForeground = true
@@ -165,8 +189,12 @@ class FreeAppOpenAdManager(private val activity: Activity) {
 }
 
 @androidx.compose.runtime.Composable
-fun FreeBannerAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier) {
-    if (isPremium) return
+fun FreeBannerAd(
+    isPremium: Boolean,
+    canRequestAds: Boolean = true,
+    modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier
+) {
+    if (isPremium || !canRequestAds) return
     val context = androidx.compose.ui.platform.LocalContext.current
     androidx.compose.ui.viewinterop.AndroidView(
         modifier = modifier.fillMaxWidth().height(50.dp),
@@ -184,8 +212,12 @@ fun FreeBannerAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
 }
 
 @androidx.compose.runtime.Composable
-fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier) {
-    if (isPremium) return
+fun FreeNativeAd(
+    isPremium: Boolean,
+    canRequestAds: Boolean = true,
+    modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier
+) {
+    if (isPremium || !canRequestAds) return
     val context = androidx.compose.ui.platform.LocalContext.current
     val nativeView = androidx.compose.runtime.remember(context) {
         val adView = com.google.android.gms.ads.nativead.NativeAdView(context)

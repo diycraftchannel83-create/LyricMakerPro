@@ -28,6 +28,7 @@ accompanistPermissions = "0.37.3"
 playServicesLocation = "21.3.0"
 playServicesAds = "25.5.0"
 billing = "9.1.0"
+ump = "4.0.0"
 cameraCamera2 = "1.5.0"
 cameraLifecycle = "1.5.0"
 cameraView = "1.5.0"
@@ -37,7 +38,6 @@ okhttp = "4.10.0"
 moshiKotlin = "1.15.2"
 moshiKotlinCodegen = "1.15.2"
 datastorePreferences = "1.1.7"
-robolectric = "4.16.1"
 firebaseBom = "34.17.0"
 secretsGradlePlugin = "2.0.1"
 googleServices = "4.5.0"
@@ -82,6 +82,7 @@ accompanist-permissions = { group = "com.google.accompanist", name = "accompanis
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 play-services-ads = { group = "com.google.android.gms", name = "play-services-ads", version.ref = "playServicesAds" }
 google-play-billing = { group = "com.android.billingclient", name = "billing", version.ref = "billing" }
+google-ump = { group = "com.google.android.ump", name = "user-messaging-platform", version.ref = "ump" }
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "cameraCamera2" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "cameraLifecycle" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "cameraView" }
@@ -91,7 +92,6 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 moshi-kotlin = { group = "com.squareup.moshi", name = "moshi-kotlin", version.ref = "moshiKotlin" }
 moshi-kotlin-codegen = { group = "com.squareup.moshi", name = "moshi-kotlin-codegen", version.ref = "moshiKotlinCodegen" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }
-robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-ai = { group = "com.google.firebase", name = "firebase-ai" }
 firebase-appcheck-recaptcha = { group = "com.google.firebase", name = "firebase-appcheck-recaptcha" }

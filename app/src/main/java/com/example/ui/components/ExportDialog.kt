@@ -38,6 +38,7 @@ fun ExportDialog(
     onExportCover: () -> Unit,
     onShare: () -> Unit,
     onExportAgain: () -> Unit,
+    onCancelExport: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var selectedQuality by remember { mutableStateOf(ExportQuality.FULL_HD_1080P) }
@@ -177,6 +178,15 @@ fun ExportDialog(
                             color = TextPrimary,
                             fontWeight = FontWeight.Medium
                         )
+                        OutlinedButton(
+                            onClick = onCancelExport,
+                            modifier = Modifier.fillMaxWidth().testTag("cancel_video_render_button"),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF6B6B))
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Cancel Rendering", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
 

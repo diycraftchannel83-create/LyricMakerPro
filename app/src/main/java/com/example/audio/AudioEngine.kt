@@ -28,7 +28,7 @@ class AudioEngine(private val context: Context) {
     val playheadMs = _playheadMs.asStateFlow()
 
     // 16-band normalized spectrum levels (0.0f .. 1.0f) for visualizer
-    private val _spectrumBands = MutableStateFlow(FloatArray(16) { 0.1f })
+    private val _spectrumBands = MutableStateFlow(FloatArray(32) { 0.1f })
     val spectrumBands = _spectrumBands.asStateFlow()
 
     private val _bassEnergy = MutableStateFlow(0.1f)
@@ -39,6 +39,13 @@ class AudioEngine(private val context: Context) {
     private var playbackStartSystemTime = 0L
     private var playheadOffsetOnStart = 0L
     private var tickerJob: Job? = null
+
+    // Reused DSP state. Mutated only by the background ticker coroutine.
+    private val smoothedBands = FloatArray(32) { 0.06f }
+    private var smoothedBass = 0.06f
+    private var previousEnvelope = 0f
+    private var envelopeFloor = 0.04f
+    private var lastBeatTimeMs = Long.MIN_VALUE
 
     fun loadTrack(track: AudioTrackConfig) {
         stop()
@@ -116,10 +123,12 @@ class AudioEngine(private val context: Context) {
         tickerJob?.cancel()
         tickerJob = null
 
-        // Decay spectrum bands gently
+        // Release smoothly rather than snapping the spectrum to silence.
         scope.launch {
-            _spectrumBands.value = FloatArray(16) { 0.05f }
-            _bassEnergy.value = 0.05f
+            for (i in smoothedBands.indices) smoothedBands[i] = min(smoothedBands[i], 0.08f)
+            smoothedBass = min(smoothedBass, 0.08f)
+            _spectrumBands.value = smoothedBands.copyOf()
+            _bassEnergy.value = smoothedBass
         }
     }
 
@@ -165,38 +174,98 @@ class AudioEngine(private val context: Context) {
                 }
                 _playheadMs.value = position.coerceAtLeast(0L)
                 updateSpectrumForPosition(_playheadMs.value, track)
-                delay(33) // ~30fps is sufficient for timeline/playhead UI updates.
+                delay(16) // Keep the audio feature clock close to a 60Hz visualizer frame cadence.
             }
         }
     }
 
     private fun updateSpectrumForPosition(positionMs: Long, track: AudioTrackConfig) {
-        val bpm = track.bpm.coerceAtLeast(60)
-        val beatIntervalMs = (60_000.0 / bpm).toDouble()
-        val currentBeat = (positionMs.toDouble() / beatIntervalMs)
-        val beatFraction = (currentBeat % 1.0).toFloat()
+        val bpm = track.bpm.coerceIn(40, 240)
+        val beatIntervalMs = 60_000.0 / bpm
+        val beatPosition = positionMs / beatIntervalMs
+        val beatFraction = (beatPosition % 1.0).toFloat()
+        val bpmKick = (1f - beatFraction * 3.2f).coerceIn(0f, 1f)
 
-        // Bass pulse peaks at the start of each quarter note beat
-        val kickEnv = (1f - beatFraction * 2.5f).coerceIn(0f, 1f)
-        val isSnareBeat = (currentBeat.toInt() % 2 == 1)
-        val snareEnv = if (isSnareBeat) (1f - beatFraction * 3f).coerceIn(0f, 1f) else 0f
-        val hiHatEnv = (1f - ((currentBeat * 4) % 1.0).toFloat() * 4f).coerceIn(0f, 0.7f)
-
-        val bands = FloatArray(16)
-        for (i in 0 until 16) {
-            val freqRatio = i / 15f
-            val baseLevel = when {
-                i < 3 -> kickEnv * 0.95f + 0.15f // sub bass
-                i in 3..7 -> snareEnv * 0.8f + kickEnv * 0.3f + 0.2f // mids
-                else -> hiHatEnv * 0.7f + 0.1f // highs
+        // The cached waveform is an amplitude envelope, not a frequency spectrum.
+        // Use it only for transient energy and keep BPM as a graceful fallback.
+        if (track.spectrumFrames.isNotEmpty()) {
+            val cached = AudioSpectrumAnalyzer.bandsAt(track.spectrumFrames, positionMs, track.analysisFrameDurationMs)
+            for (i in smoothedBands.indices) {
+                val target = cached[i]
+                smoothedBands[i] += (target - smoothedBands[i]) * if (target > smoothedBands[i]) 0.72f else 0.18f
             }
-            // Add subtle undulating harmonics
-            val wobble = sin(positionMs * 0.005 + i * 0.8).toFloat() * 0.12f
-            bands[i] = (baseLevel + wobble).coerceIn(0.05f, 1.0f)
+            val bassTarget = cached.take(6).average().toFloat()
+            smoothedBass += (bassTarget - smoothedBass) * if (bassTarget > smoothedBass) 0.75f else 0.16f
+            _spectrumBands.value = smoothedBands.copyOf()
+            _bassEnergy.value = smoothedBass
+            return
+        }
+        val peaks = track.waveformPeaks
+        val envelope = if (peaks.isNotEmpty() && track.durationMs > 0L) {
+            val index = ((positionMs.toDouble() / track.durationMs) * peaks.size)
+                .toInt().coerceIn(0, peaks.lastIndex)
+            peaks[index].takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0f
+        } else 0f
+
+        val localBaseline = if (peaks.isNotEmpty() && track.durationMs > 0L) {
+            val center = ((positionMs.toDouble() / track.durationMs) * peaks.size)
+                .toInt().coerceIn(0, peaks.lastIndex)
+            val radius = (peaks.size / (track.durationMs / 1000f).coerceAtLeast(1f) * 0.45f)
+                .toInt().coerceIn(2, 24)
+            var sum = 0f
+            var count = 0
+            for (offset in -radius..radius step 2) {
+                val sample = peaks.getOrNull(center + offset)
+                if (sample != null && sample.isFinite()) {
+                    sum += sample.coerceIn(0f, 1f)
+                    count++
+                }
+            }
+            if (count > 0) sum / count else envelopeFloor
+        } else envelopeFloor
+
+        envelopeFloor += (localBaseline - envelopeFloor) * 0.035f
+        val transient = if (envelope > max(0.08f, envelopeFloor * 1.42f) &&
+            envelope - previousEnvelope > 0.025f &&
+            (lastBeatTimeMs == Long.MIN_VALUE || positionMs - lastBeatTimeMs > 180L)
+        ) {
+            lastBeatTimeMs = positionMs
+            ((envelope - envelopeFloor) / (1f - envelopeFloor).coerceAtLeast(0.08f)).coerceIn(0f, 1f)
+        } else 0f
+        previousEnvelope = envelope
+
+        // This is a tempo/envelope-reactive fallback until decoded PCM FFT frames
+        // are connected to the preview and export feature timeline.
+        val kick = max(bpmKick * 0.72f, transient)
+        val snare = if ((beatPosition.toInt() % 2) == 1) {
+            (1f - beatFraction * 3.4f).coerceIn(0f, 1f) * 0.55f
+        } else 0f
+        val hat = (1f - ((beatPosition * 4.0) % 1.0).toFloat() * 4f).coerceIn(0f, 0.65f)
+
+        val targets = FloatArray(32)
+        for (i in targets.indices) {
+            val normalized = i / 31f
+            val base = when {
+                i < 6 -> kick * (0.52f + (1f - normalized) * 0.42f) + envelope * 0.12f
+                i < 22 -> snare * 0.58f + kick * 0.22f + envelope * 0.12f
+                else -> hat * 0.72f + envelope * 0.08f
+            }
+            val pulse = sin(positionMs * (0.0035 + normalized * 0.004) + i * 0.47).toFloat() * 0.045f
+            targets[i] = (base + pulse).coerceIn(0.025f, 1f)
         }
 
-        _spectrumBands.value = bands
-        _bassEnergy.value = (kickEnv * 0.85f + 0.15f).coerceIn(0.1f, 1.5f)
+        // Fast attack, slower release: transient response stays punchy without jitter.
+        for (i in smoothedBands.indices) {
+            val target = targets[i]
+            val coefficient = if (target > smoothedBands[i]) 0.62f else 0.16f
+            smoothedBands[i] += (target - smoothedBands[i]) * coefficient
+        }
+        val bassTarget = max(kick, envelope * 0.72f).coerceIn(0.025f, 1f)
+        val bassCoefficient = if (bassTarget > smoothedBass) 0.68f else 0.14f
+        smoothedBass += (bassTarget - smoothedBass) * bassCoefficient
+
+        _spectrumBands.value = smoothedBands.copyOf()
+        _bassEnergy.value = smoothedBass
     }
 
     private fun startSynthesizedPlayback(track: AudioTrackConfig, startMs: Long) {

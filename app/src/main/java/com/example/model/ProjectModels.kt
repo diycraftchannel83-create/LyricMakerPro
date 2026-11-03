@@ -38,6 +38,17 @@ enum class VisualizerType(val label: String, val description: String) {
     THREE_D_RADIAL("3D Radial Spectrum", "Dimensional circular spectrum with depth and glow"),
     THREE_D_WAVE("3D Wave Ribbon", "Layered flowing wave ribbons reacting to the track"),
     THREE_D_ORBIT("3D Particle Orbit", "Depth-layered particles orbiting to the audio rhythm"),
+    BARS_SPECTRUM("Spectrum Bars", "16-band gradient frequency spectrum equalizer"),
+    CIRCULAR_WAVE("Sin Bars", "Colorful animated sine-wave spectrum with luminous particles and mesh lines"),
+    OSCILLOSCOPE("Terrain Bars", "Transparent 3D neon terrain spectrum mesh with audio-reactive peaks"),
+    FLOATING_PARTICLES("Ambient Dust", "Dreamy floating bokeh dust particles"),
+    VINYL_SPINNER("Cool Bars", "Vivid multicolor neon spectrum bars with mirrored reflections and waveform mesh"),
+    BASS_PULSE("Bass Shockwave", "Expanding concentric acoustic ripples on kick beat"),
+    AURORA_BLOOM("Aurora Bloom", "Soft multicolor glow clouds that breathe with the music"),
+    GLOW_ORBS("Glow Orbs", "Floating luminous particles with depth and audio pulses"),
+    NEON_RIBBON("Neon Ribbon", "Layered flowing light ribbons driven by the spectrum"),
+    RADIAL_BURST("Radial Burst", "A vivid circular spectrum with glowing audio spokes"),
+    SPECTRUM_TUNNEL("Spectrum Tunnel", "A colorful perspective tunnel pulsing to the track"),
     NONE("Off", "Clean background without visualizer overlay")
 }
 
@@ -117,7 +128,11 @@ data class AudioTrackConfig(
     val durationMs: Long = 30_000L,
     val beatType: AudioBeatType = AudioBeatType.SYNTH_SYNTHWAVE,
     val customUri: String? = null,
-    val waveformPeaks: List<Float> = emptyList()
+    val waveformPeaks: List<Float> = emptyList(),
+    val spectrumFrames: List<List<Float>> = emptyList(),
+    val pitchFramesHz: List<Float> = emptyList(),
+    val beatTimesMs: List<Long> = emptyList(),
+    val analysisFrameDurationMs: Long = 23L
 )
 
 enum class MediaClipType { IMAGE, VIDEO }
@@ -172,7 +187,7 @@ enum class ExportQuality(
     val scaleFactor: Float,
     val targetBitrate: Int
 ) {
-    FULL_HD_1080P("1080p Full HD", "1080p • 60fps", 1.0f, 8_000_000),
+    FULL_HD_1080P("1080p Full HD", "1080p • 30fps", 1.0f, 8_000_000),
     HD_720P("720p HD", "720p • 30fps", 0.666f, 4_000_000),
     SD_480P("480p Social Clip", "480p • Fast Export", 0.444f, 2_000_000)
 }

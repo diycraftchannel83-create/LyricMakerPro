@@ -113,6 +113,7 @@ dependencies {
   implementation(libs.firebase.ai)
   implementation(libs.play.services.ads)
   implementation(libs.google.play.billing)
+  implementation(libs.google.ump)
   // Uncomment to use Firestore:
   // implementation(libs.firebase.firestore)
 
@@ -136,7 +137,6 @@ dependencies {
   testImplementation(libs.androidx.junit)
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
-  testImplementation(libs.robolectric)
   androidTestImplementation(platform(libs.androidx.compose.bom))
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
   androidTestImplementation(libs.androidx.espresso.core)

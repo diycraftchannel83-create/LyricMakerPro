@@ -14,6 +14,9 @@ import androidx.core.content.FileProvider
 import com.winsmediatama.lyricmakerpro.model.*
 import com.winsmediatama.lyricmakerpro.audio.AudioWaveformExtractor
 import com.winsmediatama.lyricmakerpro.data.LyricMakerStorage
+import com.winsmediatama.lyricmakerpro.audio.AudioWaveformExtractor
+import com.winsmediatama.lyricmakerpro.audio.AudioSpectrumAnalyzer
+import com.winsmediatama.lyricmakerpro.visualizer.AudioGlowVisualizerRenderer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -83,8 +86,12 @@ class VideoExportEngine(private val context: Context) {
         val backgroundFile = File(exportDir, "LyricBackground_${System.currentTimeMillis()}.png")
         val width = (project.canvasRatio.exportWidth * quality.scaleFactor).toInt().let { if (it % 2 != 0) it + 1 else it }
         val height = (project.canvasRatio.exportHeight * quality.scaleFactor).toInt().let { if (it % 2 != 0) it + 1 else it }
+        var mediaAssets: List<ExportMediaAsset> = emptyList()
 
         try {
+            // Media3 still requires a concrete image source to establish video
+            // dimensions and duration. The frame overlay replaces its pixels with
+            // the real project background/media on every encoded frame.
             val bgBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             try {
                 drawBackground(Canvas(bgBitmap), width, height, project.background, 0L)
@@ -110,6 +117,13 @@ class VideoExportEngine(private val context: Context) {
 
             val watermarkBitmap = loadWatermarkBitmap()
             val overlay = ProjectLyricOverlay(this@VideoExportEngine, width, height, visualizerProject, watermarkBitmap)
+            // Prepare the actual timeline media once. Each encoded frame below will
+            // select the clip active at that presentation timestamp.
+            mediaAssets = prepareMediaAssets(project.mediaClips)
+            val watermarkBitmap = loadWatermarkBitmap()
+            val overlay = ProjectLyricOverlay(
+                this@VideoExportEngine, width, height, project, watermarkBitmap, mediaAssets
+            )
             val effects = listOf<androidx.media3.common.Effect>(
                 androidx.media3.effect.Presentation.createForWidthAndHeight(
                     width, height, androidx.media3.effect.Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
@@ -209,6 +223,7 @@ class VideoExportEngine(private val context: Context) {
                 }
             }
         } finally {
+            releaseMediaAssets(mediaAssets)
             backgroundFile.delete()
         }
     }
@@ -219,7 +234,8 @@ class VideoExportEngine(private val context: Context) {
         private val width: Int,
         private val height: Int,
         private val project: VideoProject,
-        private val watermarkBitmap: Bitmap
+        private val watermarkBitmap: Bitmap,
+        private val mediaAssets: List<ExportMediaAsset>
     ) : androidx.media3.effect.BitmapOverlay() {
         private var cached: Bitmap? = null
 
@@ -236,6 +252,11 @@ class VideoExportEngine(private val context: Context) {
             if (project.showWatermark) {
                 owner.drawWatermark(Canvas(bitmap), width, height, watermarkBitmap)
             }
+            owner.renderFrameInternal(
+                Canvas(bitmap), width, height, project,
+                (presentationTimeUs / 1000L).coerceAtLeast(0L),
+                mediaAssets, watermarkBitmap
+            )
             return bitmap
         }
 
@@ -392,10 +413,11 @@ class VideoExportEngine(private val context: Context) {
         height: Int,
         project: VideoProject,
         timeMs: Long,
-        mediaAssets: List<ExportMediaAsset>
+        mediaAssets: List<ExportMediaAsset>,
+        watermarkBitmap: Bitmap? = null
     ) {
         val activeAsset = mediaAssets
-            .filter { asset -> timeMs >= asset.clip.startMs && timeMs < asset.clip.startMs + asset.clip.exportDurationMs }
+            .filter { asset -> timeMs >= asset.clip.startMs && timeMs < asset.clip.endMs }
             .maxByOrNull { it.clip.startMs }
         val frameBitmap = when {
             activeAsset?.image != null -> activeAsset.image
@@ -418,14 +440,24 @@ class VideoExportEngine(private val context: Context) {
 
         // 2. Visualizer Overlay
         drawVisualizer(canvas, width, height, project.visualizer, project.visualizerColorHex, timeMs, project.audioTrack.bpm, project.audioTrack.waveformPeaks, project.durationMs)
+        // Keep all visualizer styles translucent over imported photo/video frames.
+        val visualizerLayer = canvas.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), 210)
+        drawVisualizer(canvas, width, height, project.visualizer, project.visualizerColorHex, timeMs, project.audioTrack.bpm,
+            project.audioTrack.waveformPeaks, project.durationMs, project.audioTrack.artist.ifBlank { project.artist }, project.audioTrack.title,
+            project.audioTrack.spectrumFrames, project.audioTrack.analysisFrameDurationMs, project.audioTrack.beatTimesMs)
+        canvas.restoreToCount(visualizerLayer)
 
         // 3. Lyrics with Typography & Transitions
         drawLyrics(canvas, width, height, project, timeMs)
 
         // 4. Watermark / Creator Tag
         if (project.showWatermark) {
-            val watermark = loadWatermarkBitmap()
-            try { drawWatermark(canvas, width, height, watermark) } finally { watermark.recycle() }
+            if (watermarkBitmap != null && !watermarkBitmap.isRecycled) {
+                drawWatermark(canvas, width, height, watermarkBitmap)
+            } else {
+                val watermark = loadWatermarkBitmap()
+                try { drawWatermark(canvas, width, height, watermark) } finally { watermark.recycle() }
+            }
         }
     }
 
@@ -531,6 +563,12 @@ class VideoExportEngine(private val context: Context) {
         bpm: Int,
         waveformPeaks: List<Float> = emptyList(),
         durationMs: Long = 1L
+        durationMs: Long = 1L,
+        metadataArtist: String = "",
+        metadataTitle: String = "",
+        spectrumFrames: List<List<Float>> = emptyList(),
+        analysisFrameDurationMs: Long = 23L,
+        beatTimesMs: List<Long> = emptyList()
     ) {
         if (type == VisualizerType.NONE) return
 
@@ -550,6 +588,30 @@ class VideoExportEngine(private val context: Context) {
             val sampleIndex = (peakIndex + offset).coerceIn(0, waveformPeaks.lastIndex)
             val neighbour = waveformPeaks[sampleIndex].coerceIn(0f, 1f)
             return (audioLevel * 0.62f + neighbour * 0.38f).coerceIn(0.025f, 1f)
+        val envelopeBands = if (spectrumFrames.isNotEmpty()) AudioSpectrumAnalyzer.bandsAt(spectrumFrames, timeMs, analysisFrameDurationMs) else AudioGlowVisualizerRenderer.bandsFromEnvelope(waveformPeaks, timeMs, durationMs)
+        val detectedBeat = AudioSpectrumAnalyzer.beatPulseAt(beatTimesMs, timeMs)
+        val kickEnergy = max(if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) envelopeBands.take(6).average().toFloat() else fallbackBeat, detectedBeat)
+        fun bandLevel(index: Int): Float = if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) {
+            envelopeBands[index.mod(envelopeBands.size)]
+        } else {
+            (fallbackBeat * (0.55f + (index % 5) * 0.09f)).coerceIn(0.04f, 1f)
+        }
+
+        // Resolve waveform-derived levels before rendering the classic rainbow spectrum.
+        if (type == VisualizerType.BARS_SPECTRUM) {
+            val bars = if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) envelopeBands else FloatArray(32) { bandLevel(it) }
+            AudioGlowVisualizerRenderer.drawClassicSpectrum(
+                canvas, width, height, timeMs, bars, metadataArtist, metadataTitle
+            )
+            return
+        }
+        if (AudioGlowVisualizerRenderer.isGlowStyle(type)) {
+            AudioGlowVisualizerRenderer.draw(
+                canvas, width, height, type, colorHex, timeMs,
+                if (spectrumFrames.isNotEmpty() || waveformPeaks.isNotEmpty()) envelopeBands else FloatArray(32) { bandLevel(it) },
+                kickEnergy
+            )
+            return
         }
 
         when (type) {
@@ -585,51 +647,10 @@ class VideoExportEngine(private val context: Context) {
                 }
             }
             VisualizerType.CIRCULAR_WAVE -> {
-                val centerX = width / 2f
-                val centerY = height * 0.35f
-                val baseRadius = min(width, height) * 0.18f
-                val radius = baseRadius * (1f + kickEnergy * 0.12f)
-
-                val ringPaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.STROKE
-                    strokeWidth = 6f
-                    color = primaryColor
-                    alpha = (180 + kickEnergy * 75).toInt()
-                }
-
-                canvas.drawCircle(centerX, centerY, radius, ringPaint)
-
-                // Outer faint shockwave
-                val outerPaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.STROKE
-                    strokeWidth = 3f
-                    color = Color.parseColor("#FF007F")
-                    alpha = (kickEnergy * 140).toInt()
-                }
-                canvas.drawCircle(centerX, centerY, radius * 1.3f, outerPaint)
+                AudioGlowVisualizerRenderer.drawSinBars(canvas, width, height, timeMs, envelopeBands)
             }
             VisualizerType.OSCILLOSCOPE -> {
-                val wavePaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.STROKE
-                    strokeWidth = 5f
-                    color = primaryColor
-                }
-                val path = Path()
-                val centerY = height * 0.80f
-                val step = width / 60f
-
-                path.moveTo(0f, centerY)
-                for (i in 0..60) {
-                    val x = i * step
-                    val phase = (x / width) * 4 * Math.PI + (timeMs * 0.008)
-                    val amp = (height * 0.04f) * (1f + kickEnergy * 0.5f)
-                    val y = centerY + sin(phase).toFloat() * amp
-                    path.lineTo(x, y)
-                }
-                canvas.drawPath(path, wavePaint)
+                AudioGlowVisualizerRenderer.drawTerrainBars(canvas, width, height, timeMs, envelopeBands)
             }
             VisualizerType.FLOATING_PARTICLES -> {
                 val particlePaint = Paint().apply {
@@ -643,49 +664,12 @@ class VideoExportEngine(private val context: Context) {
                     val y = (height - ((timeMs * speed + i * 150) % height)).toFloat()
                     val x = ((sin(timeMs * 0.001 + i) * 0.35 + 0.5) * width).toFloat()
                     val radius = (i % 4 + 3) * 2f
-                    particlePaint.alpha = (sin(timeMs * 0.004 + i) * 60 + 120).toInt().coerceIn(40, 200)
+                    particlePaint.alpha = (70 + bandLevel(i) * 150).toInt().coerceIn(40, 220)
                     canvas.drawCircle(x, y, radius, particlePaint)
                 }
             }
             VisualizerType.VINYL_SPINNER -> {
-                val centerX = width / 2f
-                val centerY = height * 0.32f
-                val radius = min(width, height) * 0.22f
-                val angle = (timeMs * 0.08f) % 360f
-
-                canvas.save()
-                canvas.rotate(angle, centerX, centerY)
-
-                val vinylPaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.FILL
-                    color = Color.parseColor("#15161C")
-                }
-                canvas.drawCircle(centerX, centerY, radius, vinylPaint)
-
-                // Groove rings
-                val groovePaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.STROKE
-                    strokeWidth = 1.5f
-                    color = Color.parseColor("#2E3142")
-                }
-                for (r in 1..4) {
-                    canvas.drawCircle(centerX, centerY, radius * (0.35f + r * 0.12f), groovePaint)
-                }
-
-                // Center label
-                val labelPaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.FILL
-                    color = primaryColor
-                }
-                canvas.drawCircle(centerX, centerY, radius * 0.32f, labelPaint)
-
-                // Spindle hole
-                canvas.drawCircle(centerX, centerY, radius * 0.08f, Paint().apply { color = Color.BLACK })
-
-                canvas.restore()
+                AudioGlowVisualizerRenderer.drawCoolBars(canvas, width, height, timeMs, envelopeBands)
             }
             VisualizerType.BASS_PULSE -> {
                 val centerX = width / 2f
@@ -814,6 +798,11 @@ class VideoExportEngine(private val context: Context) {
                     canvas.drawCircle(x, y, radius, paint)
                 }
             }
+            VisualizerType.AURORA_BLOOM,
+            VisualizerType.GLOW_ORBS,
+            VisualizerType.NEON_RIBBON,
+            VisualizerType.RADIAL_BURST,
+            VisualizerType.SPECTRUM_TUNNEL,
             VisualizerType.NONE -> {}
         }
     }

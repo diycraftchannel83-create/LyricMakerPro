@@ -548,6 +548,11 @@ private fun VisualizerTab(viewModel: LyricMakerViewModel, project: VideoProject)
                             VisualizerType.THREE_D_RADIAL,
                             VisualizerType.THREE_D_WAVE,
                             VisualizerType.THREE_D_ORBIT -> Icons.Default.AutoAwesome
+                            VisualizerType.AURORA_BLOOM -> Icons.Default.AutoAwesome
+                            VisualizerType.GLOW_ORBS -> Icons.Default.Grain
+                            VisualizerType.NEON_RIBBON -> Icons.Default.Waves
+                            VisualizerType.RADIAL_BURST -> Icons.Default.DonutLarge
+                            VisualizerType.SPECTRUM_TUNNEL -> Icons.Default.BarChart
                             VisualizerType.NONE -> Icons.Default.Block
                         },
                         contentDescription = null,
