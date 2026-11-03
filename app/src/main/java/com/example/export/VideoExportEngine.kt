@@ -68,7 +68,7 @@ class VideoExportEngine(private val context: Context) {
     suspend fun exportVideo(
         project: VideoProject,
         quality: ExportQuality,
-        durationSeconds: Int = 15,
+        durationSeconds: Int = 0,
         onProgress: (ExportProgress) -> Unit
     ): File = withContext(Dispatchers.Main.immediate) {
         val audioUri = project.audioTrack.customUri
