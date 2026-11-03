@@ -471,6 +471,8 @@ private fun drawInto(
         }
     }
 
+    // Render every visualizer on a translucent overlay so imported media remains visible.
+    val visualizerLayer = native.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), 210)
     // Reference-style rainbow bars share the same metadata-aware renderer as MP4 export.
     if (project.visualizer == VisualizerType.BARS_SPECTRUM) {
         val bars = if (project.audioTrack.waveformPeaks.isNotEmpty())
@@ -515,23 +517,10 @@ private fun drawInto(
             }
         }
         VisualizerType.OSCILLOSCOPE -> {
-            val wavePaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.STROKE
-                strokeWidth = 4f
-                color = visColor
-            }
-            val path = android.graphics.Path()
-            val centerY = height * 0.78f
-            val step = width / 40f
-            path.moveTo(0f, centerY)
-            for (i in 0..40) {
-                val x = i * step
-                val phase = (x / width) * 4 * Math.PI + (timeMs * 0.008)
-                val amp = (height * 0.035f) * (1f + bassEnergy * 0.6f)
-                val y = centerY + sin(phase).toFloat() * amp
-                path.lineTo(x, y)
-            }
-            native.drawPath(path, wavePaint)
+            val terrainBands = if (project.audioTrack.waveformPeaks.isNotEmpty())
+                AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
+            else spectrumBands
+            AudioGlowVisualizerRenderer.drawTerrainBars(native, width, height, timeMs, terrainBands)
         }
         VisualizerType.BASS_PULSE -> {
             val cx = width / 2f
@@ -582,6 +571,8 @@ private fun drawInto(
         VisualizerType.SPECTRUM_TUNNEL,
         VisualizerType.NONE -> {}
     }
+
+    native.restoreToCount(visualizerLayer)
 
     // 3. Lyrics
     val lyrics = project.lyrics
