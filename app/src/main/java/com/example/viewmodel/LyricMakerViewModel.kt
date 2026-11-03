@@ -53,6 +53,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
     val syncLineIndex = _syncLineIndex.asStateFlow()
     private var tapSyncTrackingJob: Job? = null
     private var tapSyncLastCommittedIndex: Int = -1
+    private var isFreshTapSyncSession: Boolean = false
 
     // Export state
     private val _isExporting = MutableStateFlow(false)
@@ -259,6 +260,7 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
     fun startTapToSync() {
         _isTapToSyncActive.value = true
         tapSyncLastCommittedIndex = -1
+        isFreshTapSyncSession = false
         audioEngine.seekTo(0L)
         _syncLineIndex.value = previewAlignedLyricIndex(
             audioEngine.playheadMs.value, _project.value.lyrics
@@ -271,6 +273,11 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         tapSyncTrackingJob = viewModelScope.launch {
             audioEngine.playheadMs.collect { position ->
                 val lyrics = _project.value.lyrics
+                if (isFreshTapSyncSession) {
+                    // In a fresh sync, the cue advances only when the user taps.
+                    // Existing placeholder timestamps must never auto-skip unsynced lines.
+                    return@collect
+                }
                 if (lyrics.isEmpty()) {
                     _syncLineIndex.value = 0
                 } else {
@@ -284,8 +291,19 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         audioEngine.play()
     }
 
+    fun resetTapToSync() {
+        if (_project.value.lyrics.isEmpty()) return
+        isFreshTapSyncSession = true
+        tapSyncLastCommittedIndex = -1
+        _syncLineIndex.value = 0
+        audioEngine.seekTo(0L)
+        if (!_isTapToSyncActive.value) _isTapToSyncActive.value = true
+        audioEngine.play()
+    }
+
     fun stopTapToSync() {
         _isTapToSyncActive.value = false
+        isFreshTapSyncSession = false
         tapSyncTrackingJob?.cancel()
         tapSyncTrackingJob = null
         audioEngine.pause()
@@ -319,8 +337,11 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
                 )
             }
             val nextStart = currentLyrics.getOrNull(index + 1)?.startMs
-            val estimatedEnd = nextStart?.takeIf { it > currentTime }
-                ?: (currentTime + 3000L)
+            val estimatedEnd = if (isFreshTapSyncSession) {
+                currentTime + 3000L
+            } else {
+                nextStart?.takeIf { it > currentTime } ?: (currentTime + 3000L)
+            }
             currentLyrics[index] = rebuildLyricLine(
                 old, old.text, currentTime, estimatedEnd.coerceAtLeast(currentTime + 200L)
             )
