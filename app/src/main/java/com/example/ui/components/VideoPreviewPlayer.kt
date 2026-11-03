@@ -495,26 +495,10 @@ private fun drawInto(
     when (project.visualizer) {
         VisualizerType.BARS_SPECTRUM -> {} // Drawn by AudioGlowVisualizerRenderer above.
         VisualizerType.CIRCULAR_WAVE -> {
-            val cx = width / 2f
-            val cy = height * 0.35f
-            val baseR = min(width, height) * 0.18f
-            val r = baseR * (1f + (bassEnergy - 0.15f).coerceAtLeast(0f) * 0.15f)
-
-            val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.STROKE
-                strokeWidth = 4f
-                color = visColor
-                alpha = 220
-            }
-            native.drawCircle(cx, cy, r, paint)
-
-            val outerPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.STROKE
-                strokeWidth = 2f
-                color = AndroidColor.parseColor("#FF007F")
-                alpha = (bassEnergy * 150).toInt().coerceIn(30, 255)
-            }
-            native.drawCircle(cx, cy, r * 1.25f, outerPaint)
+            val sinBars = if (project.audioTrack.waveformPeaks.isNotEmpty())
+                AudioGlowVisualizerRenderer.bandsFromEnvelope(project.audioTrack.waveformPeaks, timeMs, project.durationMs)
+            else spectrumBands
+            AudioGlowVisualizerRenderer.drawSinBars(native, width, height, timeMs, sinBars)
         }
         VisualizerType.FLOATING_PARTICLES -> {
             val pPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
