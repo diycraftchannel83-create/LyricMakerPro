@@ -196,7 +196,7 @@ fun TapToSyncModal(
                     border = androidx.compose.foundation.BorderStroke(1.dp, NeonMagenta.copy(alpha = 0.8f)),
                     modifier = Modifier.testTag("reset_tap_sync_button")
                 ) {
-                    Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Reset Sync", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
