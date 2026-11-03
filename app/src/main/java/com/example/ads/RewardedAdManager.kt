@@ -165,7 +165,7 @@ fun FreeBannerAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
     if (isPremium) return
     val context = androidx.compose.ui.platform.LocalContext.current
     androidx.compose.ui.viewinterop.AndroidView(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().height(50.dp),
         factory = { ctx ->
             com.google.android.gms.ads.AdView(ctx).apply {
                 setAdSize(com.google.android.gms.ads.AdSize.BANNER)
