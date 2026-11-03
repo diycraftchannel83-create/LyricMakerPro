@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.core.content.FileProvider
 import com.winsmediatama.lyricmakerpro.model.*
+import com.winsmediatama.lyricmakerpro.audio.AudioWaveformExtractor
 import com.winsmediatama.lyricmakerpro.data.LyricMakerStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -96,8 +97,19 @@ class VideoExportEngine(private val context: Context) {
                 bgBitmap.recycle()
             }
 
+            // Older projects may not contain cached waveform data. Decode the selected song
+            // before rendering so exported visualizers react to the real track, not only BPM.
+            val visualizerProject = if (project.audioTrack.waveformPeaks.isEmpty()) {
+                val peaks = AudioWaveformExtractor.extract(
+                    context = context,
+                    uriString = audioUri,
+                    durationMs = project.audioTrack.durationMs
+                )
+                project.copy(audioTrack = project.audioTrack.copy(waveformPeaks = peaks))
+            } else project
+
             val watermarkBitmap = loadWatermarkBitmap()
-            val overlay = ProjectLyricOverlay(this@VideoExportEngine, width, height, project, watermarkBitmap)
+            val overlay = ProjectLyricOverlay(this@VideoExportEngine, width, height, visualizerProject, watermarkBitmap)
             val effects = listOf<androidx.media3.common.Effect>(
                 androidx.media3.effect.Presentation.createForWidthAndHeight(
                     width, height, androidx.media3.effect.Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
