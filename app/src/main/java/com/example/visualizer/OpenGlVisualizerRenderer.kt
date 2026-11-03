@@ -203,7 +203,8 @@ object OpenGlVisualizerRenderer {
                 float rays = abs(sin(atan(q.y,q.x)*8.0));
                 addGlow(rgb,alpha,uAccent,lineGlow(rays,0.025)*0.18);
             }
-            float outAlpha = clamp(alpha,0.0,0.92);\n            gl_FragColor = vec4(clamp(rgb,0.0,1.0), outAlpha);
+            float outAlpha = clamp(alpha,0.0,0.92);
+            gl_FragColor = vec4(clamp(rgb,0.0,1.0), outAlpha);
         }
     """.trimIndent()
 
