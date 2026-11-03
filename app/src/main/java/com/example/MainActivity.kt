@@ -546,6 +546,7 @@ class MainActivity : ComponentActivity() {
                             onExportCover = { viewModel.exportCoverImage() },
                             onShare = { viewModel.shareLastExported() },
                             onExportAgain = { viewModel.prepareAnotherExport() },
+                            onCancelExport = { viewModel.cancelExport() },
                             onDismiss = { viewModel.setShowExportDialog(false) }
                         )
                     }
