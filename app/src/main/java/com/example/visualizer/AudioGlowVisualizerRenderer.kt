@@ -61,7 +61,8 @@ object AudioGlowVisualizerRenderer {
         colorHex: String,
         timeMs: Long,
         spectrumBands: FloatArray,
-        bassEnergy: Float
+        bassEnergy: Float,
+        previewQuality: Boolean = false
     ) {
         if (width <= 0 || height <= 0 || !isGlowStyle(type)) return
         val accent = runCatching { Color.parseColor(colorHex) }.getOrDefault(palette[0])
@@ -71,7 +72,13 @@ object AudioGlowVisualizerRenderer {
         val beat = bassEnergy.coerceIn(0f, 1f)
         fun level(index: Int): Float = spectrumBands.getOrElse(index.mod(spectrumBands.size.coerceAtLeast(1))) { beat }.coerceIn(0f, 1f)
         fun color(index: Int): Int = if (index == 0) accent else palette[index.mod(palette.size)]
+        val previewGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
         fun glow(x: Float, y: Float, radius: Float, tint: Int, alpha: Int = 180) {
+            if (previewQuality) {
+                previewGlowPaint.color = withAlpha(tint, alpha)
+                canvas.drawCircle(x, y, radius * 0.62f, previewGlowPaint)
+                return
+            }
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = RadialGradient(
                     x, y, radius,
@@ -100,8 +107,8 @@ object AudioGlowVisualizerRenderer {
                     setShadowLayer(minSide * 0.035f, 0f, 0f, accent)
                 }
                 val path = Path()
-                for (i in 0..80) {
-                    val x = width * i / 80f
+                for (i in 0..(if (previewQuality) 40 else 80)) {
+                    val x = width * i / (if (previewQuality) 40f else 80f)
                     val band = level(i * 3)
                     val y = height * (0.52f + sin(i * 0.095 + timeMs * 0.0014).toFloat() * (0.06f + band * 0.12f))
                     if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
@@ -109,7 +116,7 @@ object AudioGlowVisualizerRenderer {
                 canvas.drawPath(path, haze)
             }
             VisualizerType.GLOW_ORBS -> {
-                for (i in 0 until 34) {
+                for (i in 0 until (if (previewQuality) 16 else 34)) {
                     val phase = timeMs * (0.00045 + (i % 5) * 0.00007) + i * (PI * 2.0 / 34.0)
                     val z = (sin(phase * 1.7) * 0.5 + 0.5).toFloat()
                     val energy = level(i * 3)
@@ -119,17 +126,22 @@ object AudioGlowVisualizerRenderer {
                     val y = cy + sin(phase * 1.23).toFloat() * orbitY
                     val radius = minSide * (0.006f + z * 0.009f + energy * 0.012f)
                     glow(x, y, radius * 4.8f, color(i), 95 + (energy * 130).toInt())
-                    val core = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = withAlpha(color(i), 150 + (z * 105).toInt()) }
-                    canvas.drawCircle(x, y, radius, core)
+                    if (previewQuality) {
+                        previewGlowPaint.color = withAlpha(color(i), 150 + (z * 105).toInt())
+                        canvas.drawCircle(x, y, radius, previewGlowPaint)
+                    } else {
+                        val core = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = withAlpha(color(i), 150 + (z * 105).toInt()) }
+                        canvas.drawCircle(x, y, radius, core)
+                    }
                 }
                 glow(cx, cy, minSide * (0.16f + beat * 0.08f), accent, 80 + (beat * 100).toInt())
             }
             VisualizerType.NEON_RIBBON -> {
-                for (layer in 0..4) {
+                for (layer in 0..(if (previewQuality) 2 else 4)) {
                     val path = Path()
                     val depth = layer / 4f
-                    for (i in 0..120) {
-                        val x = width * i / 120f
+                    for (i in 0..(if (previewQuality) 60 else 120)) {
+                        val x = width * i / (if (previewQuality) 60f else 120f)
                         val energy = level(i + layer * 7)
                         val envelope = 0.035f + energy * 0.12f
                         val y = height * (0.43f + layer * 0.075f) +
@@ -155,7 +167,7 @@ object AudioGlowVisualizerRenderer {
             VisualizerType.RADIAL_BURST -> {
                 val inner = minSide * 0.105f
                 val count = 96
-                for (i in 0 until count) {
+                for (i in 0 until (if (previewQuality) 48 else count)) {
                     val angle = i.toDouble() / count * PI * 2.0 + timeMs * 0.00012
                     val energy = level(i * 2)
                     val length = minSide * (0.055f + energy * 0.19f)
@@ -184,7 +196,7 @@ object AudioGlowVisualizerRenderer {
             }
             VisualizerType.SPECTRUM_TUNNEL -> {
                 val rotation = timeMs * 0.00045
-                for (layer in 0..10) {
+                for (layer in 0..(if (previewQuality) 5 else 10)) {
                     val depth = (layer + 1) / 11f
                     val energy = level(layer * 3)
                     val pulse = 1f + energy * 0.18f
