@@ -1,6 +1,8 @@
 package com.winsmediatama.lyricmakerpro.visualizer
 
 import android.graphics.Canvas
+import android.graphics.LinearGradient
+import android.graphics.Typeface
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
@@ -211,6 +213,106 @@ object AudioGlowVisualizerRenderer {
             }
             else -> Unit
         }
+    }
+
+
+    /** Reference-style rainbow spectrum bars with metadata header and mirrored neon reflection. */
+    fun drawClassicSpectrum(canvas: Canvas, width: Int, height: Int, timeMs: Long,
+        bands: FloatArray, artist: String, trackTitle: String) {
+        if (width <= 0 || height <= 0) return
+        val minSide = min(width, height).toFloat()
+        val baseY = height * 0.665f
+        val count = 16
+        val gap = width * 0.009f
+        val totalWidth = width * 0.88f
+        val barWidth = (totalWidth - gap * (count - 1)) / count
+        val segmentGap = height * 0.006f
+        val segmentHeight = height * 0.021f
+        val rainbow = intArrayOf(
+            Color.rgb(55,92,255), Color.rgb(65,55,255), Color.rgb(170,35,255), Color.rgb(238,25,150),
+            Color.rgb(255,35,75), Color.rgb(255,75,35), Color.rgb(255,130,25), Color.rgb(255,175,25),
+            Color.rgb(255,220,30), Color.rgb(255,240,30), Color.rgb(220,255,25), Color.rgb(125,255,20),
+            Color.rgb(70,255,25), Color.rgb(45,245,40), Color.rgb(55,225,35), Color.rgb(80,220,45)
+        )
+        val centerX = width * 0.5f
+        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE; textAlign = Paint.Align.CENTER
+            typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
+            textSize = height * 0.078f
+            setShadowLayer(height * 0.006f, 0f, 0f, Color.WHITE)
+        }
+        val subtitlePaint = Paint(titlePaint).apply { textSize = height * 0.052f }
+        artist.trim().takeIf { it.isNotEmpty() && !it.equals("unknown", true) }?.let {
+            canvas.drawText(it, centerX, height * 0.265f, titlePaint)
+        }
+        trackTitle.trim().takeIf { it.isNotEmpty() && !it.equals("unknown", true) }?.let {
+            canvas.drawText(it, centerX, height * 0.315f, subtitlePaint)
+        }
+
+        // Fine, colorful floating particles over a pure black canvas.
+        val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        for (i in 0 until 115) {
+            val seed = i * 127.1
+            val x = ((sin(seed * 0.73) * 0.5 + 0.5) * width).toFloat()
+            val y = ((cos(seed * 1.17) * 0.5 + 0.5) * height * 0.76f).toFloat()
+            val twinkle = (0.35 + 0.65 * (0.5 + 0.5 * sin(timeMs * 0.002 + seed))).toFloat()
+            val radius = minSide * (0.0011f + (i % 4) * 0.00055f)
+            val tint = rainbow[i % rainbow.size]
+            particlePaint.color = withAlpha(tint, (35 + twinkle * 150).toInt())
+            particlePaint.setShadowLayer(radius * 5f, 0f, 0f, tint)
+            canvas.drawCircle(x, y, radius * (0.7f + twinkle), particlePaint)
+            particlePaint.clearShadowLayer()
+        }
+
+        val startX = (width - totalWidth) / 2f
+        for (i in 0 until count) {
+            val energy = bands.getOrElse(i) { 0.25f }.coerceIn(0.04f, 1f)
+            val stack = (2 + (energy * 7.2f * (0.88f + 0.12f * sin(timeMs * 0.004 + i * 0.7).toFloat())).toInt()).coerceIn(2, 9)
+            val x = startX + i * (barWidth + gap)
+            val skew = barWidth * 0.10f
+            val tint = rainbow[i]
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = tint }
+            // Colored haze behind each column.
+            val haze = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = RadialGradient(x + barWidth/2f, baseY, height * 0.15f,
+                    intArrayOf(withAlpha(tint, 48), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
+            }
+            canvas.drawCircle(x + barWidth/2f, baseY, height * 0.15f, haze)
+            for (segment in 0 until stack) {
+                val top = baseY - (segment + 1) * (segmentHeight + segmentGap)
+                val bar = Path().apply {
+                    moveTo(x + skew, top); lineTo(x + barWidth, top)
+                    lineTo(x + barWidth - skew, top + segmentHeight); lineTo(x, top + segmentHeight); close()
+                }
+                paint.alpha = 242
+                paint.setShadowLayer(height * 0.008f, 0f, 0f, tint)
+                canvas.drawPath(bar, paint)
+                paint.clearShadowLayer()
+                val reflectionTop = baseY + height * 0.012f + segment * (segmentHeight + segmentGap)
+                val reflection = Path().apply {
+                    moveTo(x, reflectionTop); lineTo(x + barWidth - skew, reflectionTop)
+                    lineTo(x + barWidth, reflectionTop + segmentHeight); lineTo(x + skew, reflectionTop + segmentHeight); close()
+                }
+                paint.alpha = (82 * (1f - segment / (stack + 1f))).toInt()
+                canvas.drawPath(reflection, paint)
+            }
+            val peakY = baseY - stack * (segmentHeight + segmentGap) - height * 0.018f
+            val cap = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE; strokeWidth = max(1f, height * 0.0024f)
+                setShadowLayer(height * 0.008f, 0f, 0f, Color.WHITE)
+            }
+            canvas.drawLine(x - barWidth * 0.05f, peakY, x + barWidth * 1.05f, peakY, cap)
+        }
+        val baseline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(0f, baseY, width.toFloat(), baseY,
+                intArrayOf(rainbow.first(), Color.MAGENTA, Color.RED, Color.YELLOW, Color.GREEN),
+                null, Shader.TileMode.CLAMP)
+            strokeWidth = height * 0.008f
+            setShadowLayer(height * 0.024f, 0f, 0f, Color.WHITE)
+        }
+        canvas.drawLine(width * 0.015f, baseY, width * 0.985f, baseY, baseline)
+        baseline.shader = null; baseline.color = Color.WHITE; baseline.strokeWidth = height * 0.002f
+        canvas.drawLine(width * 0.015f, baseY, width * 0.985f, baseY, baseline)
     }
 
     private fun withAlpha(color: Int, alpha: Int): Int =
