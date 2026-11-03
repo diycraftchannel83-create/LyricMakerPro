@@ -167,7 +167,7 @@ enum class ExportQuality(
     val scaleFactor: Float,
     val targetBitrate: Int
 ) {
-    FULL_HD_1080P("1080p Full HD", "1080p • 60fps", 1.0f, 8_000_000),
+    FULL_HD_1080P("1080p Full HD", "1080p • 30fps", 1.0f, 8_000_000),
     HD_720P("720p HD", "720p • 30fps", 0.666f, 4_000_000),
     SD_480P("480p Social Clip", "480p • Fast Export", 0.444f, 2_000_000)
 }
