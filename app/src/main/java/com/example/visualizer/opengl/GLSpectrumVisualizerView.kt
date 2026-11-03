@@ -140,7 +140,7 @@ class GLSpectrumVisualizerView @JvmOverloads constructor(
             "EGL make-current failed"
         }
 
-        program = linkProgram(readRaw(R.raw.lyric_gl_spectrum), readRaw(R.raw.lyric_gl_spectrum_frag))
+        program = linkProgram(readRaw(R.raw.lyric_gl_spectrum_vertex), readRaw(R.raw.lyric_gl_spectrum_fragment))
         timeLocation = GLES30.glGetUniformLocation(program, "uTime")
         bandsLocation = GLES30.glGetUniformLocation(program, "uBands")
         positionLocation = GLES30.glGetAttribLocation(program, "aPosition")
