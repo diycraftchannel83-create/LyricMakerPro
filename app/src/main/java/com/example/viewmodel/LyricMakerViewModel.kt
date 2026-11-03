@@ -245,14 +245,28 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // --- Tap-To-Sync Workflow ---
+    // Keep Tap-to-Sync on the exact same line-selection rule as VideoPreviewPlayer:
+    // first line whose inclusive [startMs, endMs] contains the playhead; otherwise
+    // the most recently completed line, falling back to the first line before lyrics begin.
+    private fun previewAlignedLyricIndex(positionMs: Long, lyrics: List<LyricLine>): Int {
+        if (lyrics.isEmpty()) return 0
+        val activeIndex = lyrics.indexOfFirst { positionMs in it.startMs..it.endMs }
+        if (activeIndex >= 0) return activeIndex
+        val previousIndex = lyrics.indexOfLast { it.endMs < positionMs }
+        return if (previousIndex >= 0) previousIndex else 0
+    }
+
     fun startTapToSync() {
         _isTapToSyncActive.value = true
         tapSyncLastCommittedIndex = -1
-        _syncLineIndex.value = 0
         audioEngine.seekTo(0L)
+        _syncLineIndex.value = previewAlignedLyricIndex(
+            audioEngine.playheadMs.value, _project.value.lyrics
+        )
 
-        // Follow the project's saved lyric timeline during playback. This also
-        // lets users revisit and correct timestamps instead of restarting at line 1.
+        // Track the same active/fallback line that the preview canvas renders.
+        // A committed line remains advanced until playback reaches the next line;
+        // seeking explicitly clears that guard so earlier timestamps can be corrected.
         tapSyncTrackingJob?.cancel()
         tapSyncTrackingJob = viewModelScope.launch {
             audioEngine.playheadMs.collect { position ->
@@ -260,14 +274,9 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
                 if (lyrics.isEmpty()) {
                     _syncLineIndex.value = 0
                 } else {
-                    val activeIndex = lyrics.indexOfLast { line ->
-                        position >= line.startMs && position < line.endMs
-                    }
-                    if (activeIndex >= 0 && activeIndex > tapSyncLastCommittedIndex) {
-                        _syncLineIndex.value = activeIndex
-                    } else if (activeIndex < 0 && tapSyncLastCommittedIndex < 0) {
-                        val upcomingIndex = lyrics.indexOfFirst { it.startMs > position }
-                        if (upcomingIndex >= 0) _syncLineIndex.value = upcomingIndex
+                    val previewIndex = previewAlignedLyricIndex(position, lyrics)
+                    if (previewIndex > tapSyncLastCommittedIndex) {
+                        _syncLineIndex.value = previewIndex
                     }
                 }
             }
@@ -283,8 +292,13 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun seekTapSyncTo(positionMs: Long) {
+        // Seeking is an explicit correction/navigation action: allow the cue to move
+        // both forward and backward to match the preview at the new playhead.
         tapSyncLastCommittedIndex = -1
         audioEngine.seekTo(positionMs)
+        _syncLineIndex.value = previewAlignedLyricIndex(
+            audioEngine.playheadMs.value, _project.value.lyrics
+        )
     }
 
     fun tapSyncNext() {
