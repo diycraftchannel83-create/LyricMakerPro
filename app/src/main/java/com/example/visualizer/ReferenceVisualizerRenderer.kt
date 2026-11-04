@@ -86,7 +86,7 @@ fun drawReferenceVisualizer(
                 val v = level(i * bands.size.coerceAtLeast(1) / count)
                 val wave = (0.16f + v * 0.84f) * (0.55f + 0.45f * abs(sin(i * 0.38 + timeMs * 0.002)))
                 val bh = h * 0.30f * wave
-                val x = left + i * (barW + gap)
+                val x = left + i.toFloat() * (barW + gap)
                 val p = neonPaint(i, Paint.Style.FILL, 0f).apply { clearShadowLayer(); alpha = 220 }
                 canvas.drawRoundRect(x.toFloat(), (base - bh).toFloat(), (x + barW).toFloat(), (base + bh * 0.56f).toFloat(), (barW * 0.3f).toFloat(), (barW * 0.3f).toFloat(), p)
             }
@@ -210,7 +210,7 @@ fun drawReferenceVisualizer(
                 val activeRows = (2 + v * (rows - 2)).toInt()
                 for (j in 0 until activeRows) {
                     val x = w * 0.14f + i * spacingX
-                    val y = centerY + (j - activeRows / 2f) * radius * 2.35f
+                    val y = centerY + (j.toFloat() - activeRows / 2f) * radius * 2.35f
                     val p = neonPaint(i * 2, Paint.Style.FILL, 0f).apply { clearShadowLayer(); alpha = (235 - j * 5).coerceIn(80, 235) }
                     canvas.drawCircle(x, y, radius, p)
                 }
