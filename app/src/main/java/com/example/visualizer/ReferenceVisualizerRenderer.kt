@@ -10,6 +10,7 @@ import com.winsmediatama.lyricmakerpro.model.VisualizerType
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
@@ -168,9 +169,16 @@ fun drawReferenceVisualizer(
                     val x = w * (0.08f + i / 120f * 0.84f)
                     val phase = i * 0.075 + timeMs * 0.002 + layer * 0.34
                     val l = level(i * bands.size.coerceAtLeast(1) / 121)
-                    val envelope = if (type == VisualizerType.PEAK_WAVE) abs(sin(i * 0.045 + layer * 0.65)).toFloat() else 1f
+                    val envelope = when (type) {
+                        VisualizerType.PEAK_WAVE -> abs(sin(i * 0.045 + layer * 0.65)).toFloat()
+                        VisualizerType.WAVE_RIBBON -> {
+                            val lobes = floatArrayOf(12f, 34f, 58f, 84f, 108f)
+                            lobes.sumOf { peak -> exp(-((i - peak) / 8.5).let { it * it }) }.toFloat().coerceAtMost(1f)
+                        }
+                        else -> 1f
+                    }
                     val amp = h * (0.018f + l * 0.13f) * (1f - layer * 0.075f)
-                    val y = centerY + sin(phase).toFloat() * amp * envelope
+                    val y = centerY + sin(if (type == VisualizerType.WAVE_RIBBON) i * 0.24 + timeMs * 0.002 + layer * 0.22 else phase).toFloat() * amp * envelope
                     if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
                 }
                 val p = neonPaint(layer * 3, Paint.Style.STROKE, max(1.3f, w * 0.0028f))
