@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,6 +34,7 @@ import com.winsmediatama.lyricmakerpro.viewmodel.LyricMakerViewModel
 fun StudioTabs(
     viewModel: LyricMakerViewModel,
     project: VideoProject,
+    selectedLineId: String?,
     currentTab: LyricMakerViewModel.StudioTab,
     onTabSelected: (LyricMakerViewModel.StudioTab) -> Unit,
     onOpenTapToSync: () -> Unit,
@@ -146,6 +148,7 @@ fun StudioTabs(
                     LyricsSyncTab(
                         viewModel = viewModel,
                         project = project,
+                        selectedLineId = selectedLineId,
                         onOpenTapToSync = onOpenTapToSync,
                         onOpenImport = { showImportDialog = true }
                     )
@@ -751,6 +754,7 @@ private fun BackgroundTab(viewModel: LyricMakerViewModel, project: VideoProject,
 private fun LyricsSyncTab(
     viewModel: LyricMakerViewModel,
     project: VideoProject,
+    selectedLineId: String?,
     onOpenTapToSync: () -> Unit,
     onOpenImport: () -> Unit
 ) {
@@ -783,8 +787,16 @@ private fun LyricsSyncTab(
             }
         }
 
+        // Keep the selected cue visible when the user scrubs the timeline.
+        val lyricListState = rememberLazyListState()
+        LaunchedEffect(selectedLineId, project.lyrics) {
+            val selectedIndex = project.lyrics.indexOfFirst { it.id == selectedLineId }
+            if (selectedIndex >= 0) lyricListState.animateScrollToItem(selectedIndex)
+        }
+
         // Editable Lines List
         LazyColumn(
+            state = lyricListState,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
@@ -797,6 +809,7 @@ private fun LyricsSyncTab(
                 ) {
                     LyricLineEditorCard(
                         line = line,
+                        isSelected = line.id == selectedLineId,
                         onTextChange = { viewModel.updateLyricText(line.id, it) },
                         onSelect = { viewModel.selectLyricLine(line.id) }
                     )
@@ -843,6 +856,7 @@ private fun LyricsSyncTab(
 @Composable
 private fun LyricLineEditorCard(
     line: LyricLine,
+    isSelected: Boolean,
     onTextChange: (String) -> Unit,
     onSelect: () -> Unit
 ) {
@@ -850,11 +864,17 @@ private fun LyricLineEditorCard(
 
     Card(
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = StudioSurfaceVariant),
-        border = androidx.compose.foundation.BorderStroke(1.dp, StudioCardBorder),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) NeonCyan.copy(alpha = 0.12f) else StudioSurfaceVariant
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            if (isSelected) 2.dp else 1.dp,
+            if (isSelected) NeonCyan else StudioCardBorder
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onSelect() }
+            .testTag(if (isSelected) "selected_lyric_" + line.id else "lyric_" + line.id)
     ) {
         Row(
             modifier = Modifier
