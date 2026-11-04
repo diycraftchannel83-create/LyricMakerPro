@@ -428,6 +428,7 @@ private fun TypographyTab(viewModel: LyricMakerViewModel, project: VideoProject)
 
 @Composable
 private fun EffectsTab(viewModel: LyricMakerViewModel, project: VideoProject) {
+    var syncedLineCount by remember(project.id) { mutableIntStateOf(0) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -495,6 +496,48 @@ private fun EffectsTab(viewModel: LyricMakerViewModel, project: VideoProject) {
 
                     if (isSelected) {
                         Icon(Icons.Default.CheckCircle, contentDescription = null, tint = NeonMagenta, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+        }
+
+        item {
+            if (project.transitionEffect == TextTransitionEffect.KARAOKE_SWEEP) {
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = StudioSurfaceVariant),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NeonCyan.copy(alpha = 0.55f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = NeonCyan)
+                            Spacer(Modifier.width(7.dp))
+                            Text("Smart Karaoke Word Sync", color = NeonCyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                        Text(
+                            "Analyze the song waveform and adjust each word's highlight timing to nearby audio attacks. Lyric line timestamps stay unchanged.",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                        Button(
+                            onClick = { syncedLineCount = viewModel.autoSyncKaraokeWords() },
+                            enabled = project.lyrics.isNotEmpty() && project.audioTrack.waveformPeaks.isNotEmpty(),
+                            colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.GraphicEq, contentDescription = null, tint = Color.Black, modifier = Modifier.size(17.dp))
+                            Spacer(Modifier.width(7.dp))
+                            Text("Sync words to music", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                        if (project.audioTrack.waveformPeaks.isEmpty()) {
+                            Text("Import audio and wait for its waveform analysis to finish.", color = TextSecondary, fontSize = 10.sp)
+                        } else if (syncedLineCount > 0) {
+                            Text("$syncedLineCount lyric lines updated. Preview and export use the new word timing.", color = NeonCyan, fontSize = 10.sp)
+                        }
                     }
                 }
             }

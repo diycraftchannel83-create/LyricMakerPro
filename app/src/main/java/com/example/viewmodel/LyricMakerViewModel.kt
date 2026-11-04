@@ -283,6 +283,93 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     /**
+     * Re-times every word in each lyric cue against the decoded audio waveform.
+     * Word duration is weighted by syllable count; internal boundaries are then
+     * nudged toward nearby waveform attacks without moving the line-level LRC cues.
+     * This is an explicit action so manually edited word timings are never overwritten silently.
+     */
+    fun autoSyncKaraokeWords(): Int {
+        val project = _project.value
+        val peaks = project.audioTrack.waveformPeaks
+        if (peaks.isEmpty() || project.lyrics.isEmpty()) return 0
+
+        val trackDuration = project.audioTrack.durationMs.coerceAtLeast(1L)
+        val syncedLyrics = project.lyrics.map { line ->
+            val tokens = (line.words.map { it.text }.takeIf { it.isNotEmpty() }
+                ?: line.text.trim().split(Regex("\\s+")))
+                .filter { it.isNotBlank() }
+            if (tokens.isEmpty() || tokens.size == 1) {
+                if (tokens.size == 1) line.copy(words = listOf(LyricWord(tokens[0], line.startMs, line.endMs)))
+                else line
+            } else {
+                val start = line.startMs
+                val end = line.endMs.coerceAtLeast(start + tokens.size * 60L)
+                val duration = end - start
+                val weights = tokens.map { token ->
+                    val syllables = Regex("[aeiouy\\u00e0-\\u00fc]+", RegexOption.IGNORE_CASE)
+                        .findAll(token)
+                        .count()
+                        .coerceAtLeast(1)
+                    0.55f + syllables * 0.45f
+                }
+                val totalWeight = weights.sum().coerceAtLeast(1f)
+                val minWordMs = 60L
+                val searchWindowMs = (duration / (tokens.size * 4L)).coerceIn(35L, 140L)
+                val boundaries = ArrayList<Long>(tokens.size + 1)
+                boundaries += start
+
+                var cumulativeWeight = 0f
+                for (wordIndex in 0 until tokens.lastIndex) {
+                    cumulativeWeight += weights[wordIndex]
+                    val ideal = start + (duration * (cumulativeWeight / totalWeight)).toLong()
+                    val remainingWords = tokens.size - wordIndex - 1
+                    val minAllowed = boundaries.last() + minWordMs
+                    val maxAllowed = end - remainingWords * minWordMs
+                    val low = (ideal - searchWindowMs).coerceIn(minAllowed, maxAllowed)
+                    val high = (ideal + searchWindowMs).coerceIn(low, maxAllowed)
+
+                    var chosen = ideal.coerceIn(minAllowed, maxAllowed)
+                    var bestScore = Double.NEGATIVE_INFINITY
+                    if (peaks.size > 2 && high > low) {
+                        val first = ((low.toDouble() / trackDuration) * peaks.size).toInt().coerceIn(1, peaks.lastIndex)
+                        val last = ((high.toDouble() / trackDuration) * peaks.size).toInt().coerceIn(first, peaks.lastIndex)
+                        for (bucket in first..last) {
+                            val level = peaks[bucket].coerceIn(0f, 1f)
+                            val rise = (level - peaks[bucket - 1]).coerceAtLeast(0f)
+                            val candidateMs = (bucket.toDouble() / peaks.size * trackDuration).toLong()
+                            val distance = kotlin.math.abs(candidateMs - ideal).toDouble() / searchWindowMs.coerceAtLeast(1L)
+                            // Prefer a clear attack close to the syllable-weighted boundary.
+                            val score = rise * 1.15 + level * 0.18 - distance * 0.42
+                            if (score > bestScore) {
+                                bestScore = score
+                                chosen = candidateMs.coerceIn(minAllowed, maxAllowed)
+                            }
+                        }
+                    }
+                    boundaries += chosen.coerceIn(minAllowed, maxAllowed)
+                }
+                boundaries += end
+
+                val words = tokens.mapIndexed { index, token ->
+                    LyricWord(
+                        text = token,
+                        startMs = boundaries[index],
+                        endMs = boundaries[index + 1].coerceAtLeast(boundaries[index] + 1L)
+                    )
+                }
+                line.copy(words = words)
+            }
+        }
+
+        val changed = syncedLyrics.count { updated ->
+            val original = project.lyrics.firstOrNull { it.id == updated.id }
+            original != null && original.words != updated.words
+        }
+        if (changed > 0) _project.value = project.copy(lyrics = syncedLyrics)
+        return changed
+    }
+
+    /**
      * Rebuilds evenly spaced word cues only for operations that create a new sync
      * (for example a fresh tap-to-sync pass). Editing an existing line must use the
      * preservation helpers below so manual word timing is not silently destroyed.

@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.winsmediatama.lyricmakerpro.ads.RewardedAdManager
 import com.winsmediatama.lyricmakerpro.ads.FreeAppOpenAdManager
+import com.winsmediatama.lyricmakerpro.ads.FreeInterstitialAdManager
 import com.winsmediatama.lyricmakerpro.ads.FreeBannerAd
 import com.winsmediatama.lyricmakerpro.ads.FreeNativeAd
 import com.winsmediatama.lyricmakerpro.billing.PermanentWatermarkBilling
@@ -57,6 +58,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var rewardedAdManager: RewardedAdManager
     private lateinit var appOpenAdManager: FreeAppOpenAdManager
+    private lateinit var interstitialAdManager: FreeInterstitialAdManager
     private lateinit var watermarkBilling: PermanentWatermarkBilling
     private val viewModel: LyricMakerViewModel by viewModels()
 
@@ -80,6 +82,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         rewardedAdManager = RewardedAdManager(this)
         appOpenAdManager = FreeAppOpenAdManager(this)
+        interstitialAdManager = FreeInterstitialAdManager(this)
         watermarkBilling = PermanentWatermarkBilling(this)
         watermarkBilling.connect()
 
@@ -111,11 +114,22 @@ class MainActivity : ComponentActivity() {
                 val watermarkEntitlementResolved by watermarkBilling.isEntitlementResolved.collectAsStateWithLifecycle()
                 // Cached Play purchase state is not trusted until the billing query resolves.
                 val hasConfirmedPermanentWatermarkRemoval = watermarkEntitlementResolved && permanentWatermarkRemoved
+                var wasExporting by remember { mutableStateOf(false) }
+                LaunchedEffect(isExporting, lastExportedFile, hasConfirmedPermanentWatermarkRemoval) {
+                    // Show an interstitial only after a successful export and only for Free users.
+                    if (wasExporting && !isExporting && lastExportedFile != null &&
+                        !hasConfirmedPermanentWatermarkRemoval
+                    ) {
+                        interstitialAdManager.showAfterExport()
+                    }
+                    wasExporting = isExporting
+                }
                 LaunchedEffect(watermarkEntitlementResolved, permanentWatermarkRemoved) {
                     // All ad formats are enabled only after Play Billing confirms Free status.
                     if (watermarkEntitlementResolved) {
                         val isPremium = permanentWatermarkRemoved
                         appOpenAdManager.setPremiumStatus(isPremium)
+                        interstitialAdManager.setPremiumStatus(isPremium)
                         if (!isPremium) rewardedAdManager.initialize()
                     }
                 }
