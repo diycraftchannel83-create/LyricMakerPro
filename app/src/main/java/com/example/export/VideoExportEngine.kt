@@ -814,7 +814,7 @@ class VideoExportEngine(private val context: Context) {
                 (Color.blue(colors[i]) + (Color.blue(colors[i+1])-Color.blue(colors[i]))*(v-i)).toInt()
             )
         }
-        canvas.drawColor(Color.BLACK)
+        // Preserve the underlying project background or imported media.
         val glow = Paint(Paint.ANTI_ALIAS_FLAG)
         for (i in 0 until 230) {
             val seed = i.toFloat()
