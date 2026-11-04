@@ -43,7 +43,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.winsmediatama.lyricmakerpro.ads.RewardedAdManager
 import com.winsmediatama.lyricmakerpro.ads.FreeAppOpenAdManager
 import com.winsmediatama.lyricmakerpro.ads.FreeInterstitialAdManager
-import com.winsmediatama.lyricmakerpro.ads.FreeBannerAd
 import com.winsmediatama.lyricmakerpro.ads.FreeNativeAd
 import com.winsmediatama.lyricmakerpro.billing.PermanentWatermarkBilling
 import com.winsmediatama.lyricmakerpro.model.BackgroundConfig
@@ -323,11 +322,6 @@ class MainActivity : ComponentActivity() {
                         }
                         }
                     },
-                    bottomBar = {
-                        if (watermarkEntitlementResolved && !hasConfirmedPermanentWatermarkRemoval) {
-                            FreeBannerAd(isPremium = false)
-                        }
-                    }
                 ) { innerPadding ->
                     BoxWithConstraints(
                         modifier = Modifier
