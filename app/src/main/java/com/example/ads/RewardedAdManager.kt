@@ -1,26 +1,38 @@
 package com.winsmediatama.lyricmakerpro.ads
 
 import android.app.Activity
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.unit.dp
+import com.google.android.gms.ads.AdError
+import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
-import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
-import com.google.android.gms.ads.OnUserEarnedRewardListener
+
+private object AdRetry {
+    private val handler = Handler(Looper.getMainLooper())
+    fun schedule(delayMs: Long, action: () -> Unit) {
+        handler.postDelayed(action, delayMs)
+    }
+}
 
 /**
- * Activity-scoped rewarded-ad loader. A clean export is authorized only from
- * the SDK's OnUserEarnedRewardListener callback.
+ * Rewarded ads authorize a clean export only after the SDK reward callback.
+ * Failed loads are retried with a bounded backoff while the user remains Free.
  */
 class RewardedAdManager(private val activity: Activity) {
     private var rewardedAd: RewardedAd? = null
     private var isLoading = false
+    private var initialized = false
+    private var isPremium = true
+    private var retryDelayMs = 15_000L
 
     private val adUnitId: String
         get() = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG) {
@@ -30,11 +42,28 @@ class RewardedAdManager(private val activity: Activity) {
         }
 
     fun initialize() {
+        isPremium = false
+        if (initialized) {
+            load()
+            return
+        }
+        initialized = true
         MobileAds.initialize(activity) { load() }
     }
 
+    fun setPremiumStatus(premium: Boolean) {
+        isPremium = premium
+        if (premium) {
+            rewardedAd = null
+        } else {
+            initialize()
+        }
+    }
+
     fun load() {
-        if (isLoading || rewardedAd != null || activity.isFinishing) return
+        if (isPremium || isLoading || rewardedAd != null ||
+            activity.isFinishing || activity.isDestroyed
+        ) return
         isLoading = true
         RewardedAd.load(
             activity,
@@ -43,24 +72,31 @@ class RewardedAdManager(private val activity: Activity) {
             object : RewardedAdLoadCallback() {
                 override fun onAdLoaded(ad: RewardedAd) {
                     isLoading = false
+                    retryDelayMs = 15_000L
                     rewardedAd = ad
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
                     isLoading = false
                     rewardedAd = null
+                    scheduleRetry()
                 }
             }
         )
     }
 
     fun show(onRewardEarned: () -> Unit, onUnavailable: () -> Unit) {
+        if (isPremium) {
+            onUnavailable()
+            return
+        }
         val ad = rewardedAd
         if (ad == null) {
             load()
             onUnavailable()
             return
         }
+
         rewardedAd = null
         var earnedReward = false
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
@@ -73,12 +109,19 @@ class RewardedAdManager(private val activity: Activity) {
                 load()
             }
         }
-        ad.show(activity, OnUserEarnedRewardListener {
+        ad.show(activity) {
             if (!earnedReward) {
                 earnedReward = true
                 onRewardEarned()
             }
-        })
+        }
+    }
+
+    private fun scheduleRetry() {
+        if (isPremium || activity.isFinishing || activity.isDestroyed) return
+        val delay = retryDelayMs
+        retryDelayMs = (retryDelayMs * 2).coerceAtMost(5 * 60_000L)
+        AdRetry.schedule(delay) { load() }
     }
 
     companion object {
@@ -88,7 +131,7 @@ class RewardedAdManager(private val activity: Activity) {
 }
 
 
-/** App-open ads are shown only after Play Billing confirms this is a Free user. */
+/** App-open ads are requested only for confirmed Free users. */
 class FreeAppOpenAdManager(private val activity: Activity) {
     private var appOpenAd: com.google.android.gms.ads.appopen.AppOpenAd? = null
     private var loading = false
@@ -96,6 +139,7 @@ class FreeAppOpenAdManager(private val activity: Activity) {
     private var hasShownThisForeground = false
     private var isForeground = false
     private var initialized = false
+    private var retryDelayMs = 15_000L
 
     private val adUnitId: String
         get() = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG)
@@ -104,15 +148,17 @@ class FreeAppOpenAdManager(private val activity: Activity) {
 
     fun setPremiumStatus(isPremium: Boolean) {
         premiumUser = isPremium
-        if (!isPremium) {
-            if (!initialized) {
-                initialized = true
-                com.google.android.gms.ads.MobileAds.initialize(activity) { load() }
-            }
-            showIfReady()
-        } else {
+        if (isPremium) {
             appOpenAd = null
+            return
         }
+        if (!initialized) {
+            initialized = true
+            MobileAds.initialize(activity) { load() }
+        } else {
+            load()
+        }
+        showIfReady()
     }
 
     fun onForeground() {
@@ -125,25 +171,28 @@ class FreeAppOpenAdManager(private val activity: Activity) {
 
     fun onBackground() {
         isForeground = false
-        hasShownThisForeground = false
     }
 
     private fun load() {
-        if (loading || appOpenAd != null || activity.isFinishing || premiumUser) return
+        if (premiumUser || loading || appOpenAd != null ||
+            activity.isFinishing || activity.isDestroyed
+        ) return
         loading = true
         com.google.android.gms.ads.appopen.AppOpenAd.load(
             activity,
             adUnitId,
-            com.google.android.gms.ads.AdRequest.Builder().build(),
+            AdRequest.Builder().build(),
             object : com.google.android.gms.ads.appopen.AppOpenAd.AppOpenAdLoadCallback() {
                 override fun onAdLoaded(ad: com.google.android.gms.ads.appopen.AppOpenAd) {
                     loading = false
+                    retryDelayMs = 15_000L
                     appOpenAd = ad
                     showIfReady()
                 }
 
-                override fun onAdFailedToLoad(error: com.google.android.gms.ads.LoadAdError) {
+                override fun onAdFailedToLoad(error: LoadAdError) {
                     loading = false
+                    scheduleRetry()
                 }
             }
         )
@@ -156,11 +205,18 @@ class FreeAppOpenAdManager(private val activity: Activity) {
         ) return
         hasShownThisForeground = true
         appOpenAd = null
-        ad.fullScreenContentCallback = object : com.google.android.gms.ads.FullScreenContentCallback() {
+        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdDismissedFullScreenContent() { load() }
-            override fun onAdFailedToShowFullScreenContent(error: com.google.android.gms.ads.AdError) { load() }
+            override fun onAdFailedToShowFullScreenContent(error: AdError) { load() }
         }
         ad.show(activity)
+    }
+
+    private fun scheduleRetry() {
+        if (premiumUser || activity.isFinishing || activity.isDestroyed) return
+        val delay = retryDelayMs
+        retryDelayMs = (retryDelayMs * 2).coerceAtMost(5 * 60_000L)
+        AdRetry.schedule(delay) { load() }
     }
 }
 
@@ -168,17 +224,21 @@ class FreeAppOpenAdManager(private val activity: Activity) {
 fun FreeBannerAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier) {
     if (isPremium) return
     val context = androidx.compose.ui.platform.LocalContext.current
+    val adView = androidx.compose.runtime.remember(context) {
+        com.google.android.gms.ads.AdView(context).apply {
+            setAdSize(com.google.android.gms.ads.AdSize.BANNER)
+            adUnitId = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG)
+                "ca-app-pub-3940256099942544/6300978111"
+            else "ca-app-pub-1254774552944426/2802476395"
+            loadAd(AdRequest.Builder().build())
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(adView) {
+        onDispose { adView.destroy() }
+    }
     androidx.compose.ui.viewinterop.AndroidView(
         modifier = modifier.fillMaxWidth().height(50.dp),
-        factory = { ctx ->
-            com.google.android.gms.ads.AdView(ctx).apply {
-                setAdSize(com.google.android.gms.ads.AdSize.BANNER)
-                adUnitId = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG)
-                    "ca-app-pub-3940256099942544/6300978111"
-                else "ca-app-pub-1254774552944426/2802476395"
-                loadAd(com.google.android.gms.ads.AdRequest.Builder().build())
-            }
-        },
+        factory = { adView },
         update = {}
     )
 }
@@ -215,24 +275,30 @@ fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
         adView
     }
     androidx.compose.runtime.DisposableEffect(nativeView) {
+        var loadedNativeAd: com.google.android.gms.ads.nativead.NativeAd? = null
         val loader = com.google.android.gms.ads.AdLoader.Builder(
             context,
             if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG)
                 "ca-app-pub-3940256099942544/2247696110"
             else "ca-app-pub-1254774552944426/3471514050"
         ).forNativeAd { ad ->
+            loadedNativeAd?.destroy()
+            loadedNativeAd = ad
             nativeView.setNativeAd(ad)
             (nativeView.headlineView as? android.widget.TextView)?.text = ad.headline
-            (nativeView.bodyView as? android.widget.TextView)?.text = ad.body.orEmpty()
-            (nativeView.bodyView as? android.widget.TextView)?.visibility =
-                if (ad.body.isNullOrBlank()) android.view.View.GONE else android.view.View.VISIBLE
+            (nativeView.bodyView as? android.widget.TextView)?.apply {
+                text = ad.body.orEmpty()
+                visibility = if (ad.body.isNullOrBlank()) android.view.View.GONE else android.view.View.VISIBLE
+            }
             (nativeView.callToActionView as? android.widget.Button)?.apply {
                 text = ad.callToAction ?: "Learn more"
                 visibility = if (ad.callToAction.isNullOrBlank()) android.view.View.GONE else android.view.View.VISIBLE
             }
-        }.withAdListener(object : com.google.android.gms.ads.AdListener() {}).build()
-        loader.loadAd(com.google.android.gms.ads.AdRequest.Builder().build())
-        onDispose { nativeView.destroy() }
+        }.withAdListener(object : AdListener() {}).build()
+        loader.loadAd(AdRequest.Builder().build())
+        onDispose {
+            loadedNativeAd?.destroy()
+        }
     }
     androidx.compose.ui.viewinterop.AndroidView(
         modifier = modifier.fillMaxWidth().heightIn(min = 76.dp, max = 116.dp),
@@ -242,11 +308,13 @@ fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
 }
 
 
-/** Interstitial ads are displayed after a successful export for confirmed Free users. */
+/** Interstitial ads are queued after successful export if a request is still loading. */
 class FreeInterstitialAdManager(private val activity: Activity) {
     private var interstitialAd: com.google.android.gms.ads.interstitial.InterstitialAd? = null
     private var isLoading = false
     private var isPremium = true
+    private var pendingShowAfterExport = false
+    private var retryDelayMs = 15_000L
 
     private val adUnitId: String
         get() = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG) {
@@ -259,6 +327,7 @@ class FreeInterstitialAdManager(private val activity: Activity) {
         isPremium = premium
         if (premium) {
             interstitialAd = null
+            pendingShowAfterExport = false
         } else {
             load()
         }
@@ -276,12 +345,15 @@ class FreeInterstitialAdManager(private val activity: Activity) {
             object : com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback() {
                 override fun onAdLoaded(ad: com.google.android.gms.ads.interstitial.InterstitialAd) {
                     isLoading = false
+                    retryDelayMs = 15_000L
                     interstitialAd = ad
+                    if (pendingShowAfterExport) showLoadedAd()
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
                     isLoading = false
                     interstitialAd = null
+                    scheduleRetry()
                 }
             }
         )
@@ -289,22 +361,31 @@ class FreeInterstitialAdManager(private val activity: Activity) {
 
     fun showAfterExport() {
         if (isPremium) return
-        val ad = interstitialAd
-        if (ad == null) {
+        pendingShowAfterExport = true
+        if (interstitialAd != null) {
+            showLoadedAd()
+        } else {
             load()
-            return
         }
-        interstitialAd = null
-        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
-            override fun onAdDismissedFullScreenContent() {
-                load()
-            }
+    }
 
-            override fun onAdFailedToShowFullScreenContent(error: AdError) {
-                load()
-            }
+    private fun showLoadedAd() {
+        if (isPremium || activity.isFinishing || activity.isDestroyed) return
+        val ad = interstitialAd ?: return
+        interstitialAd = null
+        pendingShowAfterExport = false
+        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdDismissedFullScreenContent() { load() }
+            override fun onAdFailedToShowFullScreenContent(error: AdError) { load() }
         }
         ad.show(activity)
+    }
+
+    private fun scheduleRetry() {
+        if (isPremium || activity.isFinishing || activity.isDestroyed) return
+        val delay = retryDelayMs
+        retryDelayMs = (retryDelayMs * 2).coerceAtMost(5 * 60_000L)
+        AdRetry.schedule(delay) { load() }
     }
 
     companion object {
