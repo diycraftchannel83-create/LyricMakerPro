@@ -789,7 +789,7 @@ private fun LyricsSyncTab(
 
         // Keep the selected cue visible when the user scrubs the timeline.
         val lyricListState = rememberLazyListState()
-        LaunchedEffect(selectedLineId, project.lyrics) {
+        LaunchedEffect(selectedLineId, project.lyrics.map { it.id }) {
             val selectedIndex = project.lyrics.indexOfFirst { it.id == selectedLineId }
             if (selectedIndex >= 0) lyricListState.animateScrollToItem(selectedIndex)
         }
