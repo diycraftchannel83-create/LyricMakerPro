@@ -1,5 +1,7 @@
 package com.winsmediatama.lyricmakerpro.export
 
+import com.winsmediatama.lyricmakerpro.visualizer.drawReferenceVisualizer
+
 import android.content.Context
 import android.content.Intent
 import android.graphics.*
@@ -634,6 +636,25 @@ class VideoExportEngine(private val context: Context) {
         when (type) {
             VisualizerType.BARS_SPECTRUM -> {
                 drawProfessionalSpectrum(canvas, width, height, ::bandLevel, timeMs)
+            }
+            VisualizerType.SPECTRUM_BARS_II,
+            VisualizerType.WAVE_MORPH,
+            VisualizerType.EQUALIZER_COLUMNS,
+            VisualizerType.AREA_LINE_UP,
+            VisualizerType.MULTI_WAVE_FLOW,
+            VisualizerType.PULSE_WAVE,
+            VisualizerType.DUAL_AREA_WAVE,
+            VisualizerType.AREA_LINE_DUAL,
+            VisualizerType.WAVE_RIBBON,
+            VisualizerType.DOT_SPECTRUM,
+            VisualizerType.VERTICAL_PULSE,
+            VisualizerType.CONTOUR_RIPPLE,
+            VisualizerType.PEAK_WAVE,
+            VisualizerType.DOT_WAVE_LINE,
+            VisualizerType.SPECTRUM_GLOW_LINE,
+            VisualizerType.BEAT_STICKS -> {
+                val samples = FloatArray(32) { index -> bandLevel(index) }
+                drawReferenceVisualizer(canvas, width, height, type, samples, audioLevel, timeMs)
             }
         VisualizerType.CIRCULAR_WAVE -> {
                 val centerX = width / 2f

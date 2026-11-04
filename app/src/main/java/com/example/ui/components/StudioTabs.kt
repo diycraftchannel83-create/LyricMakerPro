@@ -592,6 +592,7 @@ private fun VisualizerTab(viewModel: LyricMakerViewModel, project: VideoProject)
                             VisualizerType.THREE_D_WAVE,
                             VisualizerType.THREE_D_ORBIT -> Icons.Default.AutoAwesome
                             VisualizerType.NONE -> Icons.Default.Block
+                            else -> Icons.Default.GraphicEq
                         },
                         contentDescription = null,
                         tint = if (isSelected) NeonCyan else TextSecondary,

@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.winsmediatama.lyricmakerpro.model.*
+import com.winsmediatama.lyricmakerpro.visualizer.drawReferenceVisualizer
 import com.winsmediatama.lyricmakerpro.ui.theme.*
 import kotlin.math.*
 import kotlinx.coroutines.delay
@@ -476,6 +477,24 @@ private fun drawInto(
     when (project.visualizer) {
         VisualizerType.BARS_SPECTRUM -> {
             drawProfessionalSpectrum(native, width, height, spectrumBands, timeMs)
+        }
+        VisualizerType.SPECTRUM_BARS_II,
+        VisualizerType.WAVE_MORPH,
+        VisualizerType.EQUALIZER_COLUMNS,
+        VisualizerType.AREA_LINE_UP,
+        VisualizerType.MULTI_WAVE_FLOW,
+        VisualizerType.PULSE_WAVE,
+        VisualizerType.DUAL_AREA_WAVE,
+        VisualizerType.AREA_LINE_DUAL,
+        VisualizerType.WAVE_RIBBON,
+        VisualizerType.DOT_SPECTRUM,
+        VisualizerType.VERTICAL_PULSE,
+        VisualizerType.CONTOUR_RIPPLE,
+        VisualizerType.PEAK_WAVE,
+        VisualizerType.DOT_WAVE_LINE,
+        VisualizerType.SPECTRUM_GLOW_LINE,
+        VisualizerType.BEAT_STICKS -> {
+            drawReferenceVisualizer(native, width, height, project.visualizer, spectrumBands, bassEnergy, timeMs)
         }
         VisualizerType.CIRCULAR_WAVE -> {
             val cx = width / 2f
