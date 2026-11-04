@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        if (::watermarkBilling.isInitialized) watermarkBilling.refreshEntitlement()
         if (::appOpenAdManager.isInitialized) appOpenAdManager.onForeground()
     }
 
@@ -125,12 +126,12 @@ class MainActivity : ComponentActivity() {
                     wasExporting = isExporting
                 }
                 LaunchedEffect(watermarkEntitlementResolved, permanentWatermarkRemoved) {
-                    // All ad formats are enabled only after Play Billing confirms Free status.
+                    // Keep every ad format in sync with the verified Play Billing entitlement.
                     if (watermarkEntitlementResolved) {
                         val isPremium = permanentWatermarkRemoved
                         appOpenAdManager.setPremiumStatus(isPremium)
                         interstitialAdManager.setPremiumStatus(isPremium)
-                        if (!isPremium) rewardedAdManager.initialize()
+                        rewardedAdManager.setPremiumStatus(isPremium)
                     }
                 }
                 val permanentWatermarkPrice by watermarkBilling.price.collectAsStateWithLifecycle()
