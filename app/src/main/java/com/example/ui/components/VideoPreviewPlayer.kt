@@ -863,7 +863,7 @@ private fun drawProfessionalSpectrumCore(
     val segmentH = height * 0.029f
     val segmentGap = height * 0.006f
     val maxSegments = 7
-    val levels = FloatArray(count) { i ->
+    val levels = IntArray(count) { i ->
         val raw = levelAt((i * 2).coerceAtMost(31))
         val shaped = (raw * 0.78f + levelAt((i * 2 + 1).coerceAtMost(31)) * 0.22f)
         (1 + (shaped * maxSegments * 1.55f).toInt()).coerceIn(2, maxSegments)
