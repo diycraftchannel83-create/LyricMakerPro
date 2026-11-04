@@ -554,37 +554,9 @@ class VideoExportEngine(private val context: Context) {
 
         when (type) {
             VisualizerType.BARS_SPECTRUM -> {
-                val barCount = 18
-                val spacing = width * 0.012f
-                val totalWidth = width * 0.88f
-                val barWidth = (totalWidth - (spacing * (barCount - 1))) / barCount
-                val startX = (width - totalWidth) / 2f
-                val baseY = height * 0.82f
-                val maxBarHeight = height * 0.16f
-
-                val barPaint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.FILL
-                }
-
-                for (i in 0 until barCount) {
-                    val peak = bandLevel(i)
-                    val barH = (peak * maxBarHeight).coerceAtLeast(10f)
-
-                    val x = startX + i * (barWidth + spacing)
-                    val rect = RectF(x, baseY - barH, x + barWidth, baseY)
-
-                    val shader = LinearGradient(
-                        x, baseY - barH, x, baseY,
-                        intArrayOf(primaryColor, Color.parseColor("#FF007F")),
-                        null,
-                        Shader.TileMode.CLAMP
-                    )
-                    barPaint.shader = shader
-                    canvas.drawRoundRect(rect, barWidth / 2f, barWidth / 2f, barPaint)
-                }
+                drawProfessionalSpectrum(canvas, width, height, ::bandLevel, timeMs)
             }
-            VisualizerType.CIRCULAR_WAVE -> {
+        VisualizerType.CIRCULAR_WAVE -> {
                 val centerX = width / 2f
                 val centerY = height * 0.35f
                 val baseRadius = min(width, height) * 0.18f
@@ -816,6 +788,103 @@ class VideoExportEngine(private val context: Context) {
             }
             VisualizerType.NONE -> {}
         }
+    }
+
+
+    private fun drawProfessionalSpectrum(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        levelAt: (Int) -> Float,
+        timeMs: Long
+    ) {
+        if (width <= 0 || height <= 0) return
+        val colors = intArrayOf(
+            Color.rgb(0,72,255), Color.rgb(100,0,255), Color.rgb(225,0,210),
+            Color.rgb(255,0,105), Color.rgb(255,35,20), Color.rgb(255,90,0),
+            Color.rgb(255,150,0), Color.rgb(255,205,0), Color.rgb(255,245,0),
+            Color.rgb(145,255,0), Color.rgb(0,255,35)
+        )
+        fun colorAt(t: Float): Int {
+            val v = t.coerceIn(0f,1f) * (colors.size - 1)
+            val i = v.toInt().coerceIn(0, colors.lastIndex - 1)
+            return Color.rgb(
+                (Color.red(colors[i]) + (Color.red(colors[i+1])-Color.red(colors[i]))*(v-i)).toInt(),
+                (Color.green(colors[i]) + (Color.green(colors[i+1])-Color.green(colors[i]))*(v-i)).toInt(),
+                (Color.blue(colors[i]) + (Color.blue(colors[i+1])-Color.blue(colors[i]))*(v-i)).toInt()
+            )
+        }
+        canvas.drawColor(Color.BLACK)
+        val glow = Paint(Paint.ANTI_ALIAS_FLAG)
+        for (i in 0 until 230) {
+            val seed = i.toFloat()
+            val x = abs((sin(seed*127.1f)*43758.5f)%1f) * width
+            val y = abs((sin(seed*311.7f+4f)*24634.6f)%1f) * height * 0.78f
+            val c = colorAt(x/width)
+            val radius = (1f + abs(sin(seed*8.3f))*2.8f) * (width/1280f).coerceAtLeast(0.45f)
+            glow.color = c
+            glow.alpha = (55 + abs(sin(seed*2.1f))*130).toInt()
+            glow.setShadowLayer(radius*3.5f,0f,0f,c)
+            canvas.drawCircle(x,y,radius,glow)
+            glow.clearShadowLayer()
+        }
+        val count=16
+        val totalW=width*0.86f
+        val gap=width*0.009f
+        val barW=(totalW-gap*(count-1))/count
+        val left=(width-totalW)/2f
+        val baseline=height*0.615f
+        val segmentH=height*0.029f
+        val segmentGap=height*0.006f
+        val maxSegments=7
+        val levels=FloatArray(count) { i ->
+            val raw=levelAt(i*2)
+            (1 + ((raw*0.78f + levelAt(i*2+1)*0.22f)*maxSegments*1.55f).toInt()).coerceIn(2,maxSegments)
+        }
+        val paint=Paint(Paint.ANTI_ALIAS_FLAG)
+        for(i in 0 until count) {
+            val x=left+i*(barW+gap)
+            val c=colorAt(i/(count-1f))
+            for(s in 0 until levels[i]) {
+                val top=baseline-(s+1)*(segmentH+segmentGap)
+                val inset=barW*0.035f
+                val path=Path().apply {
+                    moveTo(x+inset+barW*0.07f,top)
+                    lineTo(x+barW-inset-barW*0.07f,top)
+                    lineTo(x+barW-inset,top+segmentH*0.5f)
+                    lineTo(x+barW-inset-barW*0.07f,top+segmentH)
+                    lineTo(x+inset+barW*0.07f,top+segmentH)
+                    lineTo(x+inset,top+segmentH*0.5f)
+                    close()
+                }
+                paint.color=c; paint.alpha=255
+                paint.setShadowLayer(width*0.003f,0f,0f,c)
+                canvas.drawPath(path,paint); paint.clearShadowLayer()
+            }
+            for(s in 0 until min(levels[i],5)) {
+                val top=baseline+height*0.012f+s*(segmentH+segmentGap)
+                paint.color=c; paint.alpha=(82f*(1f-s/5f)).toInt()
+                canvas.drawRoundRect(RectF(x,top,x+barW,top+segmentH*0.9f),segmentH*0.18f,segmentH*0.18f,paint)
+            }
+        }
+        val streak=Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color=Color.WHITE; strokeWidth=(width*0.0022f).coerceAtLeast(1.2f)
+            strokeCap=Paint.Cap.ROUND; setShadowLayer(width*0.006f,0f,0f,Color.WHITE)
+        }
+        for(i in 0 until count) if(i%2==0 || i%5==0) {
+            val x=left+i*(barW+gap)
+            val y=baseline-(levels[i]+1)*(segmentH+segmentGap)-height*0.025f
+            canvas.drawLine(x+barW*0.08f,y,x+barW*0.08f+barW*(if(i%3==0)0.9f else 0.62f),y,streak)
+        }
+        val line=Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style=Paint.Style.STROKE; strokeWidth=(height*0.008f).coerceAtLeast(3f)
+            shader=LinearGradient(left-width*0.02f,baseline,left+totalW,baseline,
+                intArrayOf(colors.first(),colors[2],colors[4],colors[6],colors[8],colors.last()),null,Shader.TileMode.CLAMP)
+            setShadowLayer(height*0.025f,0f,0f,Color.WHITE)
+        }
+        canvas.drawLine(width*0.025f,baseline,width*0.975f,baseline,line)
+        line.clearShadowLayer(); line.shader=null; line.strokeWidth=(height*0.003f).coerceAtLeast(1.5f); line.color=Color.WHITE
+        canvas.drawLine(width*0.025f,baseline,width*0.975f,baseline,line)
     }
 
     private fun drawLyrics(canvas: Canvas, width: Int, height: Int, project: VideoProject, timeMs: Long) {
