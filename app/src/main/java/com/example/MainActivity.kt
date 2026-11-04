@@ -368,7 +368,13 @@ class MainActivity : ComponentActivity() {
                                         playheadMs = playheadMs,
                                         selectedLineId = selectedLineId,
                                         onSelectLine = { viewModel.selectLyricLine(it) },
-                                        onSeek = { viewModel.audioEngine.seekTo(it) },
+                                        onSeek = { positionMs ->
+                                            viewModel.audioEngine.seekTo(positionMs)
+                                            val ordered = project.lyrics.sortedBy { it.startMs }
+                                            val active = ordered.lastOrNull { positionMs >= it.startMs && positionMs < it.endMs }
+                                            val target = active ?: ordered.lastOrNull { it.endMs <= positionMs } ?: ordered.firstOrNull()
+                                            target?.let { viewModel.selectLyricLine(it.id) }
+                                        },
                                         onNudge = { viewModel.nudgeSelectedLyric(it) },
                                         onMoveLine = { viewModel.moveSelectedLyric(it) },
                                         onAdjustStart = { viewModel.updateSelectedLyricStart(it) },
@@ -388,6 +394,7 @@ class MainActivity : ComponentActivity() {
                                     StudioTabs(
                                         viewModel = viewModel,
                                         project = project,
+                                        selectedLineId = selectedLineId,
                                         currentTab = currentTab,
                                         onTabSelected = { viewModel.selectTab(it) },
                                         onOpenTapToSync = { viewModel.startTapToSync() },
@@ -423,7 +430,13 @@ class MainActivity : ComponentActivity() {
                                         playheadMs = playheadMs,
                                         selectedLineId = selectedLineId,
                                         onSelectLine = { viewModel.selectLyricLine(it) },
-                                        onSeek = { viewModel.audioEngine.seekTo(it) },
+                                        onSeek = { positionMs ->
+                                            viewModel.audioEngine.seekTo(positionMs)
+                                            val ordered = project.lyrics.sortedBy { it.startMs }
+                                            val active = ordered.lastOrNull { positionMs >= it.startMs && positionMs < it.endMs }
+                                            val target = active ?: ordered.lastOrNull { it.endMs <= positionMs } ?: ordered.firstOrNull()
+                                            target?.let { viewModel.selectLyricLine(it.id) }
+                                        },
                                         onNudge = { viewModel.nudgeSelectedLyric(it) },
                                         onMoveLine = { viewModel.moveSelectedLyric(it) },
                                         onAdjustStart = { viewModel.updateSelectedLyricStart(it) },
@@ -444,6 +457,7 @@ class MainActivity : ComponentActivity() {
                                 StudioTabs(
                                     viewModel = viewModel,
                                     project = project,
+                                    selectedLineId = selectedLineId,
                                     currentTab = currentTab,
                                     onTabSelected = { viewModel.selectTab(it) },
                                     onOpenTapToSync = { viewModel.startTapToSync() },
