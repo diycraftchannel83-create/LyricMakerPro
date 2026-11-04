@@ -474,23 +474,7 @@ private fun drawInto(
     val visColor = try { AndroidColor.parseColor(project.visualizerColorHex) } catch (_: Exception) { AndroidColor.CYAN }
     when (project.visualizer) {
         VisualizerType.BARS_SPECTRUM -> {
-            val barCount = 16
-            val spacing = width * 0.012f
-            val totalW = width * 0.88f
-            val barW = (totalW - (spacing * (barCount - 1))) / barCount
-            val startX = (width - totalW) / 2f
-            val baseY = height * 0.82f
-            val maxH = height * 0.16f
-
-            val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply { style = AndroidPaint.Style.FILL }
-
-            for (i in 0 until barCount) {
-                val bandLevel = spectrumBands.getOrElse(i) { 0.2f }
-                val barH = (bandLevel * maxH).coerceAtLeast(6f)
-                val x = startX + i * (barW + spacing)
-                paint.shader = LinearGradient(x, baseY - barH, x, baseY, intArrayOf(visColor, AndroidColor.MAGENTA), null, Shader.TileMode.CLAMP)
-                native.drawRoundRect(x, baseY - barH, x + barW, baseY, barW / 2f, barW / 2f, paint)
-            }
+            drawProfessionalSpectrum(native, width, height, spectrumBands, timeMs)
         }
         VisualizerType.CIRCULAR_WAVE -> {
             val cx = width / 2f
@@ -815,6 +799,139 @@ private fun drawInto(
         }
         native.drawBitmap(watermarkBitmap, null, destination, wmPaint)
     }
+}
+
+private fun drawProfessionalSpectrum(
+    canvas: android.graphics.Canvas,
+    width: Int,
+    height: Int,
+    bands: FloatArray,
+    timeMs: Long
+) {
+    drawProfessionalSpectrumCore(canvas, width, height, { index ->
+        bands.getOrElse(index.coerceIn(0, bands.lastIndex.coerceAtLeast(0))) { 0.12f }.coerceIn(0.035f, 1f)
+    }, timeMs)
+}
+
+private fun drawProfessionalSpectrumCore(
+    canvas: android.graphics.Canvas,
+    width: Int,
+    height: Int,
+    levelAt: (Int) -> Float,
+    timeMs: Long
+) {
+    if (width <= 0 || height <= 0) return
+    val colors = intArrayOf(
+        AndroidColor.rgb(0, 72, 255), AndroidColor.rgb(100, 0, 255),
+        AndroidColor.rgb(225, 0, 210), AndroidColor.rgb(255, 0, 105),
+        AndroidColor.rgb(255, 35, 20), AndroidColor.rgb(255, 90, 0),
+        AndroidColor.rgb(255, 150, 0), AndroidColor.rgb(255, 205, 0),
+        AndroidColor.rgb(255, 245, 0), AndroidColor.rgb(145, 255, 0),
+        AndroidColor.rgb(0, 255, 35)
+    )
+    fun colorAt(t: Float): Int {
+        val v = t.coerceIn(0f, 1f) * (colors.size - 1)
+        val i = v.toInt().coerceIn(0, colors.lastIndex - 1)
+        return AndroidColor.rgb(
+            (AndroidColor.red(colors[i]) + (AndroidColor.red(colors[i + 1]) - AndroidColor.red(colors[i])) * (v - i)).toInt(),
+            (AndroidColor.green(colors[i]) + (AndroidColor.green(colors[i + 1]) - AndroidColor.green(colors[i])) * (v - i)).toInt(),
+            (AndroidColor.blue(colors[i]) + (AndroidColor.blue(colors[i + 1]) - AndroidColor.blue(colors[i])) * (v - i)).toInt()
+        )
+    }
+    canvas.drawColor(AndroidColor.BLACK)
+    val glow = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply { style = AndroidPaint.Style.FILL }
+    // Deterministic rainbow bokeh field; subtle enough to preserve imported footage.
+    for (i in 0 until 230) {
+        val seed = i.toFloat()
+        val x = ((sin(seed * 127.1f) * 43758.5f) % 1f).let { abs(it) } * width
+        val y = ((sin(seed * 311.7f + 4f) * 24634.6f) % 1f).let { abs(it) } * height * 0.78f
+        val c = colorAt(x / width)
+        val radius = (1.0f + abs(sin(seed * 8.3f)) * 2.8f) * (width / 1280f).coerceAtLeast(0.45f)
+        glow.color = c
+        glow.alpha = (55 + abs(sin(seed * 2.1f)) * 130).toInt()
+        glow.setShadowLayer(radius * 3.5f, 0f, 0f, c)
+        canvas.drawCircle(x, y, radius, glow)
+        glow.clearShadowLayer()
+    }
+
+    val count = 16
+    val totalW = width * 0.86f
+    val gap = width * 0.009f
+    val barW = (totalW - gap * (count - 1)) / count
+    val left = (width - totalW) / 2f
+    val baseline = height * 0.615f
+    val segmentH = height * 0.029f
+    val segmentGap = height * 0.006f
+    val maxSegments = 7
+    val levels = FloatArray(count) { i ->
+        val raw = levelAt((i * 2).coerceAtMost(31))
+        val shaped = (raw * 0.78f + levelAt((i * 2 + 1).coerceAtMost(31)) * 0.22f)
+        (1 + (shaped * maxSegments * 1.55f).toInt()).coerceIn(2, maxSegments)
+    }
+    val segmentPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply { style = AndroidPaint.Style.FILL }
+    for (i in 0 until count) {
+        val x = left + i * (barW + gap)
+        val c = colorAt(i / (count - 1f))
+        val segments = levels[i]
+        for (s in 0 until segments) {
+            val top = baseline - (s + 1) * (segmentH + segmentGap)
+            val inset = barW * 0.035f
+            val path = android.graphics.Path().apply {
+                moveTo(x + inset + barW * 0.07f, top)
+                lineTo(x + barW - inset - barW * 0.07f, top)
+                lineTo(x + barW - inset, top + segmentH * 0.5f)
+                lineTo(x + barW - inset - barW * 0.07f, top + segmentH)
+                lineTo(x + inset + barW * 0.07f, top + segmentH)
+                lineTo(x + inset, top + segmentH * 0.5f)
+                close()
+            }
+            segmentPaint.color = c
+            segmentPaint.alpha = 255
+            segmentPaint.setShadowLayer(width * 0.003f, 0f, 0f, c)
+            canvas.drawPath(path, segmentPaint)
+            segmentPaint.clearShadowLayer()
+        }
+        // Soft mirrored segments below the neon baseline.
+        for (s in 0 until min(segments, 5)) {
+            val top = baseline + height * 0.012f + s * (segmentH + segmentGap)
+            val fade = (82f * (1f - s / 5f)).toInt().coerceAtLeast(0)
+            segmentPaint.color = c
+            segmentPaint.alpha = fade
+            val rect = android.graphics.RectF(x, top, x + barW, top + segmentH * 0.9f)
+            canvas.drawRoundRect(rect, segmentH * 0.18f, segmentH * 0.18f, segmentPaint)
+        }
+    }
+
+    // Floating white light streaks above selected columns.
+    val streak = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.WHITE
+        strokeWidth = (width * 0.0022f).coerceAtLeast(1.2f)
+        strokeCap = AndroidPaint.Cap.ROUND
+        setShadowLayer(width * 0.006f, 0f, 0f, AndroidColor.WHITE)
+    }
+    for (i in 0 until count) {
+        if (i % 2 == 0 || i % 5 == 0) {
+            val x = left + i * (barW + gap)
+            val y = baseline - (levels[i] + 1) * (segmentH + segmentGap) - height * 0.025f
+            val length = barW * if (i % 3 == 0) 0.9f else 0.62f
+            canvas.drawLine(x + barW * 0.08f, y, x + barW * 0.08f + length, y, streak)
+        }
+    }
+    // Brilliant continuous rainbow baseline with a soft bloom.
+    val linePaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+        style = AndroidPaint.Style.STROKE
+        strokeWidth = (height * 0.008f).coerceAtLeast(3f)
+        shader = LinearGradient(left - width * 0.02f, baseline, left + totalW, baseline,
+            intArrayOf(colors.first(), colors[2], colors[4], colors[6], colors[8], colors.last()),
+            null, Shader.TileMode.CLAMP)
+        setShadowLayer(height * 0.025f, 0f, 0f, AndroidColor.WHITE)
+    }
+    canvas.drawLine(width * 0.025f, baseline, width * 0.975f, baseline, linePaint)
+    linePaint.clearShadowLayer()
+    linePaint.shader = null
+    linePaint.strokeWidth = (height * 0.003f).coerceAtLeast(1.5f)
+    linePaint.color = AndroidColor.WHITE
+    canvas.drawLine(width * 0.025f, baseline, width * 0.975f, baseline, linePaint)
 }
 
 private fun formatTime(ms: Long): String {
