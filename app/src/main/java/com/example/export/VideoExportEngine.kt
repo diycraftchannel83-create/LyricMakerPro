@@ -992,20 +992,26 @@ class VideoExportEngine(private val context: Context) {
     }
 
     private fun drawLyrics(canvas: Canvas, width: Int, height: Int, project: VideoProject, timeMs: Long) {
-        val lyrics = project.lyrics
-        if (lyrics.isEmpty()) return
+        val orderedLyrics = project.lyrics.sortedBy { it.startMs }
+        if (orderedLyrics.isEmpty()) return
 
         val typography = project.typography
-        val activeLineIndex = lyrics.indexOfFirst { timeMs in it.startMs..it.endMs }
+        // Half-open ranges prevent adjacent cues from both owning the boundary.
+        // When cues overlap, prefer the cue with the latest start time.
+        val activeLineIndex = orderedLyrics.indexOfLast { timeMs >= it.startMs && timeMs < it.endMs }
 
-        val lineToDraw = if (activeLineIndex != -1) {
-            lyrics[activeLineIndex]
+        val lineToDraw = if (activeLineIndex >= 0) {
+            orderedLyrics[activeLineIndex]
         } else {
-            // Find next upcoming line or last passed line
-            lyrics.findLast { it.endMs < timeMs } ?: lyrics.firstOrNull()
+            orderedLyrics.lastOrNull { it.endMs <= timeMs } ?: orderedLyrics.firstOrNull()
         } ?: return
 
-        val isCurrentlyActive = timeMs in lineToDraw.startMs..lineToDraw.endMs
+        // Never let stale/partial word cues replace the complete lyric sentence.
+        val expectedWords = lineToDraw.text.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+        val actualWords = lineToDraw.words.map { it.text.trim() }.filter { it.isNotBlank() }
+        val karaokeWordsComplete = expectedWords.isNotEmpty() && actualWords == expectedWords
+
+        val isCurrentlyActive = timeMs >= lineToDraw.startMs && timeMs < lineToDraw.endMs
         val progressInLine = if (isCurrentlyActive) {
             ((timeMs - lineToDraw.startMs).toFloat() / lineToDraw.durationMs).coerceIn(0f, 1f)
         } else {
@@ -1087,7 +1093,7 @@ class VideoExportEngine(private val context: Context) {
             val charCount = (lineToDraw.text.length * (progressInLine * 1.3f).coerceIn(0f, 1f)).toInt()
             val visibleText = lineToDraw.text.take(charCount) + if (charCount < lineToDraw.text.length) "_" else ""
             drawStyledText(canvas, visibleText, centerX, centerY, textPaint, strokePaint, typography, parseColor(typography.primaryColorHex, Color.WHITE))
-        } else if (project.transitionEffect == TextTransitionEffect.KARAOKE_SWEEP && isCurrentlyActive && lineToDraw.words.isNotEmpty()) {
+        } else if (project.transitionEffect == TextTransitionEffect.KARAOKE_SWEEP && isCurrentlyActive && karaokeWordsComplete) {
             drawKaraokeWords(canvas, centerX, centerY, lineToDraw, timeMs, textPaint, strokePaint, typography, width)
         } else {
             val color = if (isCurrentlyActive) {
@@ -1133,8 +1139,8 @@ class VideoExportEngine(private val context: Context) {
         val baseColor = parseColor(typography.primaryColorHex, Color.WHITE)
         val activeColor = parseColor(typography.highlightColorHex, Color.parseColor("#00F5D4"))
 
-        for (word in line.words) {
-            val wordString = word.text + " "
+        for ((wordIndex, word) in line.words.withIndex()) {
+            val wordString = word.text + if (wordIndex < line.words.lastIndex) " " else ""
             val wordW = textPaint.measureText(wordString)
             val isWordActive = timeMs in word.startMs..word.endMs
             val hasWordPassed = timeMs > word.endMs

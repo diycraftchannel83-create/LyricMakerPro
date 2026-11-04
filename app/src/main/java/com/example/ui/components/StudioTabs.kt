@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,6 +34,8 @@ import com.winsmediatama.lyricmakerpro.viewmodel.LyricMakerViewModel
 fun StudioTabs(
     viewModel: LyricMakerViewModel,
     project: VideoProject,
+    selectedLineId: String?,
+    playheadMs: Long,
     currentTab: LyricMakerViewModel.StudioTab,
     onTabSelected: (LyricMakerViewModel.StudioTab) -> Unit,
     onOpenTapToSync: () -> Unit,
@@ -146,6 +149,8 @@ fun StudioTabs(
                     LyricsSyncTab(
                         viewModel = viewModel,
                         project = project,
+                        selectedLineId = selectedLineId,
+                        playheadMs = playheadMs,
                         onOpenTapToSync = onOpenTapToSync,
                         onOpenImport = { showImportDialog = true }
                     )
@@ -751,6 +756,8 @@ private fun BackgroundTab(viewModel: LyricMakerViewModel, project: VideoProject,
 private fun LyricsSyncTab(
     viewModel: LyricMakerViewModel,
     project: VideoProject,
+    selectedLineId: String?,
+    playheadMs: Long,
     onOpenTapToSync: () -> Unit,
     onOpenImport: () -> Unit
 ) {
@@ -783,8 +790,27 @@ private fun LyricsSyncTab(
             }
         }
 
+        // Navigation focus follows the actual playhead, not only a stale editor selection.
+        // This keeps Timeline scrubbing, preview playback and the Sync list on the same cue.
+        // It is deliberately independent from Tap-to-Sync and never writes lyric timestamps.
+        val orderedLyrics = remember(project.lyrics) { project.lyrics.sortedBy { it.startMs } }
+        val playheadLineId = remember(playheadMs, orderedLyrics) {
+            orderedLyrics.lastOrNull { playheadMs >= it.startMs && playheadMs < it.endMs }?.id
+                ?: orderedLyrics.lastOrNull { it.endMs <= playheadMs }?.id
+                ?: orderedLyrics.firstOrNull()?.id
+        }
+        val focusedLineId = playheadLineId ?: selectedLineId
+        val lyricListState = rememberLazyListState()
+        LaunchedEffect(focusedLineId, project.lyrics.map { it.id }) {
+            val focusedIndex = project.lyrics.indexOfFirst { it.id == focusedLineId }
+            if (focusedIndex >= 0 && focusedIndex != lyricListState.firstVisibleItemIndex) {
+                lyricListState.animateScrollToItem(focusedIndex)
+            }
+        }
+
         // Editable Lines List
         LazyColumn(
+            state = lyricListState,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
@@ -797,6 +823,7 @@ private fun LyricsSyncTab(
                 ) {
                     LyricLineEditorCard(
                         line = line,
+                        isSelected = line.id == focusedLineId,
                         onTextChange = { viewModel.updateLyricText(line.id, it) },
                         onSelect = { viewModel.selectLyricLine(line.id) }
                     )
@@ -843,6 +870,7 @@ private fun LyricsSyncTab(
 @Composable
 private fun LyricLineEditorCard(
     line: LyricLine,
+    isSelected: Boolean,
     onTextChange: (String) -> Unit,
     onSelect: () -> Unit
 ) {
@@ -850,11 +878,17 @@ private fun LyricLineEditorCard(
 
     Card(
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = StudioSurfaceVariant),
-        border = androidx.compose.foundation.BorderStroke(1.dp, StudioCardBorder),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) NeonCyan.copy(alpha = 0.12f) else StudioSurfaceVariant
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            if (isSelected) 2.dp else 1.dp,
+            if (isSelected) NeonCyan else StudioCardBorder
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onSelect() }
+            .testTag(if (isSelected) "selected_lyric_" + line.id else "lyric_" + line.id)
     ) {
         Row(
             modifier = Modifier
