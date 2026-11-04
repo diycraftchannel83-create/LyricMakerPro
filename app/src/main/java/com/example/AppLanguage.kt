@@ -169,7 +169,20 @@ object AppLanguage {
   "Dimensional circular spectrum with depth and glow" to "สเปกตรัมวงกลมสามมิติพร้อมความลึกและแสง",
   "Layered flowing wave ribbons reacting to the track" to "ริบบิ้นคลื่นซ้อนชั้นตอบสนองต่อเพลง",
   "Depth-layered particles orbiting to the audio rhythm" to "อนุภาคหลายระดับความลึกโคจรตามจังหวะเสียง",
-  "Clean background without visualizer overlay" to "พื้นหลังสะอาดโดยไม่มีวิชวลไลเซอร์"
+  "Clean background without visualizer overlay" to "พื้นหลังสะอาดโดยไม่มีวิชวลไลเซอร์",
+  "Drag directly on the preview to reposition all lyric lines." to "ลากบนหน้าพรีวิวเพื่อปรับตำแหน่งเนื้อเพลงทุกบรรทัด",
+  "Smart Karaoke Word Sync" to "ซิงค์คำคาราโอเกะแบบอัจฉริยะ",
+  "Analyze the song waveform and adjust each word's highlight timing to nearby audio attacks. Lyric line timestamps stay unchanged." to "วิเคราะห์รูปคลื่นเสียงและปรับเวลาการไฮไลต์แต่ละคำให้ตรงกับจังหวะเสียงใกล้เคียง โดยไม่เปลี่ยนเวลาเริ่มต้นของแต่ละบรรทัด",
+  "Sync words to music" to "ซิงค์คำให้ตรงกับเพลง",
+  "Import audio and wait for its waveform analysis to finish." to "นำเข้าเสียงและรอให้การวิเคราะห์รูปคลื่นเสร็จสิ้น",
+  "$syncedLineCount lyric lines updated. Preview and export use the new word timing." to "อัปเดตเนื้อเพลงแล้ว $syncedLineCount บรรทัด พรีวิวและส่งออกจะใช้เวลาใหม่ของแต่ละคำ",
+  "Add line" to "เพิ่มบรรทัด",
+  "Add first lyric line" to "เพิ่มบรรทัดเนื้อเพลงแรก",
+  "Enter lyric text..." to "ป้อนข้อความเนื้อเพลง...",
+  "Import Lyrics or LRC File" to "นำเข้าเนื้อเพลงหรือไฟล์ LRC",
+  "Paste raw text or timestamped .lrc lines. Plain text will be automatically segmented into editable video cue lines." to "วางข้อความธรรมดาหรือบรรทัด .lrc ที่มีเวลา ข้อความธรรมดาจะถูกแบ่งเป็นบรรทัดวิดีโอที่แก้ไขได้โดยอัตโนมัติ",
+  "Import Lyrics" to "นำเข้าเนื้อเพลง",
+  "Cancel" to "ยกเลิก"
  )
 
  private val localizedUi: Map<String, Map<String, String>> = mapOf(
