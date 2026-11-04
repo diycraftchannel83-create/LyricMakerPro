@@ -488,13 +488,13 @@ private fun EffectsTab(viewModel: LyricMakerViewModel, project: VideoProject) {
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = effect.label,
+                            text = AppLanguage.text(effect.label),
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
                             color = if (isSelected) NeonMagenta else TextPrimary
                         )
                         Text(
-                            text = effect.description,
+                            text = AppLanguage.text(effect.description),
                             fontSize = 11.sp,
                             color = TextSecondary
                         )
@@ -607,12 +607,12 @@ private fun VisualizerTab(viewModel: LyricMakerViewModel, project: VideoProject)
                     Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = type.label,
+                            text = AppLanguage.text(type.label),
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp,
                             color = if (isSelected) NeonCyan else TextPrimary
                         )
-                        Text(text = type.description, fontSize = 10.sp, color = TextSecondary)
+                        Text(text = AppLanguage.text(type.description), fontSize = 10.sp, color = TextSecondary)
                     }
                     if (isSelected) {
                         Icon(Icons.Default.Check, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(16.dp))
