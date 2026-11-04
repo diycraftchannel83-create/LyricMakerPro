@@ -91,12 +91,9 @@ object AppLanguage {
   "Creator Tag / Watermark" to "แท็กผู้สร้าง / ลายน้ำ",
   "Display ${project.watermarkText} in corner" to "แสดง ${project.watermarkText} ที่มุมภาพ",
   "Tap-to-Sync Mode" to "โหมดแตะเพื่อซิงค์",
-  "Import LRC/Text" to "นำเข้า LRC/ข้อความ"
- )
- private val thaiOverrides = mapOf(
+  "Import LRC/Text" to "นำเข้า LRC/ข้อความ",
   "Karaoke Sweep" to "คาราโอเกะไล่สี",
   "Real-time color fill synchronized with song beat" to "เติมสีแบบเรียลไทม์ให้ตรงกับจังหวะเพลง",
-  "Kinetic Pop" to "ป๊อปแบบไดนามิก",
   "High-energy scale bounce and overshoot punch" to "ขยายและเด้งอย่างมีพลังพร้อมแรงกระแทก",
   "Neon Pulse" to "พัลส์นีออน",
   "Electric neon glow power-on flicker and shimmer" to "แสงนีออนกะพริบและระยิบระยับ",
@@ -172,7 +169,9 @@ object AppLanguage {
   "Dimensional circular spectrum with depth and glow" to "สเปกตรัมวงกลมสามมิติพร้อมความลึกและแสง",
   "Layered flowing wave ribbons reacting to the track" to "ริบบิ้นคลื่นซ้อนชั้นตอบสนองต่อเพลง",
   "Depth-layered particles orbiting to the audio rhythm" to "อนุภาคหลายระดับความลึกโคจรตามจังหวะเสียง",
-  "Clean background without visualizer overlay" to "พื้นหลังสะอาดโดยไม่มีวิชวลไลเซอร์",
+  "Clean background without visualizer overlay" to "พื้นหลังสะอาดโดยไม่มีวิชวลไลเซอร์"
+ )
+
  private val keys = listOf("Insert Audio","Insert Picture","Insert Video","Insert Lyrics (.TXT / .LRC)","Open Project","Save Project","Save Lyrics (.LRC)","Privacy Policy","Language","About","Exit","Export","Close","Timeline","Fit","Sync","Done","Edit Lyric","Correct lyric text","Installed version","Version code")
  fun text(source:String):String { if (current == "Thailand") return thaiOverrides[source] ?: source; val i=keys.indexOf(source); return if(i<0) source else data[current]?.getOrNull(i) ?: source }
 }
