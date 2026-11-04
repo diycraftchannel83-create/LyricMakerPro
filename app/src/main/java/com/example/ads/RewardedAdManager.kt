@@ -240,3 +240,75 @@ fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
         update = {}
     )
 }
+
+
+/** Interstitial ads are displayed after a successful export for confirmed Free users. */
+class FreeInterstitialAdManager(private val activity: Activity) {
+    private var interstitialAd: com.google.android.gms.ads.interstitial.InterstitialAd? = null
+    private var isLoading = false
+    private var isPremium = true
+
+    private val adUnitId: String
+        get() = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG) {
+            TEST_INTERSTITIAL_AD_UNIT_ID
+        } else {
+            PRODUCTION_INTERSTITIAL_AD_UNIT_ID
+        }
+
+    fun setPremiumStatus(premium: Boolean) {
+        isPremium = premium
+        if (premium) {
+            interstitialAd = null
+        } else {
+            load()
+        }
+    }
+
+    fun load() {
+        if (isPremium || isLoading || interstitialAd != null ||
+            activity.isFinishing || activity.isDestroyed
+        ) return
+        isLoading = true
+        com.google.android.gms.ads.interstitial.InterstitialAd.load(
+            activity,
+            adUnitId,
+            AdRequest.Builder().build(),
+            object : com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback() {
+                override fun onAdLoaded(ad: com.google.android.gms.ads.interstitial.InterstitialAd) {
+                    isLoading = false
+                    interstitialAd = ad
+                }
+
+                override fun onAdFailedToLoad(error: LoadAdError) {
+                    isLoading = false
+                    interstitialAd = null
+                }
+            }
+        )
+    }
+
+    fun showAfterExport() {
+        if (isPremium) return
+        val ad = interstitialAd
+        if (ad == null) {
+            load()
+            return
+        }
+        interstitialAd = null
+        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdDismissedFullScreenContent() {
+                load()
+            }
+
+            override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                load()
+            }
+        }
+        ad.show(activity)
+    }
+
+    companion object {
+        private const val TEST_INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"
+        private const val PRODUCTION_INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-1254774552944426/3914322052"
+    }
+}
