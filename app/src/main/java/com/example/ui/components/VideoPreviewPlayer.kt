@@ -838,7 +838,7 @@ private fun drawProfessionalSpectrumCore(
             (AndroidColor.blue(colors[i]) + (AndroidColor.blue(colors[i + 1]) - AndroidColor.blue(colors[i])) * (v - i)).toInt()
         )
     }
-    canvas.drawColor(AndroidColor.BLACK)
+    // Preserve the imported photo/video background; render only transparent visualizer particles.
     val glow = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply { style = AndroidPaint.Style.FILL }
     // Deterministic rainbow bokeh field; subtle enough to preserve imported footage.
     for (i in 0 until 230) {
