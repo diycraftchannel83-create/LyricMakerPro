@@ -122,9 +122,10 @@ fun VideoPreviewPlayer(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f, fill = false)
-                .heightIn(min = 220.dp, max = 340.dp)
-                .padding(horizontal = 16.dp, vertical = 4.dp),
+                // Compact the preview viewport on mobile so playback controls
+                // and the multi-track editor move upward and remain visible.
+                .heightIn(min = 200.dp, max = 260.dp)
+                .padding(horizontal = 16.dp, vertical = 2.dp),
             contentAlignment = Alignment.Center
         ) {
             Box(
