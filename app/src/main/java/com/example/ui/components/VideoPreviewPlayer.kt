@@ -686,7 +686,7 @@ private fun drawInto(
             val expectedWords = lineToDraw.text.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
             val actualWords = lineToDraw.words.map { it.text.trim() }.filter { it.isNotBlank() }
             val karaokeWordsComplete = expectedWords.isNotEmpty() && actualWords == expectedWords
-            val isCurrentlyActive = timeMs in lineToDraw.startMs..lineToDraw.endMs
+            val isCurrentlyActive = timeMs >= lineToDraw.startMs && timeMs < lineToDraw.endMs
             val progressInLine = if (isCurrentlyActive) {
                 ((timeMs - lineToDraw.startMs).toFloat() / lineToDraw.durationMs).coerceIn(0f, 1f)
             } else {
@@ -779,8 +779,8 @@ private fun drawInto(
             } else if (project.transitionEffect == TextTransitionEffect.KARAOKE_SWEEP && isCurrentlyActive && karaokeWordsComplete) {
                 val totalW = textPaint.measureText(lineToDraw.text)
                 var curX = cx - (totalW / 2f)
-                for (w in lineToDraw.words) {
-                    val wStr = w.text + " "
+                for ((wordIndex, w) in lineToDraw.words.withIndex()) {
+                    val wStr = w.text + if (wordIndex < lineToDraw.words.lastIndex) " " else ""
                     val wW = textPaint.measureText(wStr)
                     val active = timeMs in w.startMs..w.endMs
                     val passed = timeMs > w.endMs
