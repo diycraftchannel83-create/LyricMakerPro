@@ -50,8 +50,9 @@ fun drawReferenceVisualizer(
         }
     fun areaPath(points: List<Pair<Float, Float>>, baseline: Float): Path = Path().apply {
         if (points.isEmpty()) return@apply
-        moveTo(points.first().first, baseline)
-        lineTo(points.first().first, points.first().second)
+        val first = points.first()
+        moveTo(first.first, baseline)
+        lineTo(first.first, first.second)
         points.drop(1).forEach { lineTo(it.first, it.second) }
         lineTo(points.last().first, baseline)
         close()
