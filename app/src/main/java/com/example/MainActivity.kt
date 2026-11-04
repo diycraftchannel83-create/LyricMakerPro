@@ -43,7 +43,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.winsmediatama.lyricmakerpro.ads.RewardedAdManager
 import com.winsmediatama.lyricmakerpro.ads.FreeAppOpenAdManager
 import com.winsmediatama.lyricmakerpro.ads.FreeInterstitialAdManager
-import com.winsmediatama.lyricmakerpro.ads.FreeBannerAd
 import com.winsmediatama.lyricmakerpro.ads.FreeNativeAd
 import com.winsmediatama.lyricmakerpro.billing.PermanentWatermarkBilling
 import com.winsmediatama.lyricmakerpro.model.BackgroundConfig
@@ -252,8 +251,16 @@ class MainActivity : ComponentActivity() {
                 ) { uri: Uri? ->
                     if (uri != null) {
                         runCatching {
-                            contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                            // Some document providers do not grant persistable access.
+                            // Permission persistence is best-effort; opening the selected URI
+                            // must still proceed while the temporary grant is valid.
+                            runCatching {
+                                contentResolver.takePersistableUriPermission(
+                                    uri,
+                                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                )
+                            }
+                            contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
                                 ?: error("Unable to read project file")
                         }.mapCatching { json -> ProjectFileCodec.decode(json) }
                             .onSuccess { loaded ->
@@ -323,11 +330,6 @@ class MainActivity : ComponentActivity() {
                         }
                         }
                     },
-                    bottomBar = {
-                        if (watermarkEntitlementResolved && !hasConfirmedPermanentWatermarkRemoval) {
-                            FreeBannerAd(isPremium = false)
-                        }
-                    }
                 ) { innerPadding ->
                     BoxWithConstraints(
                         modifier = Modifier
