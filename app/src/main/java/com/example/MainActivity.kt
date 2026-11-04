@@ -98,7 +98,7 @@ class MainActivity : ComponentActivity() {
                 val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
                 var studioSheetExpanded by rememberSaveable { mutableStateOf(false) }
                 val studioSheetHeight by animateDpAsState(
-                    targetValue = if (studioSheetExpanded) 360.dp else 78.dp,
+                    targetValue = if (studioSheetExpanded) 300.dp else 64.dp,
                     label = "studio-sheet-height"
                 )
 
