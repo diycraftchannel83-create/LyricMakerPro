@@ -240,6 +240,8 @@ fun ExportDialog(
                         Text("Export Video Again", fontWeight = FontWeight.Bold)
                     }
                 } else if (!isExporting) {
+                    val canExport = project.audioTrack.beatType == com.winsmediatama.lyricmakerpro.model.AudioBeatType.CUSTOM_FILE && project.durationMs > 0L
+
                     if (isPermanentWatermarkRemoved) {
                         Surface(color = NeonCyan.copy(alpha = 0.12f), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
                             Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -250,7 +252,7 @@ fun ExportDialog(
                         }
                         Button(
                             onClick = { onStartExport(selectedQuality, selectedDurationSec) },
-                            enabled = project.audioTrack.beatType == com.winsmediatama.lyricmakerpro.model.AudioBeatType.CUSTOM_FILE && project.durationMs > 0L,
+                            enabled = canExport,
                             colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
                             modifier = Modifier.fillMaxWidth().testTag("start_export_without_watermark_button")
                         ) {
@@ -259,6 +261,34 @@ fun ExportDialog(
                             Text("Export Without Watermark", fontWeight = FontWeight.Bold, color = Color.Black)
                         }
                     } else {
+                        // Free export must never be gated by a purchase or an ad.
+                        // MainActivity passes removeWatermark=false unless Play Billing
+                        // has verified a permanent entitlement.
+                        Button(
+                            onClick = { onStartExport(selectedQuality, selectedDurationSec) },
+                            enabled = canExport,
+                            colors = ButtonDefaults.buttonColors(containerColor = NeonMagenta),
+                            modifier = Modifier.fillMaxWidth().testTag("start_export_with_watermark_button")
+                        ) {
+                            Icon(Icons.Default.MovieCreation, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Export With Watermark", fontWeight = FontWeight.Bold)
+                        }
+
+                        // Remove watermark for this export only after the SDK reward callback.
+                        Button(
+                            onClick = { onWatchAdAndExport(selectedQuality, selectedDurationSec) },
+                            enabled = canExport,
+                            colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
+                            modifier = Modifier.fillMaxWidth().testTag("watch_ad_export_button")
+                        ) {
+                            Icon(Icons.Default.PlayCircle, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Black)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Watch Ad • Export Without Watermark", fontWeight = FontWeight.Bold, color = Color.Black)
+                        }
+
+                        Divider(color = StudioCardBorder)
+
                         Button(
                             onClick = onBuyPermanentWatermark,
                             colors = ButtonDefaults.buttonColors(containerColor = CyberYellow),
@@ -276,26 +306,14 @@ fun ExportDialog(
                             onClick = onRestorePurchases,
                             modifier = Modifier.fillMaxWidth().testTag("restore_remove_watermark_button")
                         ) { Text("Restore Purchase") }
-                        Button(
-                            onClick = { onWatchAdAndExport(selectedQuality, selectedDurationSec) },
-                            enabled = project.audioTrack.beatType == com.winsmediatama.lyricmakerpro.model.AudioBeatType.CUSTOM_FILE && project.durationMs > 0L,
-                            colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
-                            modifier = Modifier.fillMaxWidth().testTag("watch_ad_export_button")
-                        ) {
-                            Icon(Icons.Default.PlayCircle, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Black)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Watch Ad • One Watermark-Free Export", fontWeight = FontWeight.Bold, color = Color.Black)
-                        }
-                        Button(
-                            onClick = { onStartExport(selectedQuality, selectedDurationSec) },
-                            enabled = project.audioTrack.beatType == com.winsmediatama.lyricmakerpro.model.AudioBeatType.CUSTOM_FILE && project.durationMs > 0L,
-                            colors = ButtonDefaults.buttonColors(containerColor = NeonMagenta),
-                            modifier = Modifier.fillMaxWidth().testTag("start_export_button")
-                        ) {
-                            Icon(Icons.Default.MovieCreation, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Export With Watermark", fontWeight = FontWeight.Bold)
-                        }
+                    }
+
+                    if (!canExport) {
+                        Text(
+                            "Import an audio file and wait for its duration to load before exporting.",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
                     }
                 }
 
