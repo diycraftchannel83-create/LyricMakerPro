@@ -388,13 +388,10 @@ class MainActivity : ComponentActivity() {
                         } else {
                             // Mobile vertical studio layout with a draggable bottom editor sheet.
                             Box(modifier = Modifier.fillMaxSize()) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        // The editor sheet is drawn over this column. Reserve its
-                                        // full current height so it cannot cover the lyric track.
-                                        .padding(bottom = studioSheetHeight)
-                                ) {
+                                // Keep preview + timeline in a stable layout. The editor sheet
+                                // overlays the lower preview area; expanding it must not remeasure
+                                // the timeline or move its tracks upward.
+                                Column(modifier = Modifier.fillMaxSize()) {
                                     VideoPreviewPlayer(
                                         project = project.copy(showWatermark = !hasConfirmedPermanentWatermarkRemoval),
                                         playheadMs = playheadMs,
@@ -405,8 +402,7 @@ class MainActivity : ComponentActivity() {
                                         onSeek = { viewModel.audioEngine.seekTo(it) },
                                         onTextPositionChange = { dx, dy -> viewModel.updateTypographyProperties(positionXPercent = project.typography.positionXPercent + dx, positionYPercent = project.typography.positionYPercent + dy) },
                                         onTextScaleChange = { factor -> viewModel.updateTypographyProperties(fontSizeSp = (project.typography.fontSizeSp * factor).coerceIn(2f, 96f)) },
-                                        videoAudioMuted = project.videoAudioMuted,
-                                        modifier = Modifier.weight(1f)
+                                        videoAudioMuted = project.videoAudioMuted
                                     )
 
                                     MultiTrackTimeline(
