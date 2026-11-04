@@ -567,13 +567,11 @@ private fun AudioTrackRow(
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
-    val horizontalInsetPx = with(density) { 5.dp.toPx() }
     Box(
         modifier = modifier
             .pointerInput(project.durationMs, pxPerMs) {
                 detectTapGestures { tap ->
-                    val timelineX = (tap.x - horizontalInsetPx).coerceAtLeast(0f)
-                    onSeek((timelineX / with(density) { pxPerMs.dp.toPx() }).toLong()
+                    onSeek((tap.x / with(density) { pxPerMs.dp.toPx() }).toLong()
                         .coerceIn(0L, project.durationMs))
                 }
             }
