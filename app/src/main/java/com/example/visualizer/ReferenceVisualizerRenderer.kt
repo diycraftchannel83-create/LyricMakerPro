@@ -123,23 +123,42 @@ fun drawReferenceVisualizer(
                 canvas.drawRect(x, centerY - bh, x + barW, centerY + bh * 0.62f, p)
             }
         }
-        VisualizerType.AREA_LINE_UP, VisualizerType.AREA_LINE_DUAL, VisualizerType.DUAL_AREA_WAVE -> {
-            val pointsTop = (0..48).map { i ->
-                val x = w * (0.08f + i / 48f * 0.84f)
-                val v = level(i * bands.size.coerceAtLeast(1) / 49)
-                val y = h * 0.43f - h * (0.04f + v * 0.17f) * (0.45f + abs(sin(i * 0.55 + timeMs * 0.0015)).toFloat() * 0.55f)
+        VisualizerType.AREA_LINE_UP -> {
+            val points = (0..56).map { i ->
+                val x = w * (0.08f + i / 56f * 0.84f)
+                val v = level(i * bands.size.coerceAtLeast(1) / 57)
+                val y = h * 0.49f - h * (0.035f + v * 0.20f) * (0.48f + abs(sin(i * 0.47 + timeMs * 0.0016)).toFloat() * 0.52f)
                 x to y
             }
-            drawGradientArea(pointsTop, h * 0.49f, Color.argb(170, 0, 240, 255), Color.argb(5, 0, 240, 255))
-            if (type != VisualizerType.AREA_LINE_UP) {
-                val pointsBottom = (0..48).map { i ->
-                    val x = w * (0.08f + i / 48f * 0.84f)
-                    val v = level((48 - i) * bands.size.coerceAtLeast(1) / 49)
-                    val y = h * 0.56f + h * (0.035f + v * 0.16f) * (0.45f + abs(sin(i * 0.48 + timeMs * 0.0018)).toFloat() * 0.55f)
-                    x to y
-                }
-                drawGradientArea(pointsBottom, h * 0.52f, Color.argb(190, 255, 0, 110), Color.argb(4, 255, 0, 110))
+            drawGradientArea(points, h * 0.52f, Color.argb(190, 0, 245, 255), Color.argb(3, 0, 245, 255))
+        }
+        VisualizerType.DUAL_AREA_WAVE -> {
+            val top = (0..56).map { i ->
+                val x = w * (0.08f + i / 56f * 0.84f)
+                val v = level(i * bands.size.coerceAtLeast(1) / 57)
+                x to (h * 0.49f - h * (0.035f + v * 0.19f) * (0.4f + abs(sin(i * 0.52 + timeMs * 0.0017)).toFloat() * 0.6f))
             }
+            val bottom = (0..56).map { i ->
+                val x = w * (0.08f + i / 56f * 0.84f)
+                val v = level((56 - i) * bands.size.coerceAtLeast(1) / 57)
+                x to (h * 0.51f + h * (0.025f + v * 0.18f) * (0.4f + abs(sin(i * 0.43 + timeMs * 0.0019)).toFloat() * 0.6f))
+            }
+            drawGradientArea(top, h * 0.50f, Color.argb(190, 0, 245, 255), Color.argb(5, 0, 245, 255))
+            drawGradientArea(bottom, h * 0.50f, Color.argb(200, 255, 0, 110), Color.argb(4, 255, 0, 110))
+        }
+        VisualizerType.AREA_LINE_DUAL -> {
+            val top = (0..48).map { i ->
+                val x = w * (0.08f + i / 48f * 0.84f)
+                val v = level(i * bands.size.coerceAtLeast(1) / 49)
+                x to (h * 0.37f - h * (0.025f + v * 0.13f) * (0.5f + abs(sin(i * 0.55 + timeMs * 0.0015)).toFloat() * 0.5f))
+            }
+            val bottom = (0..48).map { i ->
+                val x = w * (0.08f + i / 48f * 0.84f)
+                val v = level((48 - i) * bands.size.coerceAtLeast(1) / 49)
+                x to (h * 0.68f - h * (0.025f + v * 0.12f) * (0.5f + abs(sin(i * 0.48 + timeMs * 0.0018)).toFloat() * 0.5f))
+            }
+            drawGradientArea(top, h * 0.43f, Color.argb(170, 0, 240, 255), Color.argb(4, 0, 240, 255))
+            drawGradientArea(bottom, h * 0.74f, Color.argb(180, 255, 0, 110), Color.argb(4, 255, 0, 110))
         }
         VisualizerType.MULTI_WAVE_FLOW, VisualizerType.WAVE_RIBBON, VisualizerType.PEAK_WAVE -> {
             val layers = if (type == VisualizerType.PEAK_WAVE) 7 else 9
