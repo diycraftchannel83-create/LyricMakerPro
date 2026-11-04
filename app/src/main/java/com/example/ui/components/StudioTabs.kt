@@ -54,7 +54,7 @@ fun StudioTabs(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(24.dp)
+                .height(16.dp)
                 .pointerInput(isExpanded) {
                     var totalDrag = 0f
                     detectVerticalDragGestures(
