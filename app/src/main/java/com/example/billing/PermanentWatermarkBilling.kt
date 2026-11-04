@@ -2,6 +2,8 @@ package com.winsmediatama.lyricmakerpro.billing
 
 import android.app.Activity
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import com.android.billingclient.api.AcknowledgePurchaseParams
 import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
@@ -44,6 +46,12 @@ class PermanentWatermarkBilling(context: Context) : PurchasesUpdatedListener {
 
     private var productDetails: ProductDetails? = null
     private var connecting = false
+    private var closed = false
+    private val retryHandler = Handler(Looper.getMainLooper())
+    private var retryDelayMs = 10_000L
+    private val reconnectRunnable = Runnable {
+        if (!closed) connect()
+    }
 
     private val billingClient = BillingClient.newBuilder(appContext)
         .setListener(this)
@@ -54,23 +62,44 @@ class PermanentWatermarkBilling(context: Context) : PurchasesUpdatedListener {
         .build()
 
     fun connect() {
-        if (billingClient.isReady || connecting) return
+        if (closed || billingClient.isReady || connecting) return
         connecting = true
         billingClient.startConnection(object : BillingClientStateListener {
             override fun onBillingSetupFinished(result: BillingResult) {
                 connecting = false
                 if (result.responseCode == BillingClient.BillingResponseCode.OK) {
+                    retryDelayMs = 10_000L
+                    retryHandler.removeCallbacks(reconnectRunnable)
                     queryProduct()
                     restorePurchases()
                 } else {
                     _message.value = "Google Play Billing unavailable: ${result.debugMessage}"
+                    scheduleReconnect()
                 }
             }
 
             override fun onBillingServiceDisconnected() {
                 connecting = false
+                scheduleReconnect()
             }
         })
+    }
+
+    /** Re-check the Play entitlement whenever the app returns to the foreground. */
+    fun refreshEntitlement() {
+        if (closed) return
+        if (billingClient.isReady) {
+            restorePurchases()
+        } else {
+            connect()
+        }
+    }
+
+    private fun scheduleReconnect() {
+        if (closed) return
+        retryHandler.removeCallbacks(reconnectRunnable)
+        retryHandler.postDelayed(reconnectRunnable, retryDelayMs)
+        retryDelayMs = (retryDelayMs * 2).coerceAtMost(5 * 60_000L)
     }
 
     private fun queryProduct() {
@@ -152,6 +181,7 @@ class PermanentWatermarkBilling(context: Context) : PurchasesUpdatedListener {
                 purchases.filter { PRODUCT_ID in it.products }.forEach(::processPurchase)
             } else {
                 _message.value = "Gagal memulihkan pembelian: ${result.debugMessage}"
+                scheduleReconnect()
             }
         }
     }
@@ -198,6 +228,8 @@ class PermanentWatermarkBilling(context: Context) : PurchasesUpdatedListener {
     }
 
     fun close() {
+        closed = true
+        retryHandler.removeCallbacks(reconnectRunnable)
         if (billingClient.isReady) billingClient.endConnection()
     }
 }
