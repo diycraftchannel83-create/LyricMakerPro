@@ -542,7 +542,7 @@ private fun EffectsTab(viewModel: LyricMakerViewModel, project: VideoProject) {
                         if (project.audioTrack.waveformPeaks.isEmpty()) {
                             Text(AppLanguage.text("Import audio and wait for its waveform analysis to finish."), color = TextSecondary, fontSize = 10.sp)
                         } else if (syncedLineCount > 0) {
-                            Text(AppLanguage.text("$syncedLineCount lyric lines updated. Preview and export use the new word timing."), color = NeonCyan, fontSize = 10.sp)
+                            Text(AppLanguage.text("\$syncedLineCount lyric lines updated. Preview and export use the new word timing.").replace("\$syncedLineCount", syncedLineCount.toString()), color = NeonCyan, fontSize = 10.sp)
                         }
                     }
                 }
