@@ -251,8 +251,16 @@ class MainActivity : ComponentActivity() {
                 ) { uri: Uri? ->
                     if (uri != null) {
                         runCatching {
-                            contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                            // Some document providers do not grant persistable access.
+                            // Permission persistence is best-effort; opening the selected URI
+                            // must still proceed while the temporary grant is valid.
+                            runCatching {
+                                contentResolver.takePersistableUriPermission(
+                                    uri,
+                                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                )
+                            }
+                            contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
                                 ?: error("Unable to read project file")
                         }.mapCatching { json -> ProjectFileCodec.decode(json) }
                             .onSuccess { loaded ->
