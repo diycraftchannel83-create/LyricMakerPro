@@ -199,7 +199,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val imagePicker = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.OpenDocument()
+                    contract = ActivityResultContracts.PickVisualMedia()
                 ) { uri: Uri? ->
                     if (uri != null) {
                         runCatching { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
@@ -213,7 +213,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val videoPicker = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.OpenDocument()
+                    contract = ActivityResultContracts.PickVisualMedia()
                 ) { uri: Uri? ->
                     if (uri != null) {
                         runCatching { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
@@ -286,9 +286,9 @@ class MainActivity : ComponentActivity() {
                             onOpenTemplates = { viewModel.setShowTemplatesSheet(true) },
                             onPickAudio = { audioPicker.launch(arrayOf("audio/*")) },
                             onPickImage = {
-                                imagePicker.launch(arrayOf("image/*"))
+                                imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                             },
-                            onPickVideo = { videoPicker.launch(arrayOf("video/*")) },
+                            onPickVideo = { videoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) },
                             onOpenExport = { viewModel.setShowExportDialog(true) },
                             onPickLyrics = { lyricsPicker.launch("text/*") },
                             onOpenProject = { openProjectLauncher.launch(arrayOf("application/json", "text/plain")) },
@@ -379,8 +379,8 @@ class MainActivity : ComponentActivity() {
                                         onTabSelected = { viewModel.selectTab(it) },
                                         onOpenTapToSync = { viewModel.startTapToSync() },
                                         onPickAudio = { audioPicker.launch(arrayOf("audio/*")) },
-                                        onPickVideo = { videoPicker.launch(arrayOf("video/*")) },
-                                        onPickImage = { imagePicker.launch(arrayOf("image/*")) },
+                                        onPickVideo = { videoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) },
+                                        onPickImage = { imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
@@ -432,8 +432,8 @@ class MainActivity : ComponentActivity() {
                                     onTabSelected = { viewModel.selectTab(it) },
                                     onOpenTapToSync = { viewModel.startTapToSync() },
                                     onPickAudio = { audioPicker.launch(arrayOf("audio/*")) },
-                                    onPickVideo = { videoPicker.launch(arrayOf("video/*")) },
-                                    onPickImage = { imagePicker.launch(arrayOf("image/*")) },
+                                    onPickVideo = { videoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) },
+                                    onPickImage = { imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                                     isExpanded = studioSheetExpanded,
                                     onToggleExpanded = { studioSheetExpanded = it },
                                     modifier = Modifier
