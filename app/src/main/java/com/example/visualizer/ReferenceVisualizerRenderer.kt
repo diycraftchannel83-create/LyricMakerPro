@@ -194,7 +194,7 @@ fun drawReferenceVisualizer(
                 val v = level(i * bands.size.coerceAtLeast(1) / count)
                 val envelope = 0.12f + v * 0.88f
                 val bh = h * 0.20f * envelope
-                val x = w * 0.12f + i * (barW + gap)
+                val x = w * 0.12f + i.toFloat() * (barW + gap)
                 val p = neonPaint(i * 3, Paint.Style.FILL, 0f).apply { clearShadowLayer(); alpha = 235 }
                 canvas.drawRect(x, centerY - bh, x + barW, centerY + bh, p)
             }
@@ -219,7 +219,7 @@ fun drawReferenceVisualizer(
         VisualizerType.VERTICAL_PULSE -> {
             val count = 66
             for (i in 0 until count) {
-                val x = w * (0.18f + i / (count - 1f) * 0.64f)
+                val x = w * (0.18f + i.toFloat() / (count - 1f) * 0.64f)
                 val v = level(i * bands.size.coerceAtLeast(1) / count)
                 val pulse = 0.12f + v * 0.88f
                 val half = h * 0.24f * pulse * (0.72f + 0.28f * abs(sin(timeMs * 0.003 + i).toFloat()))
@@ -253,7 +253,7 @@ fun drawReferenceVisualizer(
             val count = 76
             val radius = max(1.4f, w * 0.0032f)
             for (i in 0 until count) {
-                val x = w * (0.12f + i / (count - 1f) * 0.76f)
+                val x = w * (0.12f + i.toFloat() / (count - 1f) * 0.76f)
                 val v = level(i * bands.size.coerceAtLeast(1) / count)
                 val y = centerY + sin(i * 0.22 + timeMs * 0.0025).toFloat() * h * (0.035f + v * 0.13f)
                 val p = neonPaint(i * 4, Paint.Style.FILL, 0f).apply { clearShadowLayer() }
