@@ -83,7 +83,7 @@ class RewardedAdManager(private val activity: Activity) {
 
     companion object {
         private const val TEST_REWARDED_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
-        private const val PRODUCTION_REWARDED_AD_UNIT_ID = "ca-app-pub-1254774552944426/3672317894"
+        private const val PRODUCTION_REWARDED_AD_UNIT_ID = "ca-app-pub-1254774552944426/5741489179"
     }
 }
 
