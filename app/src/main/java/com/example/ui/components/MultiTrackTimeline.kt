@@ -58,7 +58,9 @@ fun MultiTrackTimeline(
 ) {
     // Zoom factor: pixels per millisecond
     var pxPerMs by remember { mutableFloatStateOf(0.065f) } // pixels per millisecond
-    val totalTimelineWidthDp = ((project.durationMs * pxPerMs) + 84f).dp.coerceAtLeast(360.dp)
+    // Every timeline layer must use the same duration-to-pixel scale. Do not add a
+    // trailing width allowance: it stretches the waveform beyond the song end.
+    val totalTimelineWidthDp = (project.durationMs.coerceAtLeast(1L) * pxPerMs).dp.coerceAtLeast(1.dp)
     val minZoom = 0.0005f
     val maxZoom = 0.18f
 
@@ -565,20 +567,18 @@ private fun AudioTrackRow(
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
-    val horizontalInsetPx = with(density) { 5.dp.toPx() }
     Box(
         modifier = modifier
             .pointerInput(project.durationMs, pxPerMs) {
                 detectTapGestures { tap ->
-                    val timelineX = (tap.x - horizontalInsetPx).coerceAtLeast(0f)
-                    onSeek((timelineX / with(density) { pxPerMs.dp.toPx() }).toLong()
+                    onSeek((tap.x / with(density) { pxPerMs.dp.toPx() }).toLong()
                         .coerceIn(0L, project.durationMs))
                 }
             }
             .clip(RoundedCornerShape(8.dp))
             .background(Color(0xFF101722))
             .border(1.dp, StudioCardBorder, RoundedCornerShape(8.dp))
-            .padding(horizontal = 5.dp, vertical = 2.dp)
+            .padding(vertical = 2.dp)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val peaks = project.audioTrack.waveformPeaks
