@@ -382,18 +382,18 @@ private fun TypographyTab(viewModel: LyricMakerViewModel, project: VideoProject)
 
         // Global lyric placement controls (applies to every lyric line).
         item {
-            Text("Lyric Position (all lines)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            Text(AppLanguage.text("Lyric Position (all lines)"), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Horizontal", fontSize = 12.sp, color = TextSecondary)
+                Text(AppLanguage.text("Horizontal"), fontSize = 12.sp, color = TextSecondary)
                 Text("${typography.positionXPercent.toInt()}%", fontSize = 12.sp, color = NeonCyan)
             }
             Slider(value = typography.positionXPercent, onValueChange = { viewModel.updateTypographyProperties(positionXPercent = it) }, valueRange = 5f..95f)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Vertical", fontSize = 12.sp, color = TextSecondary)
+                Text(AppLanguage.text("Vertical"), fontSize = 12.sp, color = TextSecondary)
                 Text("${typography.positionYPercent.toInt()}%", fontSize = 12.sp, color = NeonCyan)
             }
             Slider(value = typography.positionYPercent, onValueChange = { viewModel.updateTypographyProperties(positionYPercent = it) }, valueRange = 5f..95f)
-            Text("Drag directly on the preview to reposition all lyric lines.", fontSize = 10.sp, color = TextSecondary)
+            Text(AppLanguage.text("Drag directly on the preview to reposition all lyric lines."), fontSize = 10.sp, color = TextSecondary)
         }
 
         // Glow Radius Slider
@@ -522,7 +522,7 @@ private fun EffectsTab(viewModel: LyricMakerViewModel, project: VideoProject) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = NeonCyan)
                             Spacer(Modifier.width(7.dp))
-                            Text("Smart Karaoke Word Sync", color = NeonCyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(AppLanguage.text("Smart Karaoke Word Sync"), color = NeonCyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                         Text(
                             "Analyze the song waveform and adjust each word's highlight timing to nearby audio attacks. Lyric line timestamps stay unchanged.",
@@ -537,12 +537,12 @@ private fun EffectsTab(viewModel: LyricMakerViewModel, project: VideoProject) {
                         ) {
                             Icon(Icons.Default.GraphicEq, contentDescription = null, tint = Color.Black, modifier = Modifier.size(17.dp))
                             Spacer(Modifier.width(7.dp))
-                            Text("Sync words to music", color = Color.Black, fontWeight = FontWeight.Bold)
+                            Text(AppLanguage.text("Sync words to music"), color = Color.Black, fontWeight = FontWeight.Bold)
                         }
                         if (project.audioTrack.waveformPeaks.isEmpty()) {
-                            Text("Import audio and wait for its waveform analysis to finish.", color = TextSecondary, fontSize = 10.sp)
+                            Text(AppLanguage.text("Import audio and wait for its waveform analysis to finish."), color = TextSecondary, fontSize = 10.sp)
                         } else if (syncedLineCount > 0) {
-                            Text("$syncedLineCount lyric lines updated. Preview and export use the new word timing.", color = NeonCyan, fontSize = 10.sp)
+                            Text(AppLanguage.text("$syncedLineCount lyric lines updated. Preview and export use the new word timing."), color = NeonCyan, fontSize = 10.sp)
                         }
                     }
                 }
@@ -847,7 +847,7 @@ private fun LyricsSyncTab(
                                 modifier = Modifier.size(14.dp)
                             )
                             Spacer(Modifier.width(3.dp))
-                            Text("Add line", color = NeonCyan, fontSize = 10.sp)
+                            Text(AppLanguage.text("Add line"), color = NeonCyan, fontSize = 10.sp)
                         }
                     }
                 }
@@ -860,7 +860,7 @@ private fun LyricsSyncTab(
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = NeonCyan)
                         Spacer(Modifier.width(6.dp))
-                        Text("Add first lyric line", color = NeonCyan)
+                        Text(AppLanguage.text("Add first lyric line"), color = NeonCyan)
                     }
                 }
             }
@@ -926,7 +926,7 @@ private fun LyricLineEditorCard(
                     unfocusedBorderColor = Color.Transparent
                 ),
                 singleLine = true,
-                placeholder = { Text("Enter lyric text...", color = TextMuted, fontSize = 12.sp) }
+                placeholder = { Text(AppLanguage.text("Enter lyric text..."), color = TextMuted, fontSize = 12.sp) }
             )
         }
     }
@@ -941,7 +941,7 @@ private fun ImportLyricsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Import Lyrics or LRC File", color = TextPrimary, fontWeight = FontWeight.Bold) },
+        title = { Text(AppLanguage.text("Import Lyrics or LRC File"), color = TextPrimary, fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -965,12 +965,12 @@ private fun ImportLyricsDialog(
                 onClick = { if (rawText.isNotBlank()) onImport(rawText) },
                 colors = ButtonDefaults.buttonColors(containerColor = NeonCyan)
             ) {
-                Text("Import Lyrics", color = Color.Black, fontWeight = FontWeight.Bold)
+                Text(AppLanguage.text("Import Lyrics"), color = Color.Black, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = TextSecondary)
+                Text(AppLanguage.text("Cancel"), color = TextSecondary)
             }
         },
         containerColor = StudioSurface
