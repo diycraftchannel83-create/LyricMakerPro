@@ -2,7 +2,7 @@ name: Android Build & Release
 
 on:
   push:
-    branches: [ main, Future ]
+    branches: [ main, Future, performance/media3-export-optimization ]
     tags:
       - "v*"
   pull_request:
