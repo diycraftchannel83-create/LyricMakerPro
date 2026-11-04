@@ -173,5 +173,5 @@ object AppLanguage {
  )
 
  private val keys = listOf("Insert Audio","Insert Picture","Insert Video","Insert Lyrics (.TXT / .LRC)","Open Project","Save Project","Save Lyrics (.LRC)","Privacy Policy","Language","About","Exit","Export","Close","Timeline","Fit","Sync","Done","Edit Lyric","Correct lyric text","Installed version","Version code")
- fun text(source:String):String { if (current == "Thailand") return thaiOverrides[source] ?: source; val i=keys.indexOf(source); return if(i<0) source else data[current]?.getOrNull(i) ?: source }
+ fun text(source:String):String { val i=keys.indexOf(source); return if (current == "Thailand") thaiOverrides[source] ?: data[current]?.getOrNull(i) ?: source else if(i<0) source else data[current]?.getOrNull(i) ?: source }
 }
