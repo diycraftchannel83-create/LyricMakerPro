@@ -89,7 +89,7 @@ object AppLanguage {
   "Minimal Solid" to "สีพื้นเรียบง่าย",
   "Dark Contrast Overlay" to "เลเยอร์เพิ่มความมืดและคอนทราสต์",
   "Creator Tag / Watermark" to "แท็กผู้สร้าง / ลายน้ำ",
-  "Display ${project.watermarkText} in corner" to "แสดง ${project.watermarkText} ที่มุมภาพ",
+  "Display \${project.watermarkText} in corner" to "แสดง ${project.watermarkText} ที่มุมภาพ",
   "Tap-to-Sync Mode" to "โหมดแตะเพื่อซิงค์",
   "Import LRC/Text" to "นำเข้า LRC/ข้อความ",
   "Karaoke Sweep" to "คาราโอเกะไล่สี",
