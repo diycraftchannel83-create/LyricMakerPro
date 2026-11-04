@@ -669,17 +669,23 @@ private fun drawInto(
     }
 
     // 3. Lyrics
-    val lyrics = project.lyrics
-    if (lyrics.isNotEmpty()) {
+    val orderedLyrics = project.lyrics.sortedBy { it.startMs }
+    if (orderedLyrics.isNotEmpty()) {
         val typography = project.typography
-        val activeLineIndex = lyrics.indexOfFirst { timeMs in it.startMs..it.endMs }
-        val lineToDraw = if (activeLineIndex != -1) {
-            lyrics[activeLineIndex]
+        // Half-open ranges prevent adjacent cues from both owning the boundary.
+        // When cues overlap, prefer the cue with the latest start time.
+        val activeLineIndex = orderedLyrics.indexOfLast { timeMs >= it.startMs && timeMs < it.endMs }
+        val lineToDraw = if (activeLineIndex >= 0) {
+            orderedLyrics[activeLineIndex]
         } else {
-            lyrics.findLast { it.endMs < timeMs } ?: lyrics.firstOrNull()
+            orderedLyrics.lastOrNull { it.endMs <= timeMs } ?: orderedLyrics.firstOrNull()
         }
 
         if (lineToDraw != null) {
+            // Never let stale/partial word cues replace the complete lyric sentence.
+            val expectedWords = lineToDraw.text.trim().split(Regex("\\\\s+")).filter { it.isNotBlank() }
+            val actualWords = lineToDraw.words.map { it.text.trim() }.filter { it.isNotBlank() }
+            val karaokeWordsComplete = expectedWords.isNotEmpty() && actualWords == expectedWords
             val isCurrentlyActive = timeMs in lineToDraw.startMs..lineToDraw.endMs
             val progressInLine = if (isCurrentlyActive) {
                 ((timeMs - lineToDraw.startMs).toFloat() / lineToDraw.durationMs).coerceIn(0f, 1f)
@@ -770,7 +776,7 @@ private fun drawInto(
                 textPaint.color = primaryC
                 if (typography.strokeWidthDp > 0f) native.drawText(txt, cx, cy, strokePaint)
                 native.drawText(txt, cx, cy, textPaint)
-            } else if (project.transitionEffect == TextTransitionEffect.KARAOKE_SWEEP && isCurrentlyActive && lineToDraw.words.isNotEmpty()) {
+            } else if (project.transitionEffect == TextTransitionEffect.KARAOKE_SWEEP && isCurrentlyActive && karaokeWordsComplete) {
                 val totalW = textPaint.measureText(lineToDraw.text)
                 var curX = cx - (totalW / 2f)
                 for (w in lineToDraw.words) {
@@ -791,7 +797,7 @@ private fun drawInto(
             }
 
             if (typography.lyricLayout == LyricLayoutMode.KARAOKE_TWO_LINE) {
-                val nextLine = lyrics.firstOrNull { it.startMs > lineToDraw.endMs }
+                val nextLine = orderedLyrics.firstOrNull { it.startMs > lineToDraw.endMs }
                 if (nextLine != null) {
                     textPaint.color = primaryC
                     textPaint.alpha = 210
