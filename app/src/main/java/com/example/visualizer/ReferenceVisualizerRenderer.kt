@@ -173,7 +173,7 @@ fun drawReferenceVisualizer(
                         VisualizerType.PEAK_WAVE -> abs(sin(i * 0.045 + layer * 0.65)).toFloat()
                         VisualizerType.WAVE_RIBBON -> {
                             val lobes = floatArrayOf(12f, 34f, 58f, 84f, 108f)
-                            lobes.sumOf { peak -> exp(-((i - peak) / 8.5).let { it * it }) }.toFloat().coerceAtMost(1f)
+                            lobes.sumOf { peak -> val d = (i - peak) / 8.5f; exp(-(d * d).toDouble()) }.toFloat().coerceAtMost(1f)
                         }
                         else -> 1f
                     }
