@@ -108,23 +108,16 @@ class VideoExportEngine(private val context: Context) {
                 project.copy(audioTrack = project.audioTrack.copy(waveformPeaks = peaks))
             } else project
 
-            val watermarkBitmap = loadWatermarkBitmap()
-            val overlay = ProjectLyricOverlay(this@VideoExportEngine, width, height, visualizerProject, watermarkBitmap)
-            val effects = listOf<androidx.media3.common.Effect>(
-                androidx.media3.effect.Presentation.createForWidthAndHeight(
-                    width, height, androidx.media3.effect.Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
-                ),
-                androidx.media3.effect.OverlayEffect(listOf(overlay))
+            // Build a single chronological video sequence from the project timeline.
+            // Gaps use the configured project background; imported images/videos occupy
+            // their own intervals and retain their source in-point when trimmed.
+            val timelineItems = buildTimelineVideoItems(
+                project = visualizerProject,
+                backgroundFile = backgroundFile,
+                totalDurationMs = totalDurationMs,
+                width = width,
+                height = height
             )
-            val backgroundItem = androidx.media3.common.MediaItem.Builder()
-                .setUri(Uri.fromFile(backgroundFile))
-                .setImageDurationMs(totalDurationMs)
-                .build()
-            val videoItem = androidx.media3.transformer.EditedMediaItem.Builder(backgroundItem)
-                .setFrameRate(30)
-                .setRemoveAudio(true)
-                .setEffects(androidx.media3.transformer.Effects(emptyList(), effects))
-                .build()
             val clippedAudio = androidx.media3.common.MediaItem.Builder()
                 .setUri(Uri.parse(audioUri))
                 .setClippingConfiguration(
@@ -137,7 +130,7 @@ class VideoExportEngine(private val context: Context) {
             val audioItem = androidx.media3.transformer.EditedMediaItem.Builder(clippedAudio)
                 .setRemoveVideo(true)
                 .build()
-            val videoSequence = androidx.media3.transformer.EditedMediaItemSequence.withVideoFrom(listOf(videoItem))
+            val videoSequence = androidx.media3.transformer.EditedMediaItemSequence.withVideoFrom(timelineItems)
             val audioSequence = androidx.media3.transformer.EditedMediaItemSequence.withAudioFrom(listOf(audioItem))
             val composition = androidx.media3.transformer.Composition.Builder(videoSequence, audioSequence).build()
 
@@ -214,6 +207,84 @@ class VideoExportEngine(private val context: Context) {
     }
 
     @androidx.media3.common.util.UnstableApi
+    private fun buildTimelineVideoItems(
+        project: VideoProject,
+        backgroundFile: File,
+        totalDurationMs: Long,
+        width: Int,
+        height: Int
+    ): List<androidx.media3.transformer.EditedMediaItem> {
+        val activeClips = project.mediaClips.mapNotNull { clip ->
+            val start = clip.startMs.coerceIn(0L, totalDurationMs)
+            val end = (clip.startMs + clip.exportDurationMs).coerceIn(0L, totalDurationMs)
+            if (end <= start) null else clip to (start to end)
+        }
+        val boundaries = (listOf(0L, totalDurationMs) +
+            activeClips.flatMap { (_, range) -> listOf(range.first, range.second) })
+            .distinct()
+            .sorted()
+
+        val presentation = androidx.media3.effect.Presentation.createForWidthAndHeight(
+            width, height,
+            androidx.media3.effect.Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP
+        )
+
+        return boundaries.zipWithNext().mapNotNull { (segmentStart, segmentEnd) ->
+            val segmentDuration = segmentEnd - segmentStart
+            if (segmentDuration <= 0L) return@mapNotNull null
+
+            // Match preview selection: the clip with the latest start time wins overlaps.
+            val activeClip = activeClips
+                .filter { (_, range) -> segmentStart >= range.first && segmentStart < range.second }
+                .maxByOrNull { it.first.startMs }
+                ?.first
+
+            val mediaItem = when (activeClip?.type) {
+                MediaClipType.IMAGE -> androidx.media3.common.MediaItem.Builder()
+                    .setUri(Uri.parse(activeClip.uri))
+                    .setImageDurationMs(segmentDuration)
+                    .build()
+
+                MediaClipType.VIDEO -> {
+                    val sourceStart = activeClip.sourceOffsetMs +
+                        (segmentStart - activeClip.startMs).coerceAtLeast(0L)
+                    androidx.media3.common.MediaItem.Builder()
+                        .setUri(Uri.parse(activeClip.uri))
+                        .setClippingConfiguration(
+                            androidx.media3.common.MediaItem.ClippingConfiguration.Builder()
+                                .setStartPositionMs(sourceStart)
+                                .setEndPositionMs(sourceStart + segmentDuration)
+                                .build()
+                        )
+                        .build()
+                }
+
+                null -> androidx.media3.common.MediaItem.Builder()
+                    .setUri(Uri.fromFile(backgroundFile))
+                    .setImageDurationMs(segmentDuration)
+                    .build()
+            }
+
+            val overlay = ProjectLyricOverlay(
+                this@VideoExportEngine,
+                width,
+                height,
+                project,
+                loadWatermarkBitmap()
+            )
+            val effects = listOf<androidx.media3.common.Effect>(
+                presentation,
+                androidx.media3.effect.OverlayEffect(listOf(overlay))
+            )
+            androidx.media3.transformer.EditedMediaItem.Builder(mediaItem)
+                .setFrameRate(30)
+                .setRemoveAudio(true)
+                .setEffects(androidx.media3.transformer.Effects(emptyList(), effects))
+                .build()
+        }
+    }
+
+    @androidx.media3.common.util.UnstableApi
     private class ProjectLyricOverlay(
         private val owner: VideoExportEngine,
         private val width: Int,
@@ -222,19 +293,24 @@ class VideoExportEngine(private val context: Context) {
         private val watermarkBitmap: Bitmap
     ) : androidx.media3.effect.BitmapOverlay() {
         private var cached: Bitmap? = null
+        private var cachedCanvas: Canvas? = null
 
         override fun getBitmap(presentationTimeUs: Long): Bitmap {
             val bitmap = cached?.takeIf { it.width == width && it.height == height }
-                ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { cached = it }
+                ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also {
+                    cached = it
+                    cachedCanvas = Canvas(it)
+                }
             bitmap.eraseColor(Color.TRANSPARENT)
+            val canvas = cachedCanvas ?: Canvas(bitmap).also { cachedCanvas = it }
             val frameTimeMs = (presentationTimeUs / 1000L).coerceAtLeast(0L)
             owner.drawVisualizer(
-                Canvas(bitmap), width, height, project.visualizer, project.visualizerColorHex,
+                canvas, width, height, project.visualizer, project.visualizerColorHex,
                 frameTimeMs, project.audioTrack.bpm, project.audioTrack.waveformPeaks, project.durationMs
             )
-            owner.drawLyrics(Canvas(bitmap), width, height, project, frameTimeMs)
+            owner.drawLyrics(canvas, width, height, project, frameTimeMs)
             if (project.showWatermark) {
-                owner.drawWatermark(Canvas(bitmap), width, height, watermarkBitmap)
+                owner.drawWatermark(canvas, width, height, watermarkBitmap)
             }
             return bitmap
         }
@@ -242,6 +318,7 @@ class VideoExportEngine(private val context: Context) {
         override fun release() {
             cached?.recycle()
             cached = null
+            cachedCanvas = null
             if (!watermarkBitmap.isRecycled) watermarkBitmap.recycle()
             super.release()
         }
