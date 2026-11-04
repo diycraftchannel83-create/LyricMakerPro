@@ -837,7 +837,7 @@ class VideoExportEngine(private val context: Context) {
         val segmentH=height*0.029f
         val segmentGap=height*0.006f
         val maxSegments=7
-        val levels=FloatArray(count) { i ->
+        val levels=IntArray(count) { i ->
             val raw=levelAt(i*2)
             (1 + ((raw*0.78f + levelAt(i*2+1)*0.22f)*maxSegments*1.55f).toInt()).coerceIn(2,maxSegments)
         }
