@@ -683,7 +683,7 @@ private fun drawInto(
 
         if (lineToDraw != null) {
             // Never let stale/partial word cues replace the complete lyric sentence.
-            val expectedWords = lineToDraw.text.trim().split(Regex("\\\\s+")).filter { it.isNotBlank() }
+            val expectedWords = lineToDraw.text.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
             val actualWords = lineToDraw.words.map { it.text.trim() }.filter { it.isNotBlank() }
             val karaokeWordsComplete = expectedWords.isNotEmpty() && actualWords == expectedWords
             val isCurrentlyActive = timeMs in lineToDraw.startMs..lineToDraw.endMs
