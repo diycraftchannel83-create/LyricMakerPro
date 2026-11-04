@@ -848,12 +848,53 @@ By using LyricMakerPro, you acknowledge this policy.""", color = TextPrimary, fo
         AlertDialog(
             onDismissRequest = { aboutDialog = false },
             containerColor = StudioSurface,
-            title = { Text("LyricMakerPro", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            title = { Text("About LyricMakerPro", color = TextPrimary, fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Wins Mediatama", color = TextPrimary)
-                    Text("${tr("Installed version")}: ${com.winsmediatama.lyricmakerpro.BuildConfig.VERSION_NAME}", color = NeonCyan)
-                    Text("${tr("Version code")}: ${com.winsmediatama.lyricmakerpro.BuildConfig.VERSION_CODE}", color = TextSecondary)
+                Column(
+                    modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("VERSION INFORMATION", color = NeonCyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("Installed version: ${com.winsmediatama.lyricmakerpro.BuildConfig.VERSION_NAME}", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                    Text("Version code: ${com.winsmediatama.lyricmakerpro.BuildConfig.VERSION_CODE}", color = TextSecondary, fontSize = 12.sp)
+                    Text(
+                        "Version note: This release includes the latest available LyricMakerPro features and improvements. Check the installed version above when reporting an issue or requesting support.",
+                        color = TextPrimary,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp
+                    )
+
+                    HorizontalDivider(color = TextSecondary.copy(alpha = 0.25f))
+                    Text("HOW TO USE LYRICMAKERPRO", color = NeonCyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+
+                    Text("1. Create or open a project", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                    Text("Start a new project, or open a previously saved project to continue editing.")
+
+                    Text("2. Import your audio", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                    Text("Choose an audio track from your device. The audio waveform and timeline help you navigate through the song.")
+
+                    Text("3. Add your lyrics", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                    Text("Enter lyrics line by line in the lyric editor, or load an LRC lyric file when you already have timed lyrics. Add or edit lines whenever needed.")
+
+                    Text("4. Synchronize lyrics with the music", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                    Text("Use Tap to Sync while the song is playing and tap for each lyric line as it is sung. You can also select a position on the audio timeline to move playback and adjust lyric timing.")
+
+                    Text("5. Add a background", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                    Text("Import a photo or video to use as the visual background for your lyric video. Arrange your media on the timeline and preview the result.")
+
+                    Text("6. Customize the look", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                    Text("Choose a visualizer or template, then adjust lyric typography, colors, size and position to match your style.")
+
+                    Text("7. Preview and export", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                    Text("Play the preview and check that the lyrics are synchronized. Open Export, select your preferred video quality and duration, then start exporting. Follow any on-screen ad or purchase instructions if they apply to your account.")
+
+                    Text("8. Save your work", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                    Text("Save the project so you can reopen and edit it later. You can also save your synchronized lyrics as an LRC file.")
+
+                    HorizontalDivider(color = TextSecondary.copy(alpha = 0.25f))
+                    Text("TIPS", color = NeonCyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("• Use clear, properly formatted lyrics for easier synchronization.\n• Preview the entire timeline before exporting.\n• Keep your original audio, photo and video files available when reopening a project if Android requests them.", color = TextSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                    Text("Developed by Wins Mediatama", color = TextSecondary, fontSize = 12.sp)
                 }
             },
             confirmButton = { TextButton(onClick = { aboutDialog = false }) { Text(tr("Close"), color = NeonCyan) } }
