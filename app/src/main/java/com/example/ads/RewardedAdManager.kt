@@ -33,6 +33,9 @@ class RewardedAdManager(private val activity: Activity) {
     private var initialized = false
     private var isPremium = true
     private var retryDelayMs = 15_000L
+    // If the user taps before an ad is ready, hold one request and show the ad
+    // automatically after loading instead of making the user tap a second time.
+    private var pendingRewardCallbacks: Pair<() -> Unit, () -> Unit>? = null
 
     private val adUnitId: String = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG) TEST_REWARDED_AD_UNIT_ID else PRODUCTION_REWARDED_AD_UNIT_ID
 
@@ -50,6 +53,9 @@ class RewardedAdManager(private val activity: Activity) {
         isPremium = premium
         if (premium) {
             rewardedAd = null
+            val pending = pendingRewardCallbacks
+            pendingRewardCallbacks = null
+            pending?.second?.invoke()
         } else {
             initialize()
         }
@@ -69,11 +75,22 @@ class RewardedAdManager(private val activity: Activity) {
                     isLoading = false
                     retryDelayMs = 15_000L
                     rewardedAd = ad
+                    val pending = pendingRewardCallbacks
+                    if (pending != null) {
+                        pendingRewardCallbacks = null
+                        rewardedAd = null
+                        showLoadedAd(ad, pending.first, pending.second)
+                    }
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
                     isLoading = false
                     rewardedAd = null
+                    val pending = pendingRewardCallbacks
+                    if (pending != null) {
+                        pendingRewardCallbacks = null
+                        pending.second()
+                    }
                     scheduleRetry()
                 }
             }
@@ -87,12 +104,24 @@ class RewardedAdManager(private val activity: Activity) {
         }
         val ad = rewardedAd
         if (ad == null) {
+            if (pendingRewardCallbacks != null) {
+                onUnavailable()
+                return
+            }
+            pendingRewardCallbacks = onRewardEarned to onUnavailable
             load()
-            onUnavailable()
             return
         }
 
         rewardedAd = null
+        showLoadedAd(ad, onRewardEarned, onUnavailable)
+    }
+
+    private fun showLoadedAd(
+        ad: RewardedAd,
+        onRewardEarned: () -> Unit,
+        onUnavailable: () -> Unit
+    ) {
         var earnedReward = false
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdDismissedFullScreenContent() {
