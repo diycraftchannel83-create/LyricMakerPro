@@ -653,7 +653,7 @@ class VideoExportEngine(private val context: Context) {
             VisualizerType.DOT_WAVE_LINE,
             VisualizerType.SPECTRUM_GLOW_LINE,
             VisualizerType.BEAT_STICKS -> {
-                val samples = FloatArray(max(1, waveformPeaks.size)) { index -> waveformPeaks.getOrElse(index) { audioLevel } }
+                val samples = FloatArray(32) { index -> bandLevel(index) }
                 drawReferenceVisualizer(canvas, width, height, type, samples, audioLevel, timeMs)
             }
         VisualizerType.CIRCULAR_WAVE -> {
