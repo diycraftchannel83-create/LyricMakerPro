@@ -77,7 +77,7 @@ fun drawReferenceVisualizer(
     }
     when (type) {
         VisualizerType.SPECTRUM_BARS_II -> {
-            val count =  fortyEight()
+            val count = 48
             val gap = w * 0.003f
             val barW = (w * 0.76f / count) - gap
             val left = w * 0.12f
@@ -288,5 +288,3 @@ fun drawReferenceVisualizer(
         else -> Unit
     }
 }
-
-private fun fortyEight(): Int = 48
