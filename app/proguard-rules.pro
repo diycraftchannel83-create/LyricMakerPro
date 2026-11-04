@@ -24,3 +24,16 @@
 # Preserve source file and line information in R8 mapping for readable crash reports.
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
+
+# Project files are serialized with Moshi's Kotlin reflection adapter.
+# Keep constructor parameter/field names and Kotlin metadata stable in minified releases;
+# otherwise Moshi can report missing required fields with obfuscated names (for example "SZ").
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+
+-keep class kotlin.Metadata { *; }
+-keep class com.winsmediatama.lyricmakerpro.model.** { *; }
+-keep class androidx.compose.ui.text.style.TextAlign { *; }
+
+# Keep Moshi's reflective Kotlin adapter available in release builds.
+-keep class com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory { *; }
+-keepclassmembers class com.winsmediatama.lyricmakerpro.data.ProjectFileCodec { *; }
