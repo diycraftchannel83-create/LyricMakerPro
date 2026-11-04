@@ -276,7 +276,10 @@ fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
     }
     androidx.compose.runtime.DisposableEffect(nativeView) {
         var loadedNativeAd: com.google.android.gms.ads.nativead.NativeAd? = null
-        val loader = com.google.android.gms.ads.AdLoader.Builder(
+        var disposed = false
+        val retryHandler = Handler(Looper.getMainLooper())
+        lateinit var loader: com.google.android.gms.ads.AdLoader
+        loader = com.google.android.gms.ads.AdLoader.Builder(
             context,
             if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG)
                 "ca-app-pub-3940256099942544/2247696110"
@@ -294,9 +297,19 @@ fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
                 text = ad.callToAction ?: "Learn more"
                 visibility = if (ad.callToAction.isNullOrBlank()) android.view.View.GONE else android.view.View.VISIBLE
             }
-        }.withAdListener(object : AdListener() {}).build()
+        }.withAdListener(object : AdListener() {
+            override fun onAdFailedToLoad(error: LoadAdError) {
+                if (!disposed) {
+                    retryHandler.postDelayed({
+                        if (!disposed) loader.loadAd(AdRequest.Builder().build())
+                    }, 30_000L)
+                }
+            }
+        }).build()
         loader.loadAd(AdRequest.Builder().build())
         onDispose {
+            disposed = true
+            retryHandler.removeCallbacksAndMessages(null)
             loadedNativeAd?.destroy()
         }
     }
@@ -362,6 +375,8 @@ class FreeInterstitialAdManager(private val activity: Activity) {
     fun showAfterExport() {
         if (isPremium) return
         pendingShowAfterExport = true
+        // Do not surface a stale export ad if the network takes too long to fill it.
+        AdRetry.schedule(60_000L) { pendingShowAfterExport = false }
         if (interstitialAd != null) {
             showLoadedAd()
         } else {
