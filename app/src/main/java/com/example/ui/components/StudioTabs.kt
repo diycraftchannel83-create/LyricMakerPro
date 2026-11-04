@@ -35,6 +35,7 @@ fun StudioTabs(
     viewModel: LyricMakerViewModel,
     project: VideoProject,
     selectedLineId: String?,
+    playheadMs: Long,
     currentTab: LyricMakerViewModel.StudioTab,
     onTabSelected: (LyricMakerViewModel.StudioTab) -> Unit,
     onOpenTapToSync: () -> Unit,
@@ -149,6 +150,7 @@ fun StudioTabs(
                         viewModel = viewModel,
                         project = project,
                         selectedLineId = selectedLineId,
+                        playheadMs = playheadMs,
                         onOpenTapToSync = onOpenTapToSync,
                         onOpenImport = { showImportDialog = true }
                     )
@@ -755,6 +757,7 @@ private fun LyricsSyncTab(
     viewModel: LyricMakerViewModel,
     project: VideoProject,
     selectedLineId: String?,
+    playheadMs: Long,
     onOpenTapToSync: () -> Unit,
     onOpenImport: () -> Unit
 ) {
@@ -787,11 +790,22 @@ private fun LyricsSyncTab(
             }
         }
 
-        // Keep the selected cue visible when the user scrubs the timeline.
+        // Navigation focus follows the actual playhead, not only a stale editor selection.
+        // This keeps Timeline scrubbing, preview playback and the Sync list on the same cue.
+        // It is deliberately independent from Tap-to-Sync and never writes lyric timestamps.
+        val orderedLyrics = remember(project.lyrics) { project.lyrics.sortedBy { it.startMs } }
+        val playheadLineId = remember(playheadMs, orderedLyrics) {
+            orderedLyrics.lastOrNull { playheadMs >= it.startMs && playheadMs < it.endMs }?.id
+                ?: orderedLyrics.lastOrNull { it.endMs <= playheadMs }?.id
+                ?: orderedLyrics.firstOrNull()?.id
+        }
+        val focusedLineId = playheadLineId ?: selectedLineId
         val lyricListState = rememberLazyListState()
-        LaunchedEffect(selectedLineId, project.lyrics.map { it.id }) {
-            val selectedIndex = project.lyrics.indexOfFirst { it.id == selectedLineId }
-            if (selectedIndex >= 0) lyricListState.animateScrollToItem(selectedIndex)
+        LaunchedEffect(focusedLineId, project.lyrics.map { it.id }) {
+            val focusedIndex = project.lyrics.indexOfFirst { it.id == focusedLineId }
+            if (focusedIndex >= 0 && focusedIndex != lyricListState.firstVisibleItemIndex) {
+                lyricListState.animateScrollToItem(focusedIndex)
+            }
         }
 
         // Editable Lines List
@@ -809,7 +823,7 @@ private fun LyricsSyncTab(
                 ) {
                     LyricLineEditorCard(
                         line = line,
-                        isSelected = line.id == selectedLineId,
+                        isSelected = line.id == focusedLineId,
                         onTextChange = { viewModel.updateLyricText(line.id, it) },
                         onSelect = { viewModel.selectLyricLine(line.id) }
                     )
