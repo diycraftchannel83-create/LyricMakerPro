@@ -177,6 +177,15 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    /**
+     * Update the selected lyric from a timeline scrub without moving the playhead.
+     * Timeline seeking owns the exact tapped timestamp; selection only drives the
+     * Sync editor's scroll position and active-row highlight.
+     */
+    fun highlightLyricLineAtPlayhead(id: String?) {
+        _selectedLineId.value = id
+    }
+
     fun nudgeSelectedLyric(deltaMs: Long) {
         val id = _selectedLineId.value ?: return
         val current = _project.value.lyrics
