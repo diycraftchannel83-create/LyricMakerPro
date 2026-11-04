@@ -263,18 +263,20 @@ fun VideoPreviewPlayer(
             }
         }
 
-        // Scrub Slider & Mini Controls
+        // Compact scrub controls: reclaim vertical space for the lyric timeline
+        // and prevent the bottom editing toolbar from covering lyric clips.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 2.dp),
+                .height(32.dp)
+                .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             IconButton(
                 onClick = onTogglePlay,
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(30.dp)
                     .clip(CircleShape)
                     .background(StudioSurfaceVariant)
                     .testTag("play_pause_button")
@@ -283,24 +285,28 @@ fun VideoPreviewPlayer(
                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = if (isPlaying) "Pause" else "Play",
                     tint = NeonCyan,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(19.dp)
                 )
             }
 
-            // Scrub slider
-            Slider(
-                value = playheadMs.toFloat().coerceIn(0f, project.durationMs.toFloat()),
-                onValueChange = { onSeek(it.toLong()) },
-                valueRange = 0f..project.durationMs.toFloat(),
-                colors = SliderDefaults.colors(
-                    thumbColor = NeonMagenta,
-                    activeTrackColor = NeonCyan,
-                    inactiveTrackColor = StudioSurfaceVariant
-                ),
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("timeline_scrub_slider")
-            )
+            // Remove Material3's default 48dp minimum touch-target height here;
+            // the row remains compact while the slider is still easy to scrub.
+            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+                Slider(
+                    value = playheadMs.toFloat().coerceIn(0f, project.durationMs.toFloat()),
+                    onValueChange = { onSeek(it.toLong()) },
+                    valueRange = 0f..project.durationMs.toFloat(),
+                    colors = SliderDefaults.colors(
+                        thumbColor = NeonMagenta,
+                        activeTrackColor = NeonCyan,
+                        inactiveTrackColor = StudioSurfaceVariant
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(28.dp)
+                        .testTag("timeline_scrub_slider")
+                )
+            }
         }
     }
 
