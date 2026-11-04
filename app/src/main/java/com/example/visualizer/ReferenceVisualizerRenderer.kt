@@ -88,7 +88,7 @@ fun drawReferenceVisualizer(
                 val bh = h * 0.30f * wave
                 val x = left + i * (barW + gap)
                 val p = neonPaint(i, Paint.Style.FILL, 0f).apply { clearShadowLayer(); alpha = 220 }
-                canvas.drawRoundRect(x, base - bh, x + barW, base + bh * 0.56f, barW * 0.3f, barW * 0.3f, p)
+                canvas.drawRoundRect(x.toFloat(), (base - bh).toFloat(), (x + barW).toFloat(), (base + bh * 0.56f).toFloat(), (barW * 0.3f).toFloat(), (barW * 0.3f).toFloat(), p)
             }
             canvas.drawLine(w * 0.08f, base, w * 0.92f, base, Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(255, 35, 135); alpha = 130; strokeWidth = max(1f, h * 0.0012f)
@@ -222,7 +222,7 @@ fun drawReferenceVisualizer(
                 val x = w * (0.18f + i / (count - 1f) * 0.64f)
                 val v = level(i * bands.size.coerceAtLeast(1) / count)
                 val pulse = 0.12f + v * 0.88f
-                val half = h * 0.24f * pulse * (0.72f + 0.28f * abs(sin(timeMs * 0.003 + i)))
+                val half = h * 0.24f * pulse * (0.72f + 0.28f * abs(sin(timeMs * 0.003 + i).toFloat()))
                 val p = neonPaint(i, Paint.Style.STROKE, max(1.2f, w * 0.0018f))
                 p.alpha = 220
                 canvas.drawLine(x, centerY - half, x, centerY + half, p)
@@ -279,7 +279,7 @@ fun drawReferenceVisualizer(
             for (i in 0 until count) {
                 val v = level(i * bands.size.coerceAtLeast(1) / count)
                 val envelope = 0.08f + v * 0.92f
-                val hBar = h * 0.10f * envelope * (0.55f + 0.45f * abs(sin(i * 0.34 + timeMs * 0.002)))
+                val hBar = h * 0.10f * envelope * (0.55f + 0.45f * abs(sin(i * 0.34 + timeMs * 0.002).toFloat()))
                 val x = w * 0.12f + i * (barW + gap)
                 val p = neonPaint(i * 3, Paint.Style.STROKE, max(1.2f, barW * 0.38f))
                 canvas.drawLine(x, centerY - hBar, x, centerY + hBar, p)
