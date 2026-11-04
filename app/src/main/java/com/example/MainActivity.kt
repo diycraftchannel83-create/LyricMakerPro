@@ -373,7 +373,7 @@ class MainActivity : ComponentActivity() {
                                             val ordered = project.lyrics.sortedBy { it.startMs }
                                             val active = ordered.lastOrNull { positionMs >= it.startMs && positionMs < it.endMs }
                                             val target = active ?: ordered.lastOrNull { it.endMs <= positionMs } ?: ordered.firstOrNull()
-                                            target?.let { viewModel.selectLyricLine(it.id) }
+                                            target?.let { viewModel.highlightLyricLineAtPlayhead(it.id) }
                                         },
                                         onNudge = { viewModel.nudgeSelectedLyric(it) },
                                         onMoveLine = { viewModel.moveSelectedLyric(it) },
