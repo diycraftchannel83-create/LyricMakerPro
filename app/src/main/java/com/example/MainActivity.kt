@@ -111,6 +111,16 @@ class MainActivity : ComponentActivity() {
                 val exportProgress by viewModel.exportProgress.collectAsStateWithLifecycle()
                 val exportStatus by viewModel.exportStatus.collectAsStateWithLifecycle()
                 val lastExportedFile by viewModel.lastExportedFile.collectAsStateWithLifecycle()
+                DisposableEffect(isExporting) {
+                    if (isExporting) {
+                        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    } else {
+                        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
+                    onDispose {
+                        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
+                }
                 val permanentWatermarkRemoved by watermarkBilling.isOwned.collectAsStateWithLifecycle()
                 val watermarkEntitlementResolved by watermarkBilling.isEntitlementResolved.collectAsStateWithLifecycle()
                 // Cached Play purchase state is not trusted until the billing query resolves.
@@ -564,6 +574,7 @@ class MainActivity : ComponentActivity() {
                             onExportCover = { viewModel.exportCoverImage() },
                             onShare = { viewModel.shareLastExported() },
                             onExportAgain = { viewModel.prepareAnotherExport() },
+                            onCancelExport = { viewModel.cancelExport() },
                             onDismiss = { viewModel.setShowExportDialog(false) }
                         )
                     }
@@ -639,47 +650,53 @@ private fun StudioTopAppBar(
                         contentDescription = "Open application menu",
                         modifier = Modifier.fillMaxSize()
                     )
+                    var projectSubmenuExpanded by remember { mutableStateOf(false) }
+                    var mediaSubmenuExpanded by remember { mutableStateOf(false) }
                     DropdownMenu(
                         expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false },
+                        onDismissRequest = { menuExpanded = false; projectSubmenuExpanded = false; mediaSubmenuExpanded = false },
                         modifier = Modifier.widthIn(min = 230.dp).background(StudioSurface)
                     ) {
                         DropdownMenuItem(
-                            text = { Text(tr("Insert Audio")) },
-                            leadingIcon = { Icon(Icons.Default.AudioFile, null, tint = NeonCyan) },
-                            onClick = { menuExpanded = false; onPickAudio() }
+                            text = { Text(tr("Project"), fontWeight = FontWeight.SemiBold) },
+                            leadingIcon = { Icon(Icons.Default.Folder, null, tint = NeonCyan) },
+                            trailingIcon = { Icon(Icons.Default.ChevronRight, null, tint = TextSecondary) },
+                            onClick = { projectSubmenuExpanded = !projectSubmenuExpanded; mediaSubmenuExpanded = false }
                         )
+                        Box {
+                            DropdownMenu(
+                                expanded = projectSubmenuExpanded,
+                                onDismissRequest = { projectSubmenuExpanded = false },
+                                modifier = Modifier.widthIn(min = 200.dp).background(StudioSurface)
+                            ) {
+                                DropdownMenuItem(text = { Text(tr("New")) }, leadingIcon = { Icon(Icons.Default.NoteAdd, null) }, onClick = { menuExpanded = false; projectSubmenuExpanded = false; onNewProject() })
+                                DropdownMenuItem(text = { Text(tr("Open")) }, leadingIcon = { Icon(Icons.Default.FolderOpen, null) }, onClick = { menuExpanded = false; projectSubmenuExpanded = false; onOpenProject() })
+                                DropdownMenuItem(text = { Text(tr("Save")) }, leadingIcon = { Icon(Icons.Default.Save, null) }, onClick = { menuExpanded = false; projectSubmenuExpanded = false; onSaveProject() })
+                            }
+                        }
                         DropdownMenuItem(
-                            text = { Text(tr("Insert Picture")) },
-                            leadingIcon = { Icon(Icons.Default.Image, null, tint = NeonCyan) },
-                            onClick = { menuExpanded = false; onPickImage() }
+                            text = { Text(tr("Insert Media"), fontWeight = FontWeight.SemiBold) },
+                            leadingIcon = { Icon(Icons.Default.AddToPhotos, null, tint = NeonCyan) },
+                            trailingIcon = { Icon(Icons.Default.ChevronRight, null, tint = TextSecondary) },
+                            onClick = { mediaSubmenuExpanded = !mediaSubmenuExpanded; projectSubmenuExpanded = false }
                         )
+                        Box {
+                            DropdownMenu(
+                                expanded = mediaSubmenuExpanded,
+                                onDismissRequest = { mediaSubmenuExpanded = false },
+                                modifier = Modifier.widthIn(min = 200.dp).background(StudioSurface)
+                            ) {
+                                DropdownMenuItem(text = { Text(tr("Audio")) }, leadingIcon = { Icon(Icons.Default.AudioFile, null, tint = NeonCyan) }, onClick = { menuExpanded = false; mediaSubmenuExpanded = false; onPickAudio() })
+                                DropdownMenuItem(text = { Text(tr("Image")) }, leadingIcon = { Icon(Icons.Default.Image, null, tint = NeonCyan) }, onClick = { menuExpanded = false; mediaSubmenuExpanded = false; onPickImage() })
+                                DropdownMenuItem(text = { Text(tr("Video")) }, leadingIcon = { Icon(Icons.Default.VideoFile, null, tint = NeonMagenta) }, onClick = { menuExpanded = false; mediaSubmenuExpanded = false; onPickVideo() })
+                            }
+                        }
                         DropdownMenuItem(
-                            text = { Text(tr("Insert Video")) },
-                            leadingIcon = { Icon(Icons.Default.VideoFile, null, tint = NeonMagenta) },
-                            onClick = { menuExpanded = false; onPickVideo() }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(tr("Insert Lyrics (.TXT / .LRC)")) },
+                            text = { Text(tr("Import Lyrics (.TXT / .LRC)")) },
                             leadingIcon = { Icon(Icons.Default.Subtitles, null, tint = NeonCyan) },
                             onClick = { menuExpanded = false; onPickLyrics() }
                         )
                         HorizontalDivider(color = StudioCardBorder)
-                        DropdownMenuItem(
-                            text = { Text(tr("New Project")) },
-                            leadingIcon = { Icon(Icons.Default.NoteAdd, null, tint = NeonCyan) },
-                            onClick = { menuExpanded = false; onNewProject() }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(tr("Open Project")) },
-                            leadingIcon = { Icon(Icons.Default.FolderOpen, null) },
-                            onClick = { menuExpanded = false; onOpenProject() }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(tr("Save Project")) },
-                            leadingIcon = { Icon(Icons.Default.Save, null) },
-                            onClick = { menuExpanded = false; onSaveProject() }
-                        )
                         DropdownMenuItem(
                             text = { Text(tr("Save Lyrics (.LRC)")) },
                             leadingIcon = { Icon(Icons.Default.Subtitles, null, tint = NeonCyan) },
