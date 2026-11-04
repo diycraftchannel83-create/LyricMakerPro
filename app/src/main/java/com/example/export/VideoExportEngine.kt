@@ -270,7 +270,8 @@ class VideoExportEngine(private val context: Context) {
                 width,
                 height,
                 project,
-                loadWatermarkBitmap()
+                loadWatermarkBitmap(),
+                segmentStart
             )
             val effects = listOf<androidx.media3.common.Effect>(
                 presentation,
@@ -290,7 +291,8 @@ class VideoExportEngine(private val context: Context) {
         private val width: Int,
         private val height: Int,
         private val project: VideoProject,
-        private val watermarkBitmap: Bitmap
+        private val watermarkBitmap: Bitmap,
+        private val timelineOffsetMs: Long = 0L
     ) : androidx.media3.effect.BitmapOverlay() {
         private var cached: Bitmap? = null
         private var cachedCanvas: Canvas? = null
@@ -303,7 +305,7 @@ class VideoExportEngine(private val context: Context) {
                 }
             bitmap.eraseColor(Color.TRANSPARENT)
             val canvas = cachedCanvas ?: Canvas(bitmap).also { cachedCanvas = it }
-            val frameTimeMs = (presentationTimeUs / 1000L).coerceAtLeast(0L)
+            val frameTimeMs = timelineOffsetMs + (presentationTimeUs / 1000L).coerceAtLeast(0L)
             owner.drawVisualizer(
                 canvas, width, height, project.visualizer, project.visualizerColorHex,
                 frameTimeMs, project.audioTrack.bpm, project.audioTrack.waveformPeaks, project.durationMs
