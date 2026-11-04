@@ -1011,7 +1011,7 @@ class VideoExportEngine(private val context: Context) {
         val actualWords = lineToDraw.words.map { it.text.trim() }.filter { it.isNotBlank() }
         val karaokeWordsComplete = expectedWords.isNotEmpty() && actualWords == expectedWords
 
-        val isCurrentlyActive = timeMs in lineToDraw.startMs..lineToDraw.endMs
+        val isCurrentlyActive = timeMs >= lineToDraw.startMs && timeMs < lineToDraw.endMs
         val progressInLine = if (isCurrentlyActive) {
             ((timeMs - lineToDraw.startMs).toFloat() / lineToDraw.durationMs).coerceIn(0f, 1f)
         } else {
@@ -1139,8 +1139,8 @@ class VideoExportEngine(private val context: Context) {
         val baseColor = parseColor(typography.primaryColorHex, Color.WHITE)
         val activeColor = parseColor(typography.highlightColorHex, Color.parseColor("#00F5D4"))
 
-        for (word in line.words) {
-            val wordString = word.text + " "
+        for ((wordIndex, word) in line.words.withIndex()) {
+            val wordString = word.text + if (wordIndex < line.words.lastIndex) " " else ""
             val wordW = textPaint.measureText(wordString)
             val isWordActive = timeMs in word.startMs..word.endMs
             val hasWordPassed = timeMs > word.endMs
