@@ -100,7 +100,7 @@ class FreeAppOpenAdManager(private val activity: Activity) {
     private val adUnitId: String
         get() = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG)
             "ca-app-pub-3940256099942544/9257395921"
-        else "ca-app-pub-1254774552944426/5183216826"
+        else "ca-app-pub-1254774552944426/9151767484"
 
     fun setPremiumStatus(isPremium: Boolean) {
         premiumUser = isPremium
