@@ -235,7 +235,7 @@ fun FreeBannerAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
 
 @androidx.compose.runtime.Composable
 fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier) {
-    if (isPremium || com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG) return
+    if (isPremium) return
     val context = androidx.compose.ui.platform.LocalContext.current
     val nativeView = androidx.compose.runtime.remember(context) {
         val adView = com.google.android.gms.ads.nativead.NativeAdView(context)
