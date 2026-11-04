@@ -814,18 +814,22 @@ class VideoExportEngine(private val context: Context) {
                 (Color.blue(colors[i]) + (Color.blue(colors[i+1])-Color.blue(colors[i]))*(v-i)).toInt()
             )
         }
-        // Preserve the underlying project background or imported media.
+        // Audio-reactive particles use the same band/beat response as the live preview.
         val glow = Paint(Paint.ANTI_ALIAS_FLAG)
         for (i in 0 until 230) {
             val seed = i.toFloat()
+            val bandEnergy = levelAt((i * 7) % 32).coerceIn(0f, 1f)
+            val beatPulse = (0.55f + 0.45f * sin(timeMs * 0.006f + seed * 1.7f)).coerceIn(0.1f, 1f)
+            val energy = (0.18f + bandEnergy * 0.82f) * beatPulse
             val x = abs((sin(seed*127.1f)*43758.5f)%1f) * width
-            val y = abs((sin(seed*311.7f+4f)*24634.6f)%1f) * height * 0.78f
+            val baseY = abs((sin(seed*311.7f+4f)*24634.6f)%1f) * height * 0.78f
+            val y = (baseY - energy * height * 0.025f).coerceAtLeast(0f)
             val c = colorAt(x/width)
-            val radius = (1f + abs(sin(seed*8.3f))*2.8f) * (width/1280f).coerceAtLeast(0.45f)
+            val radius = (0.7f + abs(sin(seed*8.3f))*2.2f + bandEnergy*2.4f) * (width/1280f).coerceAtLeast(0.45f)
             glow.color = c
-            glow.alpha = (55 + abs(sin(seed*2.1f))*130).toInt()
-            glow.setShadowLayer(radius*3.5f,0f,0f,c)
-            canvas.drawCircle(x,y,radius,glow)
+            glow.alpha = (24f + energy * 205f).toInt().coerceIn(18, 230)
+            glow.setShadowLayer(radius*(2.2f+energy*2.2f),0f,0f,c)
+            canvas.drawCircle(x,y,radius*(0.65f+energy*0.7f),glow)
             glow.clearShadowLayer()
         }
         val count=16

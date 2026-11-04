@@ -2,7 +2,7 @@ name: Android Build & Release
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, Future ]
     tags:
       - "v*"
   pull_request:

@@ -34,12 +34,7 @@ class RewardedAdManager(private val activity: Activity) {
     private var isPremium = true
     private var retryDelayMs = 15_000L
 
-    private val adUnitId: String
-        get() = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG) {
-            TEST_REWARDED_AD_UNIT_ID
-        } else {
-            PRODUCTION_REWARDED_AD_UNIT_ID
-        }
+    private val adUnitId: String = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG) TEST_REWARDED_AD_UNIT_ID else PRODUCTION_REWARDED_AD_UNIT_ID
 
     fun initialize() {
         isPremium = false
@@ -125,8 +120,8 @@ class RewardedAdManager(private val activity: Activity) {
     }
 
     companion object {
-        private const val TEST_REWARDED_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
         private const val PRODUCTION_REWARDED_AD_UNIT_ID = "ca-app-pub-1254774552944426/5741489179"
+        private const val TEST_REWARDED_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
     }
 }
 
@@ -141,10 +136,7 @@ class FreeAppOpenAdManager(private val activity: Activity) {
     private var initialized = false
     private var retryDelayMs = 15_000L
 
-    private val adUnitId: String
-        get() = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG)
-            "ca-app-pub-3940256099942544/9257395921"
-        else "ca-app-pub-1254774552944426/9151767484"
+    private val adUnitId: String = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG) "ca-app-pub-3940256099942544/9257395921" else "ca-app-pub-1254774552944426/9151767484"
 
     fun setPremiumStatus(isPremium: Boolean) {
         premiumUser = isPremium
@@ -227,9 +219,7 @@ fun FreeBannerAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
     val adView = androidx.compose.runtime.remember(context) {
         com.google.android.gms.ads.AdView(context).apply {
             setAdSize(com.google.android.gms.ads.AdSize.BANNER)
-            adUnitId = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG)
-                "ca-app-pub-3940256099942544/6300978111"
-            else "ca-app-pub-1254774552944426/2802476395"
+            adUnitId = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG) "ca-app-pub-3940256099942544/6300978111" else "ca-app-pub-1254774552944426/2802476395"
             loadAd(AdRequest.Builder().build())
         }
     }
@@ -281,9 +271,7 @@ fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
         lateinit var loader: com.google.android.gms.ads.AdLoader
         loader = com.google.android.gms.ads.AdLoader.Builder(
             context,
-            if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG)
-                "ca-app-pub-3940256099942544/2247696110"
-            else "ca-app-pub-1254774552944426/3471514050"
+            if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG) "ca-app-pub-3940256099942544/2247696110" else "ca-app-pub-1254774552944426/3471514050"
         ).forNativeAd { ad ->
             loadedNativeAd?.destroy()
             loadedNativeAd = ad
@@ -329,12 +317,7 @@ class FreeInterstitialAdManager(private val activity: Activity) {
     private var pendingShowAfterExport = false
     private var retryDelayMs = 15_000L
 
-    private val adUnitId: String
-        get() = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG) {
-            TEST_INTERSTITIAL_AD_UNIT_ID
-        } else {
-            PRODUCTION_INTERSTITIAL_AD_UNIT_ID
-        }
+    private val adUnitId: String = if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG) TEST_INTERSTITIAL_AD_UNIT_ID else PRODUCTION_INTERSTITIAL_AD_UNIT_ID
 
     fun setPremiumStatus(premium: Boolean) {
         isPremium = premium
@@ -404,7 +387,7 @@ class FreeInterstitialAdManager(private val activity: Activity) {
     }
 
     companion object {
-        private const val TEST_INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"
         private const val PRODUCTION_INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-1254774552944426/3914322052"
+        private const val TEST_INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"
     }
 }
