@@ -659,7 +659,7 @@ private fun StudioTopAppBar(
                     ) {
                         DropdownMenuItem(
                             text = { Text(tr("Project"), fontWeight = FontWeight.SemiBold) },
-                            leadingIcon = { Icon(Icons.Default.Folder, null, tint = NeonCyan) },
+                            leadingIcon = { Icon(Icons.Default.FolderOpen, null, tint = NeonCyan) },
                             trailingIcon = { Icon(Icons.Default.ChevronRight, null, tint = TextSecondary) },
                             onClick = { projectSubmenuExpanded = !projectSubmenuExpanded; mediaSubmenuExpanded = false }
                         )
@@ -676,7 +676,7 @@ private fun StudioTopAppBar(
                         }
                         DropdownMenuItem(
                             text = { Text(tr("Insert Media"), fontWeight = FontWeight.SemiBold) },
-                            leadingIcon = { Icon(Icons.Default.AddToPhotos, null, tint = NeonCyan) },
+                            leadingIcon = { Icon(Icons.Default.Add, null, tint = NeonCyan) },
                             trailingIcon = { Icon(Icons.Default.ChevronRight, null, tint = TextSecondary) },
                             onClick = { mediaSubmenuExpanded = !mediaSubmenuExpanded; projectSubmenuExpanded = false }
                         )
