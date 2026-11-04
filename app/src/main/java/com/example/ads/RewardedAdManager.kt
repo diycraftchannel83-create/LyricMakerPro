@@ -254,11 +254,23 @@ fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
             setTextColor(android.graphics.Color.LTGRAY)
             maxLines = 2
         }
+        // Google requires MediaView (not ImageView) for the primary native-ad
+        // image/video asset. Keep it registered on NativeAdView so the SDK can
+        // render video controls and correctly measure/click-track the media asset.
+        val mediaView = com.google.android.gms.ads.nativead.MediaView(context).apply {
+            val heightPx = (120 * context.resources.displayMetrics.density).toInt()
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                heightPx
+            )
+        }
         val cta = android.widget.Button(context).apply { text = "Learn more" }
+        container.addView(mediaView)
         container.addView(headline)
         container.addView(body)
         container.addView(cta)
         adView.addView(container)
+        adView.mediaView = mediaView
         adView.headlineView = headline
         adView.bodyView = body
         adView.callToActionView = cta
@@ -276,6 +288,16 @@ fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
             loadedNativeAd?.destroy()
             loadedNativeAd = ad
             nativeView.setNativeAd(ad)
+            // Bind the primary image/video through the registered MediaView.
+            (nativeView.mediaView as? com.google.android.gms.ads.nativead.MediaView)?.apply {
+                val mediaContent = ad.mediaContent
+                if (mediaContent != null) {
+                    setMediaContent(mediaContent)
+                    visibility = android.view.View.VISIBLE
+                } else {
+                    visibility = android.view.View.GONE
+                }
+            }
             (nativeView.headlineView as? android.widget.TextView)?.text = ad.headline
             (nativeView.bodyView as? android.widget.TextView)?.apply {
                 text = ad.body.orEmpty()
