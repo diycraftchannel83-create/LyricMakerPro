@@ -70,10 +70,33 @@ jobs:
           fi
           echo "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/upload-key.jks"
           test -s "$GITHUB_WORKSPACE/upload-key.jks"
-          if ! keytool -list -keystore "$GITHUB_WORKSPACE/upload-key.jks" -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
-            echo "::error::Keystore alias '$KEY_ALIAS' was not found or the keystore password is incorrect. Set ANDROID_KEY_ALIAS to the existing alias in your upload keystore (default: upload)."
+          # Validate the keystore password independently from the alias.
+          if ! keytool -list -keystore "$GITHUB_WORKSPACE/upload-key.jks" -storepass "$STORE_PASSWORD" > "$RUNNER_TEMP/keystore-list.txt" 2> "$RUNNER_TEMP/keystore-error.txt"; then
+            echo "::error::Cannot open upload keystore. Check ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD."
+            cat "$RUNNER_TEMP/keystore-error.txt"
             exit 1
           fi
+
+          # Confirm that the configured alias exists and is a private-key entry.
+          mapfile -t PRIVATE_KEY_ALIASES < <(awk -F', ' '/, PrivateKeyEntry,/ {print $1}' "$RUNNER_TEMP/keystore-list.txt")
+          if [ "${#PRIVATE_KEY_ALIASES[@]}" -eq 0 ]; then
+            echo "::error::The keystore contains no PrivateKeyEntry. Check that ANDROID_KEYSTORE_BASE64 points to the upload signing keystore."
+            exit 1
+          fi
+
+          if ! printf '%s\\n' "${PRIVATE_KEY_ALIASES[@]}" | grep -Fxq -- "$KEY_ALIAS"; then
+            if [ "${#PRIVATE_KEY_ALIASES[@]}" -eq 1 ]; then
+              DETECTED_ALIAS="${PRIVATE_KEY_ALIASES[0]}"
+              echo "::warning::Configured ANDROID_KEY_ALIAS does not match. Using the only private-key alias found in the keystore: $DETECTED_ALIAS"
+              KEY_ALIAS="$DETECTED_ALIAS"
+            else
+              echo "::error::ANDROID_KEY_ALIAS '$KEY_ALIAS' was not found. Available private-key aliases:"
+              printf ' - %s\\n' "${PRIVATE_KEY_ALIASES[@]}"
+              exit 1
+            fi
+          fi
+
+          echo "Release keystore validated; private-key alias selected."
           echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/upload-key.jks" >> "$GITHUB_ENV"
           echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
 
