@@ -84,14 +84,14 @@ jobs:
             exit 1
           fi
 
-          if ! printf '%s\\n' "${PRIVATE_KEY_ALIASES[@]}" | grep -Fxq -- "$KEY_ALIAS"; then
+          if ! printf '%s\n' "${PRIVATE_KEY_ALIASES[@]}" | grep -Fxq -- "$KEY_ALIAS"; then
             if [ "${#PRIVATE_KEY_ALIASES[@]}" -eq 1 ]; then
               DETECTED_ALIAS="${PRIVATE_KEY_ALIASES[0]}"
               echo "::warning::Configured ANDROID_KEY_ALIAS does not match. Using the only private-key alias found in the keystore: $DETECTED_ALIAS"
               KEY_ALIAS="$DETECTED_ALIAS"
             else
               echo "::error::ANDROID_KEY_ALIAS '$KEY_ALIAS' was not found. Available private-key aliases:"
-              printf ' - %s\\n' "${PRIVATE_KEY_ALIASES[@]}"
+              printf ' - %s\n' "${PRIVATE_KEY_ALIASES[@]}"
               exit 1
             fi
           fi
