@@ -266,58 +266,126 @@ fun FreeBannerAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
 fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier) {
     if (isPremium) return
     val context = androidx.compose.ui.platform.LocalContext.current
+    val density = context.resources.displayMetrics.density
+    fun dp(value: Int) = (value * density).toInt()
+
     val nativeView = androidx.compose.runtime.remember(context) {
         val adView = com.google.android.gms.ads.nativead.NativeAdView(context)
         val container = android.widget.LinearLayout(context).apply {
             orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(14, 8, 14, 8)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
             setBackgroundColor(android.graphics.Color.rgb(28, 34, 48))
+            layoutParams = android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        // Clear ad attribution is required for programmatically rendered native ads.
+        val attribution = android.widget.TextView(context).apply {
+            text = "Ad"
+            textSize = 11f
+            setTextColor(android.graphics.Color.rgb(0, 220, 200))
+            setPadding(0, 0, 0, dp(6))
+            contentDescription = "Advertisement"
+        }
+        val header = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        val icon = android.widget.ImageView(context).apply {
+            scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+            layoutParams = android.widget.LinearLayout.LayoutParams(dp(40), dp(40)).apply {
+                marginEnd = dp(10)
+            }
+        }
+        val titleAndAdvertiser = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            layoutParams = android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         }
         val headline = android.widget.TextView(context).apply {
             textSize = 14f
             setTextColor(android.graphics.Color.WHITE)
             maxLines = 2
         }
+        val advertiser = android.widget.TextView(context).apply {
+            textSize = 11f
+            setTextColor(android.graphics.Color.LTGRAY)
+            maxLines = 1
+        }
         val body = android.widget.TextView(context).apply {
             textSize = 12f
             setTextColor(android.graphics.Color.LTGRAY)
-            maxLines = 2
+            maxLines = 3
+            setPadding(0, dp(6), 0, dp(6))
         }
-        // Google requires MediaView (not ImageView) for the primary native-ad
-        // image/video asset. Keep it registered on NativeAdView so the SDK can
-        // render video controls and correctly measure/click-track the media asset.
         val mediaView = com.google.android.gms.ads.nativead.MediaView(context).apply {
-            val heightPx = (120 * context.resources.displayMetrics.density).toInt()
             layoutParams = android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                heightPx
-            )
+                dp(120)
+            ).apply { bottomMargin = dp(6) }
         }
-        val cta = android.widget.Button(context).apply { text = "Learn more" }
-        container.addView(mediaView)
-        container.addView(headline)
+        val cta = android.widget.Button(context).apply {
+            textSize = 12f
+            isAllCaps = false
+        }
+
+        titleAndAdvertiser.addView(headline)
+        titleAndAdvertiser.addView(advertiser)
+        header.addView(icon)
+        header.addView(titleAndAdvertiser)
+        container.addView(attribution)
+        container.addView(header)
         container.addView(body)
+        container.addView(mediaView)
         container.addView(cta)
         adView.addView(container)
-        adView.mediaView = mediaView
+
+        // Register every asset view used by this layout with NativeAdView.
+        adView.iconView = icon
         adView.headlineView = headline
+        adView.advertiserView = advertiser
         adView.bodyView = body
+        adView.mediaView = mediaView
         adView.callToActionView = cta
         adView
     }
+
     androidx.compose.runtime.DisposableEffect(nativeView) {
         var loadedNativeAd: com.google.android.gms.ads.nativead.NativeAd? = null
         var disposed = false
         val retryHandler = Handler(Looper.getMainLooper())
-        lateinit var loader: com.google.android.gms.ads.AdLoader
-        loader = com.google.android.gms.ads.AdLoader.Builder(
+        val loader = com.google.android.gms.ads.AdLoader.Builder(
             context,
             if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG) "ca-app-pub-3940256099942544/2247696110" else "ca-app-pub-1254774552944426/3471514050"
         ).forNativeAd { ad ->
+            if (disposed) {
+                ad.destroy()
+                return@forNativeAd
+            }
             loadedNativeAd?.destroy()
             loadedNativeAd = ad
-            nativeView.setNativeAd(ad)
-            // Bind the primary image/video through the registered MediaView.
+
+            (nativeView.iconView as? android.widget.ImageView)?.apply {
+                setImageDrawable(ad.icon?.drawable)
+                visibility = if (ad.icon?.drawable != null) android.view.View.VISIBLE else android.view.View.GONE
+            }
+            (nativeView.headlineView as? android.widget.TextView)?.apply {
+                text = ad.headline
+                visibility = if (ad.headline.isNullOrBlank()) android.view.View.GONE else android.view.View.VISIBLE
+            }
+            (nativeView.advertiserView as? android.widget.TextView)?.apply {
+                text = ad.advertiser.orEmpty()
+                visibility = if (ad.advertiser.isNullOrBlank()) android.view.View.GONE else android.view.View.VISIBLE
+            }
+            (nativeView.bodyView as? android.widget.TextView)?.apply {
+                text = ad.body.orEmpty()
+                visibility = if (ad.body.isNullOrBlank()) android.view.View.GONE else android.view.View.VISIBLE
+            }
+            (nativeView.callToActionView as? android.widget.Button)?.apply {
+                text = ad.callToAction.orEmpty()
+                visibility = if (ad.callToAction.isNullOrBlank()) android.view.View.GONE else android.view.View.VISIBLE
+            }
             (nativeView.mediaView as? com.google.android.gms.ads.nativead.MediaView)?.apply {
                 val mediaContent = ad.mediaContent
                 if (mediaContent != null) {
@@ -327,15 +395,8 @@ fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
                     visibility = android.view.View.GONE
                 }
             }
-            (nativeView.headlineView as? android.widget.TextView)?.text = ad.headline
-            (nativeView.bodyView as? android.widget.TextView)?.apply {
-                text = ad.body.orEmpty()
-                visibility = if (ad.body.isNullOrBlank()) android.view.View.GONE else android.view.View.VISIBLE
-            }
-            (nativeView.callToActionView as? android.widget.Button)?.apply {
-                text = ad.callToAction ?: "Learn more"
-                visibility = if (ad.callToAction.isNullOrBlank()) android.view.View.GONE else android.view.View.VISIBLE
-            }
+            // Register the populated NativeAd only after all asset views are bound.
+            nativeView.setNativeAd(ad)
         }.withAdListener(object : AdListener() {
             override fun onAdFailedToLoad(error: LoadAdError) {
                 if (!disposed) {
@@ -345,20 +406,22 @@ fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
                 }
             }
         }).build()
+
         loader.loadAd(AdRequest.Builder().build())
         onDispose {
             disposed = true
             retryHandler.removeCallbacksAndMessages(null)
             loadedNativeAd?.destroy()
+            loadedNativeAd = null
         }
     }
+
     androidx.compose.ui.viewinterop.AndroidView(
-        modifier = modifier.fillMaxWidth().heightIn(min = 76.dp, max = 116.dp),
+        modifier = modifier.fillMaxWidth().heightIn(min = 180.dp, max = 280.dp),
         factory = { nativeView },
         update = {}
     )
 }
-
 
 /** Interstitial ads are queued after successful export if a request is still loading. */
 class FreeInterstitialAdManager(private val activity: Activity) {
