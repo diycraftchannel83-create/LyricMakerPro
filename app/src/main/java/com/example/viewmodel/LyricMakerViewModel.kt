@@ -285,11 +285,19 @@ class LyricMakerViewModel(application: Application) : AndroidViewModel(applicati
         audioEngine.seekTo(newStart)
     }
 
+    fun deleteLyricLine(id: String) {
+        val project = _project.value
+        if (project.lyrics.none { it.id == id }) return
+        val remainingLyrics = project.lyrics.filterNot { it.id == id }
+        _project.value = project.copy(lyrics = remainingLyrics)
+        if (_selectedLineId.value == id) {
+            _selectedLineId.value = remainingLyrics.firstOrNull()?.id
+        }
+    }
+
     fun deleteSelectedLyric() {
         val id = _selectedLineId.value ?: return
-        val currentLyrics = _project.value.lyrics.filterNot { it.id == id }
-        _project.value = _project.value.copy(lyrics = currentLyrics)
-        _selectedLineId.value = currentLyrics.firstOrNull()?.id
+        deleteLyricLine(id)
     }
 
     /**

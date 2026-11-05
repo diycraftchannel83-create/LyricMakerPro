@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.winsmediatama.lyricmakerpro.AppLanguage
 import com.winsmediatama.lyricmakerpro.data.PresetLibrary
 import com.winsmediatama.lyricmakerpro.model.*
 import com.winsmediatama.lyricmakerpro.ui.theme.*
@@ -107,7 +108,7 @@ fun StudioTabs(
                     onClick = { onTabSelected(tab) },
                     text = {
                         Text(
-                            text = tab.label,
+                            text = AppLanguage.text(tab.label),
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             fontSize = 12.sp,
                             color = if (isSelected) NeonCyan else TextSecondary
@@ -197,13 +198,13 @@ private fun TimelineControlsTab(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Real-Time Lyric Sync",
+                        text = AppLanguage.text("Real-Time Lyric Sync"),
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary,
                         fontSize = 14.sp
                     )
                     Text(
-                        text = "Listen to music and tap on each beat to lock in timestamps with haptic feedback.",
+                        text = AppLanguage.text("Listen to music and tap on each beat to lock in timestamps with haptic feedback."),
                         color = TextSecondary,
                         fontSize = 11.sp
                     )
@@ -216,7 +217,7 @@ private fun TimelineControlsTab(
                 ) {
                     Icon(imageVector = Icons.Default.TouchApp, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Sync Now", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(AppLanguage.text("Sync Now"), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -232,7 +233,7 @@ private fun TimelineControlsTab(
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp), tint = NeonCyan)
                 Spacer(Modifier.width(6.dp))
-                Text("Add Lyric Line", fontSize = 12.sp, color = NeonCyan)
+                Text(AppLanguage.text("Add Lyric Line"), fontSize = 12.sp, color = NeonCyan)
             }
 
             OutlinedButton(
@@ -241,7 +242,7 @@ private fun TimelineControlsTab(
             ) {
                 Icon(Icons.Default.LibraryMusic, contentDescription = null, modifier = Modifier.size(16.dp), tint = CyberYellow)
                 Spacer(Modifier.width(6.dp))
-                Text("Presets Library", fontSize = 12.sp, color = CyberYellow)
+                Text(AppLanguage.text("Presets Library"), fontSize = 12.sp, color = CyberYellow)
             }
         }
     }
@@ -258,7 +259,7 @@ private fun TypographyTab(viewModel: LyricMakerViewModel, project: VideoProject)
         // Typography Presets Carousel
         item {
             Text(
-                text = "Preset Styles",
+                text = AppLanguage.text("Preset Styles"),
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
                 color = TextPrimary
@@ -285,13 +286,13 @@ private fun TypographyTab(viewModel: LyricMakerViewModel, project: VideoProject)
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "Lyrics",
+                                text = AppLanguage.text("Lyrics"),
                                 fontSize = 15.sp,
                                 fontWeight = if (preset.isBold) FontWeight.Bold else FontWeight.Normal,
                                 color = parseColorHex(preset.highlightColorHex)
                             )
                             Spacer(Modifier.height(4.dp))
-                            Text(text = preset.name, fontSize = 11.sp, color = TextSecondary)
+                            Text(text = AppLanguage.text(preset.name), fontSize = 11.sp, color = TextSecondary)
                         }
                     }
                 }
@@ -300,7 +301,7 @@ private fun TypographyTab(viewModel: LyricMakerViewModel, project: VideoProject)
 
         // Font Family Selector
         item {
-            Text(text = "Font Family", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            Text(text = AppLanguage.text("Font Family"), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
             Spacer(Modifier.height(6.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(
@@ -315,7 +316,7 @@ private fun TypographyTab(viewModel: LyricMakerViewModel, project: VideoProject)
                     FilterChip(
                         selected = typography.fontFamilyName.equals(fam, ignoreCase = true),
                         onClick = { viewModel.updateTypographyProperties(fontFamily = fam) },
-                        label = { Text(label, fontSize = 12.sp) }
+                        label = { Text(AppLanguage.text(label), fontSize = 12.sp) }
                     )
                 }
             }
@@ -327,7 +328,7 @@ private fun TypographyTab(viewModel: LyricMakerViewModel, project: VideoProject)
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(text = "Font Size", fontSize = 12.sp, color = TextSecondary)
+                Text(text = AppLanguage.text("Font Size"), fontSize = 12.sp, color = TextSecondary)
                 Text(text = "${typography.fontSizeSp.toInt()}sp", fontSize = 12.sp, color = NeonCyan)
             }
             Slider(
@@ -340,40 +341,40 @@ private fun TypographyTab(viewModel: LyricMakerViewModel, project: VideoProject)
 
         // Style options previously shown in the preview popup now live here only.
         item {
-            Text("Font Style", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            Text(AppLanguage.text("Font Style"), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
                     selected = typography.isBold,
                     onClick = { viewModel.updateTypographyProperties(isBold = !typography.isBold) },
-                    label = { Text("Bold") }
+                    label = { Text(AppLanguage.text("Bold")) }
                 )
                 FilterChip(
                     selected = typography.isItalic,
                     onClick = { viewModel.updateTypographyProperties(isItalic = !typography.isItalic) },
-                    label = { Text("Italic") }
+                    label = { Text(AppLanguage.text("Italic")) }
                 )
             }
         }
         item {
-            Text("Visual Font Effects", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            Text(AppLanguage.text("Visual Font Effects"), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(FontVisualEffect.entries) { effect ->
                     FilterChip(
                         selected = typography.visualEffect == effect,
                         onClick = { viewModel.updateTypographyProperties(visualEffect = effect) },
-                        label = { Text(effect.label, fontSize = 10.sp) }
+                        label = { Text(AppLanguage.text(effect.label), fontSize = 10.sp) }
                     )
                 }
             }
         }
         item {
-            Text("Karaoke Layout", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            Text(AppLanguage.text("Karaoke Layout"), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(LyricLayoutMode.entries) { mode ->
                     FilterChip(
                         selected = typography.lyricLayout == mode,
                         onClick = { viewModel.updateTypographyProperties(lyricLayout = mode) },
-                        label = { Text(mode.label, fontSize = 10.sp) }
+                        label = { Text(AppLanguage.text(mode.label), fontSize = 10.sp) }
                     )
                 }
             }
@@ -381,18 +382,18 @@ private fun TypographyTab(viewModel: LyricMakerViewModel, project: VideoProject)
 
         // Global lyric placement controls (applies to every lyric line).
         item {
-            Text("Lyric Position (all lines)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            Text(AppLanguage.text("Lyric Position (all lines)"), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Horizontal", fontSize = 12.sp, color = TextSecondary)
+                Text(AppLanguage.text("Horizontal"), fontSize = 12.sp, color = TextSecondary)
                 Text("${typography.positionXPercent.toInt()}%", fontSize = 12.sp, color = NeonCyan)
             }
             Slider(value = typography.positionXPercent, onValueChange = { viewModel.updateTypographyProperties(positionXPercent = it) }, valueRange = 5f..95f)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Vertical", fontSize = 12.sp, color = TextSecondary)
+                Text(AppLanguage.text("Vertical"), fontSize = 12.sp, color = TextSecondary)
                 Text("${typography.positionYPercent.toInt()}%", fontSize = 12.sp, color = NeonCyan)
             }
             Slider(value = typography.positionYPercent, onValueChange = { viewModel.updateTypographyProperties(positionYPercent = it) }, valueRange = 5f..95f)
-            Text("Drag directly on the preview to reposition all lyric lines.", fontSize = 10.sp, color = TextSecondary)
+            Text(AppLanguage.text("Drag directly on the preview to reposition all lyric lines."), fontSize = 10.sp, color = TextSecondary)
         }
 
         // Glow Radius Slider
@@ -487,13 +488,13 @@ private fun EffectsTab(viewModel: LyricMakerViewModel, project: VideoProject) {
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = effect.label,
+                            text = AppLanguage.text(effect.label),
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
                             color = if (isSelected) NeonMagenta else TextPrimary
                         )
                         Text(
-                            text = effect.description,
+                            text = AppLanguage.text(effect.description),
                             fontSize = 11.sp,
                             color = TextSecondary
                         )
@@ -521,7 +522,7 @@ private fun EffectsTab(viewModel: LyricMakerViewModel, project: VideoProject) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = NeonCyan)
                             Spacer(Modifier.width(7.dp))
-                            Text("Smart Karaoke Word Sync", color = NeonCyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(AppLanguage.text("Smart Karaoke Word Sync"), color = NeonCyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                         Text(
                             "Analyze the song waveform and adjust each word's highlight timing to nearby audio attacks. Lyric line timestamps stay unchanged.",
@@ -536,12 +537,12 @@ private fun EffectsTab(viewModel: LyricMakerViewModel, project: VideoProject) {
                         ) {
                             Icon(Icons.Default.GraphicEq, contentDescription = null, tint = Color.Black, modifier = Modifier.size(17.dp))
                             Spacer(Modifier.width(7.dp))
-                            Text("Sync words to music", color = Color.Black, fontWeight = FontWeight.Bold)
+                            Text(AppLanguage.text("Sync words to music"), color = Color.Black, fontWeight = FontWeight.Bold)
                         }
                         if (project.audioTrack.waveformPeaks.isEmpty()) {
-                            Text("Import audio and wait for its waveform analysis to finish.", color = TextSecondary, fontSize = 10.sp)
+                            Text(AppLanguage.text("Import audio and wait for its waveform analysis to finish."), color = TextSecondary, fontSize = 10.sp)
                         } else if (syncedLineCount > 0) {
-                            Text("$syncedLineCount lyric lines updated. Preview and export use the new word timing.", color = NeonCyan, fontSize = 10.sp)
+                            Text(AppLanguage.text("\$syncedLineCount lyric lines updated. Preview and export use the new word timing.").replace("\$syncedLineCount", syncedLineCount.toString()), color = NeonCyan, fontSize = 10.sp)
                         }
                     }
                 }
@@ -558,7 +559,7 @@ private fun VisualizerTab(viewModel: LyricMakerViewModel, project: VideoProject)
     ) {
         // Visualizer Overlay Style Selection
         item {
-            Text(text = "Visualizer Type", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            Text(text = AppLanguage.text("Visualizer Type"), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
             Spacer(Modifier.height(6.dp))
         }
 
@@ -606,12 +607,12 @@ private fun VisualizerTab(viewModel: LyricMakerViewModel, project: VideoProject)
                     Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = type.label,
+                            text = AppLanguage.text(type.label),
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp,
                             color = if (isSelected) NeonCyan else TextPrimary
                         )
-                        Text(text = type.description, fontSize = 10.sp, color = TextSecondary)
+                        Text(text = AppLanguage.text(type.description), fontSize = 10.sp, color = TextSecondary)
                     }
                     if (isSelected) {
                         Icon(Icons.Default.Check, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(16.dp))
@@ -657,7 +658,7 @@ private fun BackgroundTab(viewModel: LyricMakerViewModel, project: VideoProject,
     ) {
         // Aspect Ratio
         item {
-            Text(text = "Export Aspect Ratio", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            Text(text = AppLanguage.text("Export Aspect Ratio"), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CanvasRatio.entries.forEach { ratio ->
@@ -665,7 +666,7 @@ private fun BackgroundTab(viewModel: LyricMakerViewModel, project: VideoProject,
                     FilterChip(
                         selected = isSelected,
                         onClick = { viewModel.setCanvasRatio(ratio) },
-                        label = { Text(ratio.label, fontSize = 12.sp) }
+                        label = { Text(AppLanguage.text(ratio.label), fontSize = 12.sp) }
                     )
                 }
             }
@@ -673,7 +674,7 @@ private fun BackgroundTab(viewModel: LyricMakerViewModel, project: VideoProject,
 
         // Background Atmosphere Presets
         item {
-            Text(text = "Atmosphere & Themes", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            Text(text = AppLanguage.text("Atmosphere & Themes"), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
             Spacer(Modifier.height(6.dp))
 
             val themes = listOf(
@@ -708,7 +709,7 @@ private fun BackgroundTab(viewModel: LyricMakerViewModel, project: VideoProject,
                                     .background(parseColorHex(cfg.primaryColorHex))
                             )
                             Spacer(Modifier.height(4.dp))
-                            Text(name, fontSize = 10.sp, color = if (isSelected) NeonCyan else TextSecondary)
+                            Text(AppLanguage.text(name), fontSize = 10.sp, color = if (isSelected) NeonCyan else TextSecondary)
                         }
                     }
                 }
@@ -721,7 +722,7 @@ private fun BackgroundTab(viewModel: LyricMakerViewModel, project: VideoProject,
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(text = "Dark Contrast Overlay", fontSize = 12.sp, color = TextSecondary)
+                Text(text = AppLanguage.text("Dark Contrast Overlay"), fontSize = 12.sp, color = TextSecondary)
                 Text(text = "${(bg.darkOverlayOpacity * 100).toInt()}%", fontSize = 12.sp, color = NeonCyan)
             }
             Slider(
@@ -740,8 +741,8 @@ private fun BackgroundTab(viewModel: LyricMakerViewModel, project: VideoProject,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
-                    Text(text = "Creator Tag / Watermark", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                    Text(text = "Display ${project.watermarkText} in corner", fontSize = 11.sp, color = TextSecondary)
+                    Text(text = AppLanguage.text("Creator Tag / Watermark"), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Text(text = AppLanguage.text("Display ${project.watermarkText} in corner"), fontSize = 11.sp, color = TextSecondary)
                 }
                 Switch(
                     checked = project.showWatermark,
@@ -761,6 +762,8 @@ private fun LyricsSyncTab(
     onOpenTapToSync: () -> Unit,
     onOpenImport: () -> Unit
 ) {
+    var pendingDeleteLineId by remember { mutableStateOf<String?>(null) }
+
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -777,7 +780,7 @@ private fun LyricsSyncTab(
             ) {
                 Icon(Icons.Default.TouchApp, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Tap-to-Sync Mode", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(AppLanguage.text("Tap-to-Sync Mode"), fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
 
             OutlinedButton(
@@ -786,7 +789,7 @@ private fun LyricsSyncTab(
             ) {
                 Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp), tint = NeonCyan)
                 Spacer(Modifier.width(6.dp))
-                Text("Import LRC/Text", fontSize = 12.sp, color = NeonCyan)
+                Text(AppLanguage.text("Import LRC/Text"), fontSize = 12.sp, color = NeonCyan)
             }
         }
 
@@ -825,7 +828,8 @@ private fun LyricsSyncTab(
                         line = line,
                         isSelected = line.id == focusedLineId,
                         onTextChange = { viewModel.updateLyricText(line.id, it) },
-                        onSelect = { viewModel.selectLyricLine(line.id) }
+                        onSelect = { viewModel.selectLyricLine(line.id) },
+                        onDelete = { pendingDeleteLineId = line.id }
                     )
 
                     // Compact insertion control between adjacent lyric rows.
@@ -846,7 +850,7 @@ private fun LyricsSyncTab(
                                 modifier = Modifier.size(14.dp)
                             )
                             Spacer(Modifier.width(3.dp))
-                            Text("Add line", color = NeonCyan, fontSize = 10.sp)
+                            Text(AppLanguage.text("Add line"), color = NeonCyan, fontSize = 10.sp)
                         }
                     }
                 }
@@ -859,11 +863,47 @@ private fun LyricsSyncTab(
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = NeonCyan)
                         Spacer(Modifier.width(6.dp))
-                        Text("Add first lyric line", color = NeonCyan)
+                        Text(AppLanguage.text("Add first lyric line"), color = NeonCyan)
                     }
                 }
             }
         }
+    }
+
+    val pendingDeleteLine = project.lyrics.firstOrNull { it.id == pendingDeleteLineId }
+    if (pendingDeleteLine != null) {
+        AlertDialog(
+            onDismissRequest = { pendingDeleteLineId = null },
+            title = {
+                Text(
+                    AppLanguage.text("Delete lyric line?"),
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    AppLanguage.text("This lyric line will be removed from the current project."),
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteLyricLine(pendingDeleteLine.id)
+                        pendingDeleteLineId = null
+                    }
+                ) {
+                    Text(AppLanguage.text("Delete"), color = NeonMagenta, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteLineId = null }) {
+                    Text(AppLanguage.text("Cancel"), color = TextSecondary)
+                }
+            },
+            containerColor = StudioSurface
+        )
     }
 }
 
@@ -872,7 +912,8 @@ private fun LyricLineEditorCard(
     line: LyricLine,
     isSelected: Boolean,
     onTextChange: (String) -> Unit,
-    onSelect: () -> Unit
+    onSelect: () -> Unit,
+    onDelete: () -> Unit
 ) {
     var textValue by remember(line.text) { mutableStateOf(line.text) }
 
@@ -925,8 +966,22 @@ private fun LyricLineEditorCard(
                     unfocusedBorderColor = Color.Transparent
                 ),
                 singleLine = true,
-                placeholder = { Text("Enter lyric text...", color = TextMuted, fontSize = 12.sp) }
+                placeholder = { Text(AppLanguage.text("Enter lyric text..."), color = TextMuted, fontSize = 12.sp) }
             )
+
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier
+                    .size(36.dp)
+                    .testTag("delete_lyric_${line.id}")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = AppLanguage.text("Delete lyric line"),
+                    tint = NeonMagenta,
+                    modifier = Modifier.size(19.dp)
+                )
+            }
         }
     }
 }
@@ -940,7 +995,7 @@ private fun ImportLyricsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Import Lyrics or LRC File", color = TextPrimary, fontWeight = FontWeight.Bold) },
+        title = { Text(AppLanguage.text("Import Lyrics or LRC File"), color = TextPrimary, fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -964,12 +1019,12 @@ private fun ImportLyricsDialog(
                 onClick = { if (rawText.isNotBlank()) onImport(rawText) },
                 colors = ButtonDefaults.buttonColors(containerColor = NeonCyan)
             ) {
-                Text("Import Lyrics", color = Color.Black, fontWeight = FontWeight.Bold)
+                Text(AppLanguage.text("Import Lyrics"), color = Color.Black, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = TextSecondary)
+                Text(AppLanguage.text("Cancel"), color = TextSecondary)
             }
         },
         containerColor = StudioSurface
