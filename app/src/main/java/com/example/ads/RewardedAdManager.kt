@@ -355,7 +355,8 @@ fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
         var loadedNativeAd: com.google.android.gms.ads.nativead.NativeAd? = null
         var disposed = false
         val retryHandler = Handler(Looper.getMainLooper())
-        val loader = com.google.android.gms.ads.AdLoader.Builder(
+        var loader: com.google.android.gms.ads.AdLoader? = null
+        loader = com.google.android.gms.ads.AdLoader.Builder(
             context,
             if (com.winsmediatama.lyricmakerpro.BuildConfig.DEBUG) "ca-app-pub-3940256099942544/2247696110" else "ca-app-pub-1254774552944426/3471514050"
         ).forNativeAd { ad ->
@@ -401,13 +402,13 @@ fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
             override fun onAdFailedToLoad(error: LoadAdError) {
                 if (!disposed) {
                     retryHandler.postDelayed({
-                        if (!disposed) loader.loadAd(AdRequest.Builder().build())
+                        if (!disposed) loader?.loadAd(AdRequest.Builder().build())
                     }, 30_000L)
                 }
             }
         }).build()
 
-        loader.loadAd(AdRequest.Builder().build())
+        loader?.loadAd(AdRequest.Builder().build())
         onDispose {
             disposed = true
             retryHandler.removeCallbacksAndMessages(null)
