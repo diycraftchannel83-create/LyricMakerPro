@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import com.winsmediatama.lyricmakerpro.model.VideoProject
 import java.io.File
 import java.io.FileInputStream
@@ -26,8 +27,15 @@ object LyricMakerStorage {
     private fun timestamp(): String = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
 
     fun saveProject(context: Context, project: VideoProject, projectName: String = project.title): Uri {
+        require(projectName.isNotBlank()) { "Project name cannot be empty" }
+
+        // Copy imported media into the app's Documents asset folders first, then
+        // serialize the copied content URIs so a reopened project is self-contained.
+        val projectWithLocalAssets = copyProjectAssets(context, project)
+            .copy(title = projectName.trim())
+
         // Keep a stable filename for this project ID so subsequent saves replace the
-        // same document, even if the user changes the visible project title.
+        // same project document rather than creating timestamped duplicates.
         val preferences = context.getSharedPreferences("lyricmakerpro_project_files", Context.MODE_PRIVATE)
         val key = "project_file_${project.id}"
         val name = preferences.getString(key, null)
@@ -35,10 +43,146 @@ object LyricMakerStorage {
             ?: "${safeName(projectName)}_${project.id.take(8)}.lyricmaker.json"
         val savedUri = saveText(
             context, name, "application/json", "$ROOT/Project",
-            ProjectFileCodec.encode(project.copy(title = projectName.trim()))
+            ProjectFileCodec.encode(projectWithLocalAssets)
         )
         preferences.edit().putString(key, name).apply()
         return savedUri
+    }
+
+    private fun copyProjectAssets(context: Context, project: VideoProject): VideoProject {
+        val audioTrack = project.audioTrack.let { track ->
+            if (track.beatType == com.winsmediatama.lyricmakerpro.model.AudioBeatType.CUSTOM_FILE) {
+                track.copy(customUri = track.customUri?.let {
+                    copyAssetToDocuments(context, Uri.parse(it), "Audio", project.id, track.id)
+                })
+            } else track
+        }
+
+        val mediaClips = project.mediaClips.map { clip ->
+            val folder = when (clip.type) {
+                com.winsmediatama.lyricmakerpro.model.MediaClipType.IMAGE -> "Image"
+                com.winsmediatama.lyricmakerpro.model.MediaClipType.VIDEO -> "Video"
+            }
+            clip.copy(
+                uri = copyAssetToDocuments(context, Uri.parse(clip.uri), folder, project.id, clip.id)
+            )
+        }
+
+        val background = project.background.copy(
+            imageUri = project.background.imageUri?.let {
+                copyAssetToDocuments(context, Uri.parse(it), "Image", project.id, "background")
+            }
+        )
+        return project.copy(audioTrack = audioTrack, mediaClips = mediaClips, background = background)
+    }
+
+    /**
+     * Copies a selected content:// or file:// asset to Documents/LyricMakerPro/Asset.
+     * MediaStore content URIs are stored in the project JSON and remain usable after
+     * the original picker grant is lost. Re-saving a project updates the same copy.
+     */
+    private fun copyAssetToDocuments(
+        context: Context,
+        sourceUri: Uri,
+        assetFolder: String,
+        projectId: String,
+        assetId: String
+    ): String {
+        require(assetFolder in setOf("Audio", "Image", "Video")) { "Unsupported asset folder" }
+
+        val relativePath = "${Environment.DIRECTORY_DOCUMENTS}/$ROOT/Asset/$assetFolder/"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && sourceUri.scheme == "content") {
+            val alreadyInTarget = runCatching {
+                context.contentResolver.query(
+                    sourceUri,
+                    arrayOf(MediaStore.MediaColumns.RELATIVE_PATH),
+                    null, null, null
+                )?.use { cursor ->
+                    cursor.moveToFirst() &&
+                        cursor.getString(0)?.equals(relativePath, ignoreCase = true) == true
+                } ?: false
+            }.getOrDefault(false)
+            if (alreadyInTarget) return sourceUri.toString()
+        }
+        if (sourceUri.scheme == "file" &&
+            sourceUri.path?.contains("/$ROOT/Asset/$assetFolder/") == true
+        ) return sourceUri.toString()
+
+        val resolver = context.contentResolver
+        val originalName = runCatching {
+            resolver.query(sourceUri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        }.getOrNull()?.takeIf { it.isNotBlank() }
+            ?: sourceUri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+            ?: "asset"
+
+        val cleanOriginalName = safeName(originalName)
+        val extension = cleanOriginalName.substringAfterLast('.', "").takeIf { it.isNotBlank() }
+        val baseName = cleanOriginalName.substringBeforeLast('.', cleanOriginalName)
+        val destinationName = "${safeName(projectId.take(8))}_${safeName(assetId.take(12))}_$baseName" +
+            (extension?.let { ".$it" } ?: "")
+        val mimeType = resolver.getType(sourceUri)
+            ?: when (assetFolder) {
+                "Audio" -> "audio/*"
+                "Image" -> "image/*"
+                else -> "video/*"
+            }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val collection = MediaStore.Files.getContentUri("external")
+            val existingUri = resolver.query(
+                collection,
+                arrayOf(MediaStore.MediaColumns._ID),
+                "${MediaStore.MediaColumns.DISPLAY_NAME}=? AND ${MediaStore.MediaColumns.RELATIVE_PATH}=?",
+                arrayOf(destinationName, relativePath),
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    Uri.withAppendedPath(collection, cursor.getLong(0).toString())
+                } else null
+            }
+
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, destinationName)
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+            val destinationUri = existingUri ?: requireNotNull(resolver.insert(collection, values)) {
+                "Cannot create asset file: $destinationName"
+            }
+            try {
+                if (existingUri != null) resolver.update(destinationUri, values, null, null)
+                val input = resolver.openInputStream(sourceUri)
+                    ?: error("Cannot read selected asset: $originalName")
+                val output = resolver.openOutputStream(destinationUri, "wt")
+                    ?: error("Cannot write copied asset: $destinationName")
+                input.use { source -> output.use { target -> source.copyTo(target) } }
+                val published = ContentValues().apply {
+                    put(MediaStore.MediaColumns.IS_PENDING, 0)
+                }
+                check(resolver.update(destinationUri, published, null, null) > 0) {
+                    "Cannot publish copied asset: $destinationName"
+                }
+                return destinationUri.toString()
+            } catch (error: Exception) {
+                if (existingUri == null) resolver.delete(destinationUri, null, null)
+                throw error
+            }
+        }
+
+        // Older Android versions use the app's Documents directory without broad storage permission.
+        val base = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+            ?: File(context.filesDir, Environment.DIRECTORY_DOCUMENTS)
+        val directory = File(base, "$ROOT/Asset/$assetFolder").apply {
+            if (!exists() && !mkdirs()) error("Cannot create asset folder: $absolutePath")
+        }
+        val destination = File(directory, destinationName)
+        resolver.openInputStream(sourceUri)?.use { input ->
+            destination.outputStream().use { output -> input.copyTo(output) }
+        } ?: error("Cannot read selected asset: $originalName")
+        return Uri.fromFile(destination).toString()
     }
 
     /**
