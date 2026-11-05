@@ -40,6 +40,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.winsmediatama.lyricmakerpro.ads.RewardedAdManager
 import com.winsmediatama.lyricmakerpro.ads.FreeAppOpenAdManager
 import com.winsmediatama.lyricmakerpro.ads.FreeInterstitialAdManager
@@ -156,6 +158,8 @@ class MainActivity : ComponentActivity() {
                 var showSaveProjectDialog by rememberSaveable { mutableStateOf(false) }
                 var showNewProjectDialog by rememberSaveable { mutableStateOf(false) }
                 var saveProjectName by rememberSaveable { mutableStateOf(project.title) }
+                var isSavingProject by remember { mutableStateOf(false) }
+                val saveProjectScope = rememberCoroutineScope()
 
                 val lyricsPicker = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.GetContent()
@@ -247,9 +251,10 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val openProjectLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.OpenDocument()
-                ) { uri: Uri? ->
-                    if (uri != null) {
+                    contract = ActivityResultContracts.StartActivityForResult()
+                ) { result: androidx.activity.result.ActivityResult ->
+                    val uri = result.data?.data
+                    if (result.resultCode == android.app.Activity.RESULT_OK && uri != null) {
                         runCatching {
                             // Some document providers do not grant persistable access.
                             // Permission persistence is best-effort; opening the selected URI
@@ -309,7 +314,20 @@ class MainActivity : ComponentActivity() {
                             onPickVideo = { videoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) },
                             onOpenExport = { viewModel.setShowExportDialog(true) },
                             onPickLyrics = { lyricsPicker.launch("text/*") },
-                            onOpenProject = { openProjectLauncher.launch(arrayOf("application/json", "text/plain")) },
+                            onOpenProject = {
+                                val projectFolderUri = android.provider.DocumentsContract.buildDocumentUri(
+                                    "com.android.externalstorage.documents",
+                                    "primary:Documents/LyricMakerPro/Project"
+                                )
+                                val intent = android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
+                                    addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                                    type = "*/*"
+                                    putExtra(android.content.Intent.EXTRA_MIME_TYPES, arrayOf("application/json", "text/plain"))
+                                    putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, projectFolderUri)
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                openProjectLauncher.launch(intent)
+                            },
                             onSaveProject = {
                                 saveProjectName = project.title
                                 showSaveProjectDialog = true
@@ -502,19 +520,39 @@ class MainActivity : ComponentActivity() {
                             },
                             confirmButton = {
                                 TextButton(
-                                    enabled = saveProjectName.isNotBlank(),
+                                    enabled = saveProjectName.isNotBlank() && !isSavingProject,
                                     onClick = {
                                         val name = saveProjectName.trim()
-                                        runCatching {
-                                            LyricMakerStorage.saveProject(this@MainActivity, project, name)
-                                        }.onSuccess {
-                                            showSaveProjectDialog = false
-                                            Toast.makeText(this@MainActivity, "Project saved as $name", Toast.LENGTH_LONG).show()
-                                        }.onFailure {
-                                            Toast.makeText(this@MainActivity, "Save failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show()
+                                        saveProjectScope.launch {
+                                            isSavingProject = true
+                                            try {
+                                                withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                                    LyricMakerStorage.saveProject(this@MainActivity, project, name)
+                                                }
+                                                showSaveProjectDialog = false
+                                                Toast.makeText(
+                                                    this@MainActivity,
+                                                    "Project saved as $name. Audio, image and video assets copied to Documents/LyricMakerPro/Asset.",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            } catch (error: Exception) {
+                                                Toast.makeText(
+                                                    this@MainActivity,
+                                                    "Save failed: ${error.localizedMessage}",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            } finally {
+                                                isSavingProject = false
+                                            }
                                         }
                                     }
-                                ) { Text("Save", color = NeonCyan) }
+                                ) {
+                                    if (isSavingProject) {
+                                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = NeonCyan)
+                                    } else {
+                                        Text("Save", color = NeonCyan)
+                                    }
+                                }
                             },
                             dismissButton = {
                                 TextButton(onClick = { showSaveProjectDialog = false }) {
