@@ -273,80 +273,96 @@ fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
         val adView = com.google.android.gms.ads.nativead.NativeAdView(context)
         val container = android.widget.LinearLayout(context).apply {
             orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            setBackgroundColor(android.graphics.Color.rgb(28, 34, 48))
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(android.graphics.Color.rgb(28, 34, 48))
+                cornerRadius = dp(12).toFloat()
+            }
             layoutParams = android.view.ViewGroup.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                 android.view.ViewGroup.LayoutParams.WRAP_CONTENT
             )
         }
 
-        // Clear ad attribution is required for programmatically rendered native ads.
+        // Keep the ad attribution visible while using a compact horizontal layout.
         val attribution = android.widget.TextView(context).apply {
             text = "Ad"
-            textSize = 11f
+            textSize = 10f
             setTextColor(android.graphics.Color.rgb(0, 220, 200))
-            setPadding(0, 0, 0, dp(6))
+            setPadding(0, 0, 0, dp(4))
             contentDescription = "Advertisement"
         }
-        val header = android.widget.LinearLayout(context).apply {
+        val row = android.widget.LinearLayout(context).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
         val icon = android.widget.ImageView(context).apply {
             scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-            layoutParams = android.widget.LinearLayout.LayoutParams(dp(40), dp(40)).apply {
-                marginEnd = dp(10)
+            layoutParams = android.widget.LinearLayout.LayoutParams(dp(38), dp(38)).apply {
+                marginEnd = dp(9)
             }
         }
-        val titleAndAdvertiser = android.widget.LinearLayout(context).apply {
+        val details = android.widget.LinearLayout(context).apply {
             orientation = android.widget.LinearLayout.VERTICAL
-            layoutParams = android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                0,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+            )
         }
         val headline = android.widget.TextView(context).apply {
-            textSize = 14f
+            textSize = 13f
             setTextColor(android.graphics.Color.WHITE)
-            maxLines = 2
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
         }
         val advertiser = android.widget.TextView(context).apply {
-            textSize = 11f
+            textSize = 10f
             setTextColor(android.graphics.Color.LTGRAY)
             maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
         }
         val body = android.widget.TextView(context).apply {
-            textSize = 12f
-            setTextColor(android.graphics.Color.LTGRAY)
-            maxLines = 3
-            setPadding(0, dp(6), 0, dp(6))
-        }
-        val mediaView = com.google.android.gms.ads.nativead.MediaView(context).apply {
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(120)
-            ).apply { bottomMargin = dp(6) }
+            textSize = 11f
+            setTextColor(android.graphics.Color.rgb(190, 196, 208))
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding(0, dp(2), 0, 0)
         }
         val cta = android.widget.Button(context).apply {
-            textSize = 12f
+            textSize = 10f
             isAllCaps = false
+            minWidth = dp(64)
+            minimumWidth = dp(64)
+            minHeight = dp(34)
+            minimumHeight = dp(34)
+            setPadding(dp(8), 0, dp(8), 0)
+            setTextColor(android.graphics.Color.WHITE)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(
+                android.graphics.Color.rgb(235, 0, 126)
+            )
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(36)
+            ).apply { marginStart = dp(8) }
         }
 
-        titleAndAdvertiser.addView(headline)
-        titleAndAdvertiser.addView(advertiser)
-        header.addView(icon)
-        header.addView(titleAndAdvertiser)
+        details.addView(headline)
+        details.addView(advertiser)
+        details.addView(body)
+        row.addView(icon)
+        row.addView(details)
+        row.addView(cta)
         container.addView(attribution)
-        container.addView(header)
-        container.addView(body)
-        container.addView(mediaView)
-        container.addView(cta)
+        container.addView(row)
         adView.addView(container)
 
-        // Register every asset view used by this layout with NativeAdView.
+        // Register every asset used by this compact native-ad layout.
         adView.iconView = icon
         adView.headlineView = headline
         adView.advertiserView = advertiser
         adView.bodyView = body
-        adView.mediaView = mediaView
         adView.callToActionView = cta
         adView
     }
@@ -387,16 +403,7 @@ fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
                 text = ad.callToAction.orEmpty()
                 visibility = if (ad.callToAction.isNullOrBlank()) android.view.View.GONE else android.view.View.VISIBLE
             }
-            (nativeView.mediaView as? com.google.android.gms.ads.nativead.MediaView)?.apply {
-                val mediaContent = ad.mediaContent
-                if (mediaContent != null) {
-                    setMediaContent(mediaContent)
-                    visibility = android.view.View.VISIBLE
-                } else {
-                    visibility = android.view.View.GONE
-                }
-            }
-            // Register the populated NativeAd only after all asset views are bound.
+            // Let the SDK manage native-ad clicks and impressions.
             nativeView.setNativeAd(ad)
         }.withAdListener(object : AdListener() {
             override fun onAdFailedToLoad(error: LoadAdError) {
@@ -418,7 +425,7 @@ fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
     }
 
     androidx.compose.ui.viewinterop.AndroidView(
-        modifier = modifier.fillMaxWidth().heightIn(min = 180.dp, max = 280.dp),
+        modifier = modifier.fillMaxWidth().heightIn(min = 88.dp, max = 112.dp),
         factory = { nativeView },
         update = {}
     )
