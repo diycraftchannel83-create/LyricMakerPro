@@ -703,7 +703,7 @@ private fun StudioTopAppBar(
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.lyricmakepro_ico),
-                        contentDescription = "Open application menu",
+                        contentDescription = tr("Open application menu"),
                         modifier = Modifier.fillMaxSize()
                     )
                     var projectSubmenuExpanded by remember { mutableStateOf(false) }

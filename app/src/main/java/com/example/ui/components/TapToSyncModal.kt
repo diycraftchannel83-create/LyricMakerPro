@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.winsmediatama.lyricmakerpro.AppLanguage
 import com.winsmediatama.lyricmakerpro.model.VideoProject
 import com.winsmediatama.lyricmakerpro.ui.theme.*
 
@@ -90,7 +91,7 @@ fun TapToSyncModal(
                             modifier = Modifier.size(24.dp)
                         )
                         Text(
-                            text = "Live Tap-to-Sync",
+                            text = AppLanguage.text("Live Tap-to-Sync"),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary
@@ -103,7 +104,7 @@ fun TapToSyncModal(
                             .size(36.dp)
                             .testTag("close_tap_to_sync_button")
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = TextSecondary)
+                        Icon(Icons.Default.Close, contentDescription = AppLanguage.text("Close"), tint = TextSecondary)
                     }
                 }
 
@@ -120,7 +121,7 @@ fun TapToSyncModal(
                 ) {
                     val syncedLine = project.lyrics.getOrNull(currentLineIndex - 1)
                     Text(
-                        text = syncedLine?.text ?: "Synced lyric will appear here",
+                        text = syncedLine?.text ?: AppLanguage.text("Synced lyric will appear here"),
                         color = if (syncedLine != null) Color(0xFF39E58C) else TextMuted,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
@@ -140,7 +141,7 @@ fun TapToSyncModal(
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        text = "Line ${(currentLineIndex + 1).coerceAtMost(project.lyrics.size)} of ${project.lyrics.size}",
+                        text = if (AppLanguage.current == "Thailand") "บรรทัด ${(currentLineIndex + 1).coerceAtMost(project.lyrics.size)} จาก ${project.lyrics.size}" else "Line ${(currentLineIndex + 1).coerceAtMost(project.lyrics.size)} of ${project.lyrics.size}",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = NeonCyan
@@ -160,14 +161,14 @@ fun TapToSyncModal(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "CURRENT LINE CUE",
+                                text = AppLanguage.text("CURRENT LINE CUE"),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = NeonCyan
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text = currentLine?.text ?: "All lines synchronized!",
+                                text = currentLine?.text ?: AppLanguage.text("All lines synchronized!"),
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,
@@ -179,7 +180,7 @@ fun TapToSyncModal(
                     // Next Upcoming Line Preview
                     if (nextLine != null) {
                         Text(
-                            text = "NEXT LYRIC\n${nextLine.text}",
+                            text = "${AppLanguage.text("NEXT LYRIC")}\n${nextLine.text}",
                             fontSize = 26.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color(0xFFFFD54F),
@@ -198,7 +199,7 @@ fun TapToSyncModal(
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Reset Sync", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text(AppLanguage.text("Reset Sync"), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
 
                 // Playback controls and seek bar directly above the beat button.
@@ -215,7 +216,7 @@ fun TapToSyncModal(
                         IconButton(onClick = onTogglePlayback, modifier = Modifier.size(44.dp)) {
                             Icon(
                                 imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (isPlaying) "Pause audio" else "Play audio",
+                                contentDescription = AppLanguage.text(if (isPlaying) "Pause audio" else "Play audio"),
                                 tint = NeonCyan,
                                 modifier = Modifier.size(30.dp)
                             )
@@ -258,13 +259,13 @@ fun TapToSyncModal(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
                             imageVector = Icons.Default.TouchApp,
-                            contentDescription = "Tap",
+                            contentDescription = AppLanguage.text("Tap"),
                             tint = Color.White,
                             modifier = Modifier.size(44.dp)
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            text = "TAP ON BEAT",
+                            text = AppLanguage.text("TAP ON BEAT"),
                             fontWeight = FontWeight.Black,
                             fontSize = 14.sp,
                             color = Color.White
@@ -283,7 +284,7 @@ fun TapToSyncModal(
                         .testTag("finish_sync_button")
                 ) {
                     Text(
-                        text = "Finish & Apply Timestamps",
+                        text = AppLanguage.text("Finish & Apply Timestamps"),
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         color = Color.Black
