@@ -62,6 +62,7 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || 'upload' }}
         run: |
           if [ -z "$KEYSTORE_BASE64" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_PASSWORD" ]; then
             echo "::error::Set ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, and ANDROID_KEY_PASSWORD in repository Actions secrets."
@@ -69,7 +70,12 @@ jobs:
           fi
           echo "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/upload-key.jks"
           test -s "$GITHUB_WORKSPACE/upload-key.jks"
+          if ! keytool -list -keystore "$GITHUB_WORKSPACE/upload-key.jks" -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
+            echo "::error::Keystore alias '$KEY_ALIAS' was not found or the keystore password is incorrect. Set ANDROID_KEY_ALIAS to the existing alias in your upload keystore (default: upload)."
+            exit 1
+          fi
           echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/upload-key.jks" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
 
       # The project intentionally uses a repository-root debug.keystore for debugConfig.
       # Recreate the standard non-production Android debug key on the ephemeral CI runner.
