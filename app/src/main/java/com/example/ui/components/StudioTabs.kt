@@ -762,6 +762,8 @@ private fun LyricsSyncTab(
     onOpenTapToSync: () -> Unit,
     onOpenImport: () -> Unit
 ) {
+    var pendingDeleteLineId by remember { mutableStateOf<String?>(null) }
+
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -826,7 +828,8 @@ private fun LyricsSyncTab(
                         line = line,
                         isSelected = line.id == focusedLineId,
                         onTextChange = { viewModel.updateLyricText(line.id, it) },
-                        onSelect = { viewModel.selectLyricLine(line.id) }
+                        onSelect = { viewModel.selectLyricLine(line.id) },
+                        onDelete = { pendingDeleteLineId = line.id }
                     )
 
                     // Compact insertion control between adjacent lyric rows.
@@ -866,6 +869,42 @@ private fun LyricsSyncTab(
             }
         }
     }
+
+    val pendingDeleteLine = project.lyrics.firstOrNull { it.id == pendingDeleteLineId }
+    if (pendingDeleteLine != null) {
+        AlertDialog(
+            onDismissRequest = { pendingDeleteLineId = null },
+            title = {
+                Text(
+                    AppLanguage.text("Delete lyric line?"),
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    AppLanguage.text("This lyric line will be removed from the current project."),
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteLyricLine(pendingDeleteLine.id)
+                        pendingDeleteLineId = null
+                    }
+                ) {
+                    Text(AppLanguage.text("Delete"), color = NeonMagenta, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteLineId = null }) {
+                    Text(AppLanguage.text("Cancel"), color = TextSecondary)
+                }
+            },
+            containerColor = StudioSurface
+        )
+    }
 }
 
 @Composable
@@ -873,7 +912,8 @@ private fun LyricLineEditorCard(
     line: LyricLine,
     isSelected: Boolean,
     onTextChange: (String) -> Unit,
-    onSelect: () -> Unit
+    onSelect: () -> Unit,
+    onDelete: () -> Unit
 ) {
     var textValue by remember(line.text) { mutableStateOf(line.text) }
 
@@ -928,6 +968,20 @@ private fun LyricLineEditorCard(
                 singleLine = true,
                 placeholder = { Text(AppLanguage.text("Enter lyric text..."), color = TextMuted, fontSize = 12.sp) }
             )
+
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier
+                    .size(36.dp)
+                    .testTag("delete_lyric_${line.id}")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = AppLanguage.text("Delete lyric line"),
+                    tint = NeonMagenta,
+                    modifier = Modifier.size(19.dp)
+                )
+            }
         }
     }
 }
