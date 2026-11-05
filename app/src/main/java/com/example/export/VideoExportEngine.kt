@@ -1107,8 +1107,8 @@ class VideoExportEngine(private val context: Context) {
         canvas.restore()
 
         // Upcoming lyric preview: compact single-line mode or full two-line karaoke mode.
-        if (activeLineIndex != -1 && activeLineIndex + 1 < lyrics.size) {
-            val nextLine = lyrics[activeLineIndex + 1]
+        if (activeLineIndex != -1 && activeLineIndex + 1 < orderedLyrics.size) {
+            val nextLine = orderedLyrics[activeLineIndex + 1]
             val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 typeface = finalTypeface
                 textSize = if (typography.lyricLayout == LyricLayoutMode.KARAOKE_TWO_LINE) baseFontSize else baseFontSize * 0.65f
