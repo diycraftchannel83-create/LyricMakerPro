@@ -45,6 +45,11 @@ android {
     release {
       isCrunchPngs = false
       isMinifyEnabled = true
+      // Package full native debug symbols in the release AAB and generate
+      // app/build/outputs/native-debug-symbols/release/native-debug-symbols.zip.
+      ndk {
+        debugSymbolLevel = "FULL"
+      }
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
       // AI Studio.
