@@ -421,7 +421,6 @@ fun FreeNativeAd(isPremium: Boolean, modifier: androidx.compose.ui.Modifier = an
             retryHandler.removeCallbacksAndMessages(null)
             loadedNativeAd?.destroy()
             loadedNativeAd = null
-            nativeView.setNativeAd(null)
         }
     }
 
